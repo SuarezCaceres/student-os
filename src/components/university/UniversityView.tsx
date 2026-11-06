@@ -3,10 +3,17 @@ import {
   CheckCircle2, 
   Clock, 
   Plus, 
-  Trash2
+  Trash2,
+  Calculator,
+  FileEdit,
+  ExternalLink,
+  FileCheck,
+  Award
 } from 'lucide-react';
 import type { UniversityAssignment, AssignmentStatus, AssignmentType } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { GradesCalculatorModal } from './GradesCalculatorModal';
+import { AssignmentDetailModal } from './AssignmentDetailModal';
 
 interface UniversityViewProps {
   assignments: UniversityAssignment[];
@@ -14,6 +21,7 @@ interface UniversityViewProps {
   onUpdateStatus: (id: string, status: AssignmentStatus) => void;
   onDeleteAssignment: (id: string) => void;
   onAddAssignment: (assignment: UniversityAssignment) => void;
+  onUpdateAssignment?: (assignment: UniversityAssignment) => void;
 }
 
 export const UniversityView: React.FC<UniversityViewProps> = ({
@@ -22,11 +30,33 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
   onUpdateStatus,
   onDeleteAssignment,
   onAddAssignment,
+  onUpdateAssignment,
 }) => {
   const [filterCourse, setFilterCourse] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
   const [weekFilter, setWeekFilter] = useState<'all' | 'current' | 'upcoming'>('all');
   const [quickTitleByWeek, setQuickTitleByWeek] = useState<{ [week: number]: string }>({});
+
+  // Modals state
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  const [detailAssignment, setDetailAssignment] = useState<UniversityAssignment | null>(null);
+
+  // Safe update handler
+  const handleSaveAssignment = (updated: UniversityAssignment) => {
+    if (onUpdateAssignment) {
+      onUpdateAssignment(updated);
+    } else {
+      // Graceful fallback without touching App.tsx
+      onDeleteAssignment(updated.id);
+      onAddAssignment(updated);
+    }
+  };
+
+  const handleSaveGradesBatch = (updatedList: UniversityAssignment[]) => {
+    updatedList.forEach((updated) => {
+      handleSaveAssignment(updated);
+    });
+  };
 
   // Unique courses for filter
   const courses = Array.from(new Set(assignments.map((a) => a.course)));
@@ -94,6 +124,21 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     }
   };
 
+  const getGradePill = (grade: number | undefined) => {
+    if (grade === undefined) return null;
+    let color = 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30';
+    if (grade >= 17) color = 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
+    else if (grade >= 14) color = 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30';
+    else if (grade >= 11) color = 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+
+    return (
+      <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-md ${color}`}>
+        <Award className="w-3 h-3" />
+        {grade} / 20
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -112,8 +157,17 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
           </p>
         </div>
 
-        {/* Filters */}
+        {/* Action Controls & Filters */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* GPA Calculator Button */}
+          <button
+            onClick={() => setIsCalculatorOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm shadow-indigo-600/30 transition-all cursor-pointer min-h-[38px]"
+          >
+            <Calculator className="w-4 h-4" />
+            <span>Calculadora GPA</span>
+          </button>
+
           {/* Week Filter Buttons */}
           <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
             <button
@@ -275,23 +329,26 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                   {weekAssignments.map((assignment) => {
                     const daysDiff = getDaysDiff(assignment.dueDate);
                     const isDone = assignment.status === 'entregado';
+                    const rubricDone = assignment.rubricCriteria ? assignment.rubricCriteria.filter((c) => c.done).length : 0;
+                    const rubricTotal = assignment.rubricCriteria ? assignment.rubricCriteria.length : 0;
 
                     return (
                       <div
                         key={assignment.id}
                         className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
                           isDone
-                            ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/20 opacity-80'
+                            ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/20 opacity-85'
                             : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md'
                         }`}
                       >
                         <div>
-                          {/* Course Pill & Type */}
+                          {/* Course Pill, Type & Grade */}
                           <div className="flex items-center justify-between gap-1.5 mb-2">
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
                               {assignment.course}
                             </span>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                              {getGradePill(assignment.gradeObtained)}
                               {getTypeBadge(assignment.type)}
                               {assignment.weightPercentage && (
                                 <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
@@ -308,6 +365,29 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                             {assignment.title}
                           </h4>
 
+                          {/* Rubric and Links Mini Pills */}
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            {rubricTotal > 0 && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                                <FileCheck className="w-3 h-3 text-emerald-500" />
+                                {rubricDone}/{rubricTotal} criterios
+                              </span>
+                            )}
+                            {assignment.submissionUrl && (
+                              <a
+                                href={assignment.submissionUrl.startsWith('http') ? assignment.submissionUrl : `https://${assignment.submissionUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:underline"
+                                title="Abrir link de entrega"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Link de entrega
+                              </a>
+                            )}
+                          </div>
+
                           {/* Notes if any */}
                           {assignment.notes && (
                             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">
@@ -316,7 +396,7 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                           )}
                         </div>
 
-                        {/* Footer: Due date countdown & Action */}
+                        {/* Footer: Due date countdown & Actions */}
                         <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between mt-2">
                           {/* Due Date Indicator */}
                           <div className="flex items-center gap-1.5 text-xs">
@@ -340,8 +420,18 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                             )}
                           </div>
 
-                          {/* Delivery Toggle & Delete */}
+                          {/* Action Buttons: Detail, Delivery & Delete */}
                           <div className="flex items-center gap-1.5">
+                            {/* Detail / Rubric button */}
+                            <button
+                              onClick={() => setDetailAssignment(assignment)}
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
+                              title="Ver detalle y rúbrica"
+                            >
+                              <FileEdit className="w-4 h-4" />
+                            </button>
+
+                            {/* Delivery status button */}
                             <button
                               onClick={() => {
                                 const newStatus: AssignmentStatus = isDone ? 'pendiente' : 'entregado';
@@ -359,6 +449,7 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                               <span>{isDone ? 'Entregada' : 'Entregar'}</span>
                             </button>
 
+                            {/* Delete button */}
                             <button
                               onClick={() => onDeleteAssignment(assignment.id)}
                               className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
@@ -377,6 +468,22 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
           );
         })}
       </div>
+
+      {/* GPA Calculator Modal */}
+      <GradesCalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        assignments={assignments}
+        onSaveGrades={handleSaveGradesBatch}
+      />
+
+      {/* Assignment Detail & Rubric Modal */}
+      <AssignmentDetailModal
+        isOpen={detailAssignment !== null}
+        onClose={() => setDetailAssignment(null)}
+        assignment={detailAssignment}
+        onSaveAssignment={handleSaveAssignment}
+      />
     </div>
   );
 };
