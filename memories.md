@@ -9,6 +9,29 @@
 
 ---
 
+## 📜 Regla General Obligatoria: Estándares de Commits, Pull Requests y Lectura Previa
+
+> [!CRITICAL]
+> **OBLIGACIÓN INELUDIBLE PARA TODOS LOS AGENTES Y DESARROLLADORES:**
+> Antes de crear cualquier commit o abrir un Pull Request en este repositorio, **ES OBLIGATORIO** leer y cumplir estrictamente la estructura definida en la skill `github-workflow-standards`.
+>
+> 1. **Lectura Previa Obligatoria:** Consultar `memories.md` para entender el contexto arquitectónico y los límites de archivos antes de tocar código.
+> 2. **Formato de Commits (Conventional Commits):**
+>    - Obligatorio: `<tipo>(<ámbito>): <descripción en imperativo y presente>`
+>    - Tipos admitidos: `feat`, `refactor`, `fix`, `ui`, `docs`, `merge`, `ci`, `chore`.
+>    - Ejemplo: `feat(learning): implement Aprendizaje tab with Active Recall`
+> 3. **Formato de Pull Requests (5 Secciones Obligatorias):**
+>    - Todo PR debe responder obligatoriamente a las 5 preguntas reflexivas:
+>      - `## 📌 ¿Qué es este proyecto / cambio?`
+>      - `## 💡 ¿Por qué se creó? (El Por Qué)`
+>      - `## 🎯 ¿Para qué sirve? (El Para Qué)`
+>      - `## 🛠️ ¿Cómo está construido? (El Cómo)`
+>      - `## 🧪 Pruebas & Validación (Checklist)`
+>
+> **ESTA ES UNA REGLA GENERAL QUE SÍ O SÍ SE DEBE CUMPLIR.** No se admitirán PRs vacíos, títulos genéricos ni commits sin el prefijo semántico correspondiente.
+
+---
+
 ## 🎯 1. Visión y Propósito del Proyecto
 
 **StudentOS PRO MAX** es un centro de control integral (Life, Gym & College Hub) desarrollado a medida para un estudiante universitario de **Ingeniería de Software / Sistemas** y apasionado del entrenamiento físico (Mateo).

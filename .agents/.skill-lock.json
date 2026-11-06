@@ -38,6 +38,22 @@
       "pluginName": "example-skills",
       "installedAt": "2026-11-06T05:52:49.484Z",
       "updatedAt": "2026-11-06T05:52:49.484Z"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/currents-dev/playwright-best-practices-skill.git",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "skillFolderHash": "b4620eb2cfc6b58173cda800b7c7578190dfd632",
+      "installedAt": "2026-11-06T07:25:34.602Z",
+      "updatedAt": "2026-11-06T07:25:34.602Z"
+    },
+    "github-workflow-standards": {
+      "source": "local/github-workflow-standards",
+      "sourceType": "local",
+      "skillPath": "github-workflow-standards/SKILL.md",
+      "installedAt": "2026-11-06T08:22:00.000Z",
+      "updatedAt": "2026-11-06T08:22:00.000Z"
     }
   },
   "dismissed": {}
