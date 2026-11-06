@@ -28,6 +28,16 @@
       "pluginName": "mattpocock-skills",
       "installedAt": "2026-11-06T05:19:20.616Z",
       "updatedAt": "2026-11-06T05:19:20.616Z"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "skillFolderHash": "d79e2a5bb4df4a386c2adcdd9ab8709bba28c3f6",
+      "pluginName": "example-skills",
+      "installedAt": "2026-11-06T05:52:49.484Z",
+      "updatedAt": "2026-11-06T05:52:49.484Z"
     }
   },
   "dismissed": {}
