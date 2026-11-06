@@ -26,11 +26,9 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
   onClose,
   onUpdateExercise,
 }) => {
-  if (!isOpen || !exercise) return null;
-
   // Initial values for 1RM calculator
-  const initialWeight = exercise.weightKg || 60;
-  const initialReps = parseInt(exercise.reps.match(/\d+/)?.[0] || '8', 10);
+  const initialWeight = exercise?.weightKg || 60;
+  const initialReps = parseInt(exercise?.reps.match(/\d+/)?.[0] || '8', 10);
 
   const [calcWeight, setCalcWeight] = useState<number>(initialWeight);
   const [calcReps, setCalcReps] = useState<number>(initialReps);
@@ -41,9 +39,11 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
   const [showAddHistory, setShowAddHistory] = useState(false);
 
   // PR state
-  const currentPR = exercise.personalRecordKg || (exercise.weightKg ? Math.round(exercise.weightKg * 1.1) : 80);
+  const currentPR = exercise?.personalRecordKg || (exercise?.weightKg ? Math.round(exercise.weightKg * 1.1) : 80);
   const [editingPR, setEditingPR] = useState(false);
   const [prInput, setPrInput] = useState<number>(currentPR);
+
+  if (!isOpen || !exercise) return null;
 
   // Epley formula: 1RM = Weight * (1 + Reps / 30)
   const calculate1RM = (weight: number, reps: number) => {

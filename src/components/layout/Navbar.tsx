@@ -9,10 +9,10 @@ import {
   Moon, 
   Sun, 
   RotateCcw,
-  Sparkles
+  BookOpen
 } from 'lucide-react';
 
-export type NavTab = 'overview' | 'kanban' | 'university' | 'gym' | 'calendar';
+export type NavTab = 'overview' | 'kanban' | 'university' | 'gym' | 'calendar' | 'learning';
 
 interface NavbarProps {
   activeTab: NavTab;
@@ -37,6 +37,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'university' as NavTab, label: 'Universidad', icon: GraduationCap },
     { id: 'gym' as NavTab, label: 'Gym Tracker', icon: Dumbbell },
     { id: 'calendar' as NavTab, label: 'Calendario', icon: CalendarDays },
+    { id: 'learning' as NavTab, label: 'Aprendizaje', icon: BookOpen },
   ];
 
   return (

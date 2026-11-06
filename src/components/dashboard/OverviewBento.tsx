@@ -8,8 +8,13 @@ import {
   Clock, 
   ArrowRight, 
   Plus,
-  Database
+  Database,
+  BookOpen,
+  Sparkles,
+  Palmtree,
+  ExternalLink
 } from 'lucide-react';
+import { YoutubeIcon } from '../common/YoutubeIcon';
 import type { AppState, DayOfWeek, AssignmentStatus, KanbanStatus } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import type { NavTab } from '../layout/Navbar';
@@ -57,6 +62,13 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   const todayBlocks = state.calendarBlocks
     .filter((b) => b.day === todayDay)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  // Current week learning & free week status
+  const currentWeek = state.currentAcademicWeek;
+  const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === currentWeek);
+  const currentWeekPending = currentWeekAssignments.filter((a) => a.status !== 'entregado');
+  const isFreeWeek = currentWeekAssignments.length > 0 && currentWeekPending.length === 0;
+  const currentReflection = state.weeklyReflections?.[currentWeek];
 
   return (
     <div className="space-y-6">
@@ -384,6 +396,169 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bento Card 6 (Col Span 3): Bitácora de Aprendizaje & Active Recall Semanal */}
+        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm col-span-1 md:col-span-2 lg:col-span-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
+                    Bitácora de Aprendizaje & Active Recall
+                  </h3>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    Semana {currentWeek}
+                  </span>
+                  {isFreeWeek && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <Palmtree className="w-3 h-3" />
+                      Semana Libre
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  ¿Qué has aprendido hoy en la semana realmente? ¿De qué te acuerdas?
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => onNavigateTab('learning')}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-bold text-xs transition-all cursor-pointer min-h-[44px] self-start lg:self-auto"
+            >
+              <span>Abrir Módulo de Aprendizaje</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Left 2 Cols: Active Recall Reflection or prompt */}
+            <div className="lg:col-span-2 space-y-3">
+              {currentReflection?.learnings ? (
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      Síntesis Feynman registrada
+                    </span>
+                    {currentReflection.mood && (
+                      <span className="text-[11px] font-bold capitalize px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        Estado: {currentReflection.mood}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed line-clamp-3">
+                    "{currentReflection.learnings}"
+                  </p>
+                  {currentReflection.keyConcepts && currentReflection.keyConcepts.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60">
+                      {currentReflection.keyConcepts.map((c, i) => (
+                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium">
+                          #{c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500/5 to-violet-500/5 border border-dashed border-indigo-300 dark:border-indigo-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      Aún no has registrado tu Active Recall de la semana {currentWeek}
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Explica con tus propias palabras lo que aprendiste para consolidar la memoria a largo plazo.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('learning')}
+                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm transition-all min-h-[40px]"
+                  >
+                    Escribir Reflexión
+                  </button>
+                </div>
+              )}
+
+              {/* Free week indicator if active */}
+              {isFreeWeek && (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
+                    <Palmtree className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    <span>
+                      <strong>¡Semana Libre activa!</strong> No tienes tareas universitarias pendientes para la semana {currentWeek}.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('gym')}
+                    className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 underline shrink-0 cursor-pointer"
+                  >
+                    Entrenar Gym
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right 1 Col: YouTube & Study Sources preview */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <YoutubeIcon className="w-4 h-4 text-red-500" />
+                    Fuentes & YouTube
+                  </span>
+                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                    {currentReflection?.resources?.length || 0}
+                  </span>
+                </div>
+
+                {currentReflection?.resources && currentReflection.resources.length > 0 ? (
+                  <div className="space-y-2">
+                    {currentReflection.resources.slice(0, 2).map((res) => (
+                      <a
+                        key={res.id}
+                        href={res.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group block p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-red-400 transition-all text-xs"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 dark:text-white truncate group-hover:text-red-500 transition-colors">
+                            {res.title}
+                          </span>
+                          <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-red-500 shrink-0 ml-1.5" />
+                        </div>
+                        {res.notes && (
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                            {res.notes}
+                          </p>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic py-4 text-center">
+                    No has guardado links de YouTube o apuntes de texto esta semana aún.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => onNavigateTab('learning')}
+                className="mt-3 w-full py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer min-h-[38px] transition-all"
+              >
+                <Plus className="w-3.5 h-3.5 text-indigo-500" />
+                <span>+ Agregar Enlace o Apunte</span>
+              </button>
             </div>
           </div>
         </div>

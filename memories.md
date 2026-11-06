@@ -3,9 +3,9 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v1.2.0 (Post-Integración Modular Agentes 1 & 2 + Frontend Design Elevado)`  
+> **Versión actual:** `v1.3.0 (Módulo de Aprendizaje & Active Recall Semanal + Detección de Semana Libre)`  
 > **Rama principal:** `feat/student-os-core-hub`  
-> **Última actualización:** Noviembre 2026 (Commit: `723c2a7`)
+> **Última actualización:** Noviembre 2026 (Feature Aprendizaje)
 
 ---
 
@@ -60,10 +60,12 @@ student-os/
 │   │   ├── calendar/
 │   │   │   ├── CalendarTimelineGrid.tsx # Vista Grilla Horaria (07:00 a 22:00) con colisiones
 │   │   │   └── WeeklyCalendar.tsx       # Horario semanal Lunes a Domingo (conmutador Lista/Grilla y export .ics)
+│   │   ├── common/
+│   │   │   └── YoutubeIcon.tsx          # Icono SVG de YouTube nítido para branding de fuentes
 │   │   ├── dashboard/
 │   │   │   ├── BackupModal.tsx          # Modal de Backup y Restauración de datos en formato .json
 │   │   │   ├── DailyHabitsCard.tsx      # Widget de hábitos (Agua +250ml, Sueño 7-8h, Pomodoros)
-│   │   │   └── OverviewBento.tsx        # Tablero Bento con vista unificada de prioridades de hoy
+│   │   │   └── OverviewBento.tsx        # Tablero Bento con vista unificada de prioridades de hoy y widget de Aprendizaje
 │   │   ├── gym/
 │   │   │   ├── ExerciseProgressModal.tsx # Historial de cargas, récord personal (PR) y calculadora 1RM (Epley)
 │   │   │   ├── GymTracker.tsx           # Tracker de rutinas, series interactivas y pesos
@@ -72,8 +74,11 @@ student-os/
 │   │   │   ├── KanbanBoard.tsx          # Tablero Kanban con buscador en tiempo real y filtros
 │   │   │   └── KanbanCard.tsx           # Tarjeta con Drag & Drop nativo HTML5 y subtareas/checklist
 │   │   ├── layout/
-│   │   │   ├── Navbar.tsx               # Barra superior fija con el nuevo logo, tabs y dark mode
+│   │   │   ├── Navbar.tsx               # Barra superior fija con el nuevo logo, pestaña Aprendizaje y dark mode
 │   │   │   └── StatsHero.tsx            # Hero con saludo dinámico según la hora, racha 🔥 y watermark
+│   │   ├── learning/
+│   │   │   ├── FreeWeekCelebrationCard.tsx # Tarjeta de celebración y sugerencias para semanas libres (0 tareas)
+│   │   │   └── LearningView.tsx         # Hub de Aprendizaje, Active Recall Feynman, fuentes de YouTube y gym check-in
 │   │   ├── quick-add/
 │   │   │   └── QuickAddModal.tsx        # Modal global de captura rápida multidisciplinaria
 │   │   └── university/
@@ -157,6 +162,20 @@ student-os/
 - **Bento Dashboard:** Resumen de lo que Mateo debe hacer hoy en todas sus áreas de vida.
 - **Widget de Hábitos Diarios:** Registro de agua (+250ml hacia meta de 2.5L), horas de sueño (meta 7-8h) y pomodoros completados.
 - **Backup & Restore JSON:** Exportación e importación instantánea del estado completo del sistema para sincronizar entre dispositivos.
+- **Bento Card de Aprendizaje & Active Recall:** Tarjeta destacada de 3 columnas que muestra la síntesis Feynman de la semana en curso, estado de Semana Libre y accesos rápidos a fuentes de YouTube.
+
+### 6. Aprendizaje & Active Recall Semanal (`src/components/learning/`)
+- **Técnica Feynman / Active Recall:** Pregunta central para el estudiante: *¿Qué has aprendido hoy en la semana realmente? ¿De qué te acuerdas?*, facilitando la consolidación de conceptos mediante explicación en palabras propias.
+- **Píldoras de Conceptos Clave:** Sistema de etiquetas interactivas (`#Concepto`) para indexar conocimientos clave semana a semana.
+- **Gestor de Fuentes de Estudio & YouTube:**
+  - Detección automática de enlaces a YouTube (asigna badge rojo característico y botón de apertura externa).
+  - Admite documentación oficial, artículos, libros técnicos y apuntes en texto libre.
+  - Guarda minutos o marcas de tiempo y notas asociadas por cada video.
+- **Detección Automática de "Semana Libre":**
+  - Si en la semana académica seleccionada hay 0 entregas pendientes (`status !== 'entregado'`), se activa automáticamente el banner **¡Semana Despejada! 🌴✨**.
+  - Ofrece atajos directos para aprovechar el tiempo libre: entrenar en el Gym o avanzar proyectos personales en el Kanban.
+- **Bitácora de Balance Físico & Gym:** Espacio para reflexionar sobre los avances de entrenamiento, cargas y sensaciones corporales semanales.
+- **Selector de Estado / Mood Semanal:** Clasificación del rendimiento general (*Increíble*, *Productivo*, *Cansado*, *Despejado*).
 
 ---
 

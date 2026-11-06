@@ -96,6 +96,28 @@ export interface DailyHabits {
   targetPomodoros: number;
 }
 
+export type ResourceType = 'youtube' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  url?: string;
+  type: ResourceType;
+  notes?: string;
+}
+
+export type ReflectionMood = 'increible' | 'productivo' | 'cansado' | 'despejado';
+
+export interface WeeklyReflection {
+  week: number;
+  learnings: string;
+  keyConcepts: string[];
+  resources: LearningResource[];
+  gymReflection?: string;
+  mood?: ReflectionMood;
+  updatedAt: string;
+}
+
 export interface AppState {
   studentName: string;
   career: string;
@@ -103,6 +125,7 @@ export interface AppState {
   streak: number;
   theme: 'dark' | 'light';
   dailyHabits?: DailyHabits;
+  weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];
   calendarBlocks: CalendarBlock[];

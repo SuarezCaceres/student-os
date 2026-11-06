@@ -137,7 +137,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           >
             {/* Background Hour Lines */}
             <div className="absolute inset-0 pointer-events-none z-0">
-              {hoursArray.map((hour, idx) => (
+              {hoursArray.map((hour) => (
                 <div
                   key={hour}
                   className="border-b border-slate-100 dark:border-slate-800/80 w-full"

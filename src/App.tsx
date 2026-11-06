@@ -9,7 +9,8 @@ import type {
   CalendarBlock, 
   DayOfWeek, 
   AssignmentStatus, 
-  KanbanStatus 
+  KanbanStatus,
+  WeeklyReflection
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -19,6 +20,7 @@ import { KanbanBoard } from './components/kanban/KanbanBoard';
 import { UniversityView } from './components/university/UniversityView';
 import { GymTracker } from './components/gym/GymTracker';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
+import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
 
 export const App: React.FC = () => {
@@ -185,6 +187,17 @@ export const App: React.FC = () => {
     }));
   };
 
+  // Learning / Reflection Handlers
+  const handleSaveReflection = (reflection: WeeklyReflection) => {
+    setState((prev) => ({
+      ...prev,
+      weeklyReflections: {
+        ...(prev.weeklyReflections || {}),
+        [reflection.week]: reflection,
+      },
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#080c14] text-slate-900 dark:text-slate-100 transition-colors">
       {/* Top Navbar */}
@@ -251,6 +264,17 @@ export const App: React.FC = () => {
             blocks={state.calendarBlocks}
             onAddBlock={handleAddCalendarBlock}
             onDeleteBlock={handleDeleteCalendarBlock}
+          />
+        )}
+
+        {activeTab === 'learning' && (
+          <LearningView
+            currentAcademicWeek={state.currentAcademicWeek}
+            assignments={state.universityAssignments}
+            gymRoutines={state.gymRoutines}
+            weeklyReflections={state.weeklyReflections}
+            onSaveReflection={handleSaveReflection}
+            onNavigateTab={setActiveTab}
           />
         )}
       </main>
