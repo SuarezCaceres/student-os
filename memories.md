@@ -3,9 +3,9 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v1.3.0 (Módulo de Aprendizaje & Active Recall Semanal + Detección de Semana Libre)`  
+> **Versión actual:** `v1.3.1 (Módulo de Aprendizaje + Rediseño Avanzado de Navbar & QuickAdd)`  
 > **Rama principal:** `feat/student-os-core-hub`  
-> **Última actualización:** Noviembre 2026 (Feature Aprendizaje)
+> **Última actualización:** Noviembre 2026 (Commit: `037e9fb`)
 
 ---
 
@@ -177,13 +177,24 @@ student-os/
 - **Bitácora de Balance Físico & Gym:** Espacio para reflexionar sobre los avances de entrenamiento, cargas y sensaciones corporales semanales.
 - **Selector de Estado / Mood Semanal:** Clasificación del rendimiento general (*Increíble*, *Productivo*, *Cansado*, *Despejado*).
 
+### 7. Sistema de Navegación & Captura Rápida (`src/components/layout/Navbar.tsx` & `src/components/quick-add/`)
+- **Navbar Obsidian Glassmorphism:**
+  - Contenedor con `backdrop-blur-2xl bg-white/85 dark:bg-[#080c14]/90` y borde sutil `dark:border-white/[0.08]`.
+  - Pestañas con prevención estricta de saltos de línea (`whitespace-nowrap`) y nombres punchy (`Overview`, `Kanban`, `Universidad`, `Gym`, `Calendario`, `Aprendizaje`).
+  - **Insignias dinámicas:** La pestaña `Aprendizaje` exhibe en vivo badges como `🌴 Libre` o `Recall` (si falta registrar la síntesis semanal).
+  - **Píldora interactiva de contexto académico:** Chip `[ ⚡ Semana 5 • 🌴 Libre ]` que al pulsarse transporta al usuario directamente a su bitácora de aprendizaje.
+- **Captura Rápida Multidisciplinaria (5 Pestañas):**
+  - Modal accesible globalmente con selector: Universidad, Gym, Kanban, Agenda y **Aprender** (guardado directo de enlaces de YouTube o notas a la semana deseada con confeti).
+
 ---
 
 ## 🌿 6. Registro de Git y Ramas
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/student-os-core-hub`** | **ACTIVA / UNIFICADA** | `723c2a7` (HEAD) | Rama principal con todas las fases y el rediseño integrados |
+| **`feat/student-os-core-hub`** | **ACTIVA / UNIFICADA** | `037e9fb` (HEAD) | Rediseño de Navbar sin wrapping, badges en vivo y Aprendizaje en QuickAdd |
+| `feat/student-os-core-hub` | Previa | `96b029e` | Módulo completo de Aprendizaje, Active Recall Feynman y YouTube |
+| `feat/student-os-core-hub` | Previa | `723c2a7` | Elevación visual obsidian, logo badge holográfico y dark mode |
 | `feat/agent-1-university-kanban` | Fusionada | `b81580a` | Trabajo del Agente 1 (Universidad + Kanban) |
 | `feat/agent-2-gym-calendar-dashboard` | Fusionada | `f93f1a7` | Trabajo del Agente 2 (Gym + Calendario + Dashboard) |
 | `main` | Base | `06e040f` | Versión inicial del repositorio |
@@ -191,6 +202,7 @@ student-os/
 ---
 
 ## 🚀 7. Verificación del Sistema
-- **Compilación de Producción:** `npm run build` ejecutado con éxito sin errores en 362ms.
-- **Servidor de Desarrollo Local:** Vite ejecutándose en segundo plano en `http://localhost:5173/`.
+- **Compilación de Producción:** `npm run build` ejecutado con éxito sin errores en 496ms.
+- **Linter Estático:** `oxlint` validado con 0 errores.
+- **Servidor de Desarrollo Local:** Vite ejecutándose en segundo plano en `http://localhost:5173/` con HMR reactivo.
 - **GitHub Remoto:** Repositorio sincronizado al 100% con `git push origin feat/student-os-core-hub`.
