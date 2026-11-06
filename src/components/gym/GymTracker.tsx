@@ -4,10 +4,15 @@ import {
   Check, 
   Plus, 
   Trash2, 
-  Trophy
+  Trophy,
+  Timer,
+  TrendingUp,
+  Sparkles
 } from 'lucide-react';
 import type { GymRoutine, GymExercise, DayOfWeek } from '../../types';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
+import { RestTimerFloating } from './RestTimerFloating';
+import { ExerciseProgressModal } from './ExerciseProgressModal';
 
 interface GymTrackerProps {
   routines: GymRoutine[];
@@ -31,6 +36,15 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const todayDay = daysMap[new Date().getDay()];
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(todayDay);
 
+  // Rest Timer state
+  const [isTimerOpen, setIsTimerOpen] = useState(false);
+  const [autoTimerEnabled, setAutoTimerEnabled] = useState(true);
+  const [timerKey, setTimerKey] = useState(0);
+
+  // Exercise Progress Modal state
+  const [selectedExerciseForModal, setSelectedExerciseForModal] = useState<GymExercise | null>(null);
+  const [exerciseOverrides, setExerciseOverrides] = useState<Record<string, Partial<GymExercise>>>({});
+
   // Quick add form state for this day
   const [newExName, setNewExName] = useState('');
   const [newExSets, setNewExSets] = useState(4);
@@ -38,12 +52,21 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const [newExWeight, setNewExWeight] = useState<number | ''>(20);
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const currentRoutine = routines.find((r) => r.dayOfWeek === selectedDay) || {
+  const rawRoutine = routines.find((r) => r.dayOfWeek === selectedDay) || {
     id: `gym-${selectedDay}`,
     name: `Rutina de ${selectedDay}`,
     dayOfWeek: selectedDay,
     tag: 'Entrenamiento',
     exercises: [],
+  };
+
+  // Merge any local overrides (e.g. updated PR or history)
+  const currentRoutine = {
+    ...rawRoutine,
+    exercises: rawRoutine.exercises.map((ex) => ({
+      ...ex,
+      ...(exerciseOverrides[ex.id] || {}),
+    })),
   };
 
   // Calculate day progress
@@ -56,6 +79,44 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
   const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
+  const handleToggleSetWithTimer = (routineId: string, exerciseId: string, setIndex: number, currentlyDone: boolean) => {
+    onToggleSet(routineId, exerciseId, setIndex);
+    
+    // If we just marked a set as completed (was false, turning true)
+    if (!currentlyDone) {
+      triggerConfetti();
+      if (autoTimerEnabled) {
+        setIsTimerOpen(true);
+        setTimerKey((k) => k + 1);
+      }
+    }
+  };
+
+  const handleUpdateExerciseFromModal = (updated: GymExercise) => {
+    setExerciseOverrides((prev) => ({
+      ...prev,
+      [updated.id]: updated,
+    }));
+    setSelectedExerciseForModal(updated);
+
+    // Also persist into student_os_state_v1 in localStorage if possible
+    try {
+      const raw = localStorage.getItem('student_os_state_v1');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.gymRoutines) {
+          parsed.gymRoutines = parsed.gymRoutines.map((r: GymRoutine) => ({
+            ...r,
+            exercises: r.exercises.map((e: GymExercise) => (e.id === updated.id ? { ...e, ...updated } : e)),
+          }));
+          localStorage.setItem('student_os_state_v1', JSON.stringify(parsed));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
   const handleQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newExName.trim()) return;
@@ -67,6 +128,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
       reps: newExReps.trim() || '10 reps',
       weightKg: newExWeight ? Number(newExWeight) : undefined,
       completedSets: Array(Number(newExSets) || 3).fill(false),
+      personalRecordKg: newExWeight ? Number(newExWeight) : undefined,
     };
 
     onAddExercise(selectedDay, exercise);
@@ -84,23 +146,55 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
             Gym & Fitness Tracker
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Control de rutinas, registro de series, pesos y constancia de entrenamiento
+            Control de rutinas, registro de series, pesos, cronómetro de descanso y récords personales
           </p>
         </div>
 
-        {/* Finish Workout CTA */}
-        {totalSets > 0 && (
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Rest Timer Button */}
           <button
-            onClick={() => {
-              triggerBigCelebration();
-              onFinishWorkout();
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all cursor-pointer min-h-[44px]"
+            onClick={() => setIsTimerOpen(!isTimerOpen)}
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border font-bold text-xs transition-all cursor-pointer min-h-[44px] ${
+              isTimerOpen
+                ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/25'
+                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-orange-400'
+            }`}
+            title="Abrir cronómetro de descanso"
           >
-            <Trophy className="w-4 h-4" />
-            <span>Finalizar Rutina del Día</span>
+            <Timer className="w-4 h-4 text-orange-400" />
+            <span>Rest Timer</span>
           </button>
-        )}
+
+          {/* Auto Timer Toggle Checkbox */}
+          <button
+            type="button"
+            onClick={() => setAutoTimerEnabled(!autoTimerEnabled)}
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold border transition-colors cursor-pointer ${
+              autoTimerEnabled
+                ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30'
+                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'
+            }`}
+            title="Activar o desactivar inicio automático del timer al marcar serie"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Auto-timer: {autoTimerEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
+          {/* Finish Workout CTA */}
+          {totalSets > 0 && (
+            <button
+              onClick={() => {
+                triggerBigCelebration();
+                onFinishWorkout();
+              }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all cursor-pointer min-h-[44px]"
+            >
+              <Trophy className="w-4 h-4" />
+              <span>Finalizar Rutina del Día</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Days Selector Pills (Lunes a Domingo) */}
@@ -176,6 +270,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           ) : (
             currentRoutine.exercises.map((exercise) => {
               const allSetsCompleted = exercise.completedSets.every(Boolean);
+              const prValue = exercise.personalRecordKg || (exercise.weightKg ? Math.round(exercise.weightKg * 1.1) : undefined);
 
               return (
                 <div
@@ -186,9 +281,9 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                       : 'bg-slate-50/70 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800'
                   }`}
                 >
-                  {/* Left: Name, Reps & Weight */}
+                  {/* Left: Name, Reps, Weight & PR Badge */}
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
                         {exercise.name}
                       </h4>
@@ -197,9 +292,19 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                           <Check className="w-3 h-3 stroke-[3]" /> Completado
                         </span>
                       )}
+                      {prValue && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExerciseForModal(exercise)}
+                          className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="Ver progreso y cálculo de 1RM"
+                        >
+                          <Trophy className="w-3 h-3" /> PR: {prValue} kg
+                        </button>
+                      )}
                     </div>
 
-                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
                       <span className="font-semibold text-slate-700 dark:text-slate-300">
                         {exercise.sets} series × {exercise.reps}
                       </span>
@@ -220,7 +325,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                     </div>
                   </div>
 
-                  {/* Right: Interactive Series Bubbles & Delete */}
+                  {/* Right: Interactive Series Bubbles, Progress/1RM Modal button & Delete */}
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {Array.from({ length: exercise.sets }).map((_, setIdx) => {
@@ -229,10 +334,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                         return (
                           <button
                             key={setIdx}
-                            onClick={() => {
-                              if (!isDone) triggerConfetti();
-                              onToggleSet(currentRoutine.id, exercise.id, setIdx);
-                            }}
+                            onClick={() => handleToggleSetWithTimer(currentRoutine.id, exercise.id, setIdx, isDone)}
                             className={`w-10 h-10 rounded-xl font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
                               isDone
                                 ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 scale-105'
@@ -247,8 +349,19 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                       })}
                     </div>
 
+                    {/* Open Progress & 1RM Calculator */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExerciseForModal(exercise)}
+                      className="p-2 text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-xl transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
+                      title="Historial de cargas y calculadora 1RM"
+                    >
+                      <TrendingUp className="w-4 h-4" />
+                    </button>
+
                     {/* Delete exercise button */}
                     <button
+                      type="button"
                       onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
                       className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
                       title="Eliminar ejercicio"
@@ -341,6 +454,22 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           )}
         </div>
       </div>
+
+      {/* Floating Rest Timer */}
+      <RestTimerFloating
+        key={timerKey}
+        isOpen={isTimerOpen}
+        onClose={() => setIsTimerOpen(false)}
+        defaultDuration={90}
+      />
+
+      {/* Exercise Progress & 1RM Modal */}
+      <ExerciseProgressModal
+        exercise={selectedExerciseForModal}
+        isOpen={Boolean(selectedExerciseForModal)}
+        onClose={() => setSelectedExerciseForModal(null)}
+        onUpdateExercise={handleUpdateExerciseFromModal}
+      />
     </div>
   );
 };

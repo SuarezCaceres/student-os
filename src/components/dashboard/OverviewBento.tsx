@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   GraduationCap, 
   Dumbbell, 
@@ -7,11 +7,14 @@ import {
   CheckCircle2, 
   Clock, 
   ArrowRight, 
-  Plus
+  Plus,
+  Database
 } from 'lucide-react';
 import type { AppState, DayOfWeek, AssignmentStatus, KanbanStatus } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import type { NavTab } from '../layout/Navbar';
+import { DailyHabitsCard } from './DailyHabitsCard';
+import { BackupModal } from './BackupModal';
 
 interface OverviewBentoProps {
   state: AppState;
@@ -30,6 +33,8 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   onUpdateKanbanStatus,
   onOpenQuickAdd,
 }) => {
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
+
   // Current day
   const daysMap: DayOfWeek[] = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const todayDay = daysMap[new Date().getDay()];
@@ -46,7 +51,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   // Kanban in progress
   const inProgressKanban = state.kanbanItems
     .filter((k) => k.status === 'in_progress')
-    .slice(0, 3);
+    .slice(0, 4);
 
   // Today's calendar blocks
   const todayBlocks = state.calendarBlocks
@@ -55,18 +60,32 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
             Resumen General (Bento Dashboard)
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Vista unificada de lo que tienes que hacer hoy y durante esta semana
+            Vista unificada de prioridades académicas, entrenamiento físico, hábitos y proyectos de hoy
           </p>
+        </div>
+
+        {/* Header Actions */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsBackupOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-sm transition-all cursor-pointer min-h-[44px]"
+            title="Exportar o importar copia de seguridad en JSON"
+          >
+            <Database className="w-4 h-4 text-indigo-500" />
+            <span>Backup / Restaurar</span>
+          </button>
         </div>
       </div>
 
-      {/* Bento Grid Container */}
+      {/* Bento Grid Container (3 Columns) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         
         {/* Bento Card 1: Entregas Universitarias Prioritarias */}
@@ -82,6 +101,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => onNavigateTab('university')}
                 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -118,6 +138,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     </div>
 
                     <button
+                      type="button"
                       onClick={() => {
                         triggerConfetti();
                         onUpdateUniStatus(a.id, 'entregado');
@@ -134,8 +155,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={() => onOpenQuickAdd('university')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Nueva Entrega</span>
@@ -161,6 +183,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
               </div>
 
               <button
+                type="button"
                 onClick={() => onNavigateTab('gym')}
                 className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -195,6 +218,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                         return (
                           <button
                             key={sIdx}
+                            type="button"
                             onClick={() => {
                               if (!isDone) triggerConfetti();
                               onToggleGymSet(todayRoutine.id, ex.id, sIdx);
@@ -218,8 +242,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={() => onNavigateTab('gym')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-orange-400 text-slate-500 hover:text-orange-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-orange-400 text-slate-500 hover:text-orange-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
           >
             <span>Ir al Tracker del Gym</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -227,7 +252,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
         </div>
 
         {/* Bento Card 3: Horario de Hoy */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between md:col-span-2 lg:col-span-1">
+        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
               <div className="flex items-center gap-2">
@@ -239,6 +264,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => onNavigateTab('calendar')}
                 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
               >
@@ -275,86 +301,101 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={() => onOpenQuickAdd('calendar')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-violet-400 text-slate-500 hover:text-violet-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-violet-400 text-slate-500 hover:text-violet-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Agendar Bloque</span>
           </button>
         </div>
 
-        {/* Bento Card 4 (Full Width): Proyectos & Tareas en Progreso (Kanban) */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm lg:col-span-3">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <KanbanSquare className="w-4 h-4" />
+        {/* Bento Card 4: Hábitos Diarios (Agua, Sueño, Pomodoro) */}
+        <DailyHabitsCard initialHabits={state.dailyHabits} />
+
+        {/* Bento Card 5 (2 Cols on lg): Proyectos & Tareas en Progreso (Kanban) */}
+        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <KanbanSquare className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
+                    Trabajos en Progreso (Kanban)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Tareas activas en las que estás enfocado actualmente
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                  Trabajos en Progreso (Kanban)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Tareas activas en las que estás trabajando actualmente
-                </p>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => onNavigateTab('kanban')}
+                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                Tablero completo <ArrowRight className="w-3 h-3" />
+              </button>
             </div>
 
-            <button
-              onClick={() => onNavigateTab('kanban')}
-              className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              Abrir Kanban completo <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {inProgressKanban.length === 0 ? (
-              <div className="col-span-full py-6 text-center text-xs text-slate-400 italic">
-                No hay tareas en progreso actualmente. ¡Mueve una desde el tablero Kanban!
-              </div>
-            ) : (
-              inProgressKanban.map((k) => (
-                <div
-                  key={k.id}
-                  className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between"
-                >
-                  <div>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 inline-block mb-1.5">
-                      {k.category}
-                    </span>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
-                      {k.title}
-                    </h4>
-                    {k.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">
-                        {k.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 mt-3 flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">
-                      {k.dueDate ? `Límite: ${k.dueDate}` : 'Sin fecha'}
-                    </span>
-                    <button
-                      onClick={() => {
-                        triggerConfetti();
-                        onUpdateKanbanStatus(k.id, 'done');
-                      }}
-                      className="px-2.5 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-transform active:scale-95"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Completar</span>
-                    </button>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {inProgressKanban.length === 0 ? (
+                <div className="col-span-full py-6 text-center text-xs text-slate-400 italic">
+                  No hay tareas en progreso actualmente. ¡Mueve una desde el tablero Kanban!
                 </div>
-              ))
-            )}
+              ) : (
+                inProgressKanban.map((k) => (
+                  <div
+                    key={k.id}
+                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 inline-block mb-1.5">
+                        {k.category}
+                      </span>
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                        {k.title}
+                      </h4>
+                      {k.description && (
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                          {k.description}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 mt-3 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">
+                        {k.dueDate ? `Límite: ${k.dueDate}` : 'Sin fecha'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          triggerConfetti();
+                          onUpdateKanbanStatus(k.id, 'done');
+                        }}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-transform active:scale-95 min-h-[32px]"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Completar</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* Backup & Restore Modal */}
+      <BackupModal
+        isOpen={isBackupOpen}
+        onClose={() => setIsBackupOpen(false)}
+        currentState={state}
+      />
     </div>
   );
 };
