@@ -6,6 +6,37 @@ export const initialData: AppState = {
   currentAcademicWeek: 5,
   streak: 12,
   theme: 'dark',
+  weeklyReflections: {
+    5: {
+      week: 5,
+      learnings: 'Esta semana entendí a fondo la diferencia entre sharding horizontal y particionado de colecciones en MongoDB. Además, reforcé la arquitectura limpia en React desacoplando lógica de efectos y vistas modulares.',
+      keyConcepts: [
+        'Sharding de datos con Hash Key',
+        'Consistencia eventual vs ACID',
+        'Sobrecarga progresiva en press banca con pausa de 2 seg',
+        'React 19 Action hooks y useTransition'
+      ],
+      resources: [
+        {
+          id: 'res-1',
+          title: 'MongoDB Sharding Explained in 10 Minutes',
+          url: 'https://www.youtube.com/watch?v=QAqKPkWbU_0',
+          type: 'youtube',
+          notes: 'Excelente explicación visual del router mongos y shard keys.'
+        },
+        {
+          id: 'res-2',
+          title: 'AWS Well-Architected Reliability Pillar',
+          url: 'https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/',
+          type: 'documentacion',
+          notes: 'Lectura obligatoria para el quiz de cloud.'
+        }
+      ],
+      gymReflection: 'Subí a 75 kg en press de banca plano manteniendo 8 repeticiones sólidas con buena retracción escapular. El descanso de 90 segundos ayudó bastante.',
+      mood: 'increible',
+      updatedAt: '2026-11-06'
+    }
+  },
   kanbanItems: [
     {
       id: 'k1',

@@ -6,6 +6,12 @@ export type Priority = 'baja' | 'media' | 'alta';
 
 export type KanbanStatus = 'todo' | 'in_progress' | 'done';
 
+export interface KanbanChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 export interface KanbanItem {
   id: string;
   title: string;
@@ -15,6 +21,14 @@ export interface KanbanItem {
   priority: Priority;
   dueDate?: string;
   createdAt: string;
+  checklist?: KanbanChecklistItem[];
+  tags?: string[];
+}
+
+export interface ExerciseHistoryEntry {
+  date: string;
+  weightKg: number;
+  reps: string;
 }
 
 export interface GymExercise {
@@ -25,6 +39,9 @@ export interface GymExercise {
   weightKg?: number;
   completedSets: boolean[];
   notes?: string;
+  personalRecordKg?: number;
+  restSeconds?: number;
+  history?: ExerciseHistoryEntry[];
 }
 
 export interface GymRoutine {
@@ -48,6 +65,12 @@ export interface CalendarBlock {
 export type AssignmentType = 'tarea' | 'proyecto' | 'examen' | 'laboratorio';
 export type AssignmentStatus = 'pendiente' | 'en_progreso' | 'entregado';
 
+export interface RubricCriterion {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
 export interface UniversityAssignment {
   id: string;
   title: string;
@@ -58,6 +81,41 @@ export interface UniversityAssignment {
   type: AssignmentType;
   weightPercentage?: number;
   notes?: string;
+  gradeObtained?: number;
+  maxGrade?: number;
+  submissionUrl?: string;
+  rubricCriteria?: RubricCriterion[];
+}
+
+export interface DailyHabits {
+  waterMl: number;
+  targetWaterMl: number;
+  sleepHours: number;
+  targetSleepHours: number;
+  pomodorosDone: number;
+  targetPomodoros: number;
+}
+
+export type ResourceType = 'youtube' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+
+export interface LearningResource {
+  id: string;
+  title: string;
+  url?: string;
+  type: ResourceType;
+  notes?: string;
+}
+
+export type ReflectionMood = 'increible' | 'productivo' | 'cansado' | 'despejado';
+
+export interface WeeklyReflection {
+  week: number;
+  learnings: string;
+  keyConcepts: string[];
+  resources: LearningResource[];
+  gymReflection?: string;
+  mood?: ReflectionMood;
+  updatedAt: string;
 }
 
 export interface AppState {
@@ -66,6 +124,8 @@ export interface AppState {
   currentAcademicWeek: number;
   streak: number;
   theme: 'dark' | 'light';
+  dailyHabits?: DailyHabits;
+  weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];
   calendarBlocks: CalendarBlock[];

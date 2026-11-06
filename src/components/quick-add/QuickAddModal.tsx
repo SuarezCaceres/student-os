@@ -6,7 +6,8 @@ import {
   KanbanSquare, 
   CalendarDays, 
   Check, 
-  Sparkles
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 import type { 
   AppState, 
@@ -17,7 +18,9 @@ import type {
   DayOfWeek, 
   Category, 
   Priority,
-  AssignmentType 
+  AssignmentType,
+  LearningResource,
+  ResourceType
 } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 
@@ -29,7 +32,8 @@ interface QuickAddModalProps {
   onAddGymExercise: (day: DayOfWeek, exercise: GymExercise) => void;
   onAddKanbanItem: (item: KanbanItem) => void;
   onAddCalendarBlock: (block: CalendarBlock) => void;
-  initialTab?: 'university' | 'gym' | 'kanban' | 'calendar';
+  onAddLearningResource?: (resource: LearningResource, week?: number) => void;
+  initialTab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning';
 }
 
 const COMMON_COURSES = [
@@ -51,9 +55,10 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   onAddGymExercise,
   onAddKanbanItem,
   onAddCalendarBlock,
+  onAddLearningResource,
   initialTab = 'university',
 }) => {
-  const [activeTab, setActiveTab] = useState<'university' | 'gym' | 'kanban' | 'calendar'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>(initialTab);
 
   // Sync tab if initialTab changes
   useEffect(() => {
@@ -98,6 +103,13 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [calStart, setCalStart] = useState('09:00');
   const [calEnd, setCalEnd] = useState('11:00');
   const [calCategory, setCalCategory] = useState<Category>('universidad');
+
+  // Form State: Learning Resource
+  const [resTitle, setResTitle] = useState('');
+  const [resType, setResType] = useState<ResourceType>('youtube');
+  const [resUrl, setResUrl] = useState('');
+  const [resNotes, setResNotes] = useState('');
+  const [resWeek, setResWeek] = useState(state.currentAcademicWeek);
 
   if (!isOpen) return null;
 
@@ -181,6 +193,28 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     onClose();
   };
 
+  const handleSaveLearning = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resTitle.trim()) return;
+
+    const newRes: LearningResource = {
+      id: `res-${Date.now()}`,
+      title: resTitle.trim(),
+      type: resType,
+      url: resUrl.trim() || undefined,
+      notes: resNotes.trim() || undefined,
+    };
+
+    if (onAddLearningResource) {
+      onAddLearningResource(newRes, Number(resWeek) || state.currentAcademicWeek);
+    }
+    triggerConfetti();
+    setResTitle('');
+    setResUrl('');
+    setResNotes('');
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md transition-opacity">
       <div 
@@ -214,53 +248,65 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
         </div>
 
         {/* Category Tabs (Frictionless navigation) */}
-        <div className="grid grid-cols-4 p-2 gap-1.5 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
+        <div className="grid grid-cols-5 p-2 gap-1 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
           <button
             onClick={() => setActiveTab('university')}
             className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
               activeTab === 'university'
-                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <GraduationCap className="w-4 h-4 mb-1" />
-            <span className="truncate">Universidad</span>
+            <GraduationCap className="w-4 h-4 mb-0.5" />
+            <span className="truncate text-[11px]">Uni</span>
           </button>
 
           <button
             onClick={() => setActiveTab('gym')}
             className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
               activeTab === 'gym'
-                ? 'bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                ? 'bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <Dumbbell className="w-4 h-4 mb-1" />
-            <span className="truncate">Gym</span>
+            <Dumbbell className="w-4 h-4 mb-0.5" />
+            <span className="truncate text-[11px]">Gym</span>
           </button>
 
           <button
             onClick={() => setActiveTab('kanban')}
             className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
               activeTab === 'kanban'
-                ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <KanbanSquare className="w-4 h-4 mb-1" />
-            <span className="truncate">Kanban</span>
+            <KanbanSquare className="w-4 h-4 mb-0.5" />
+            <span className="truncate text-[11px]">Kanban</span>
           </button>
 
           <button
             onClick={() => setActiveTab('calendar')}
             className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
               activeTab === 'calendar'
-                ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm border border-slate-200/80 dark:border-slate-700'
+                ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
-            <CalendarDays className="w-4 h-4 mb-1" />
-            <span className="truncate">Horario</span>
+            <CalendarDays className="w-4 h-4 mb-0.5" />
+            <span className="truncate text-[11px]">Agenda</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('learning')}
+            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
+              activeTab === 'learning'
+                ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
+                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <BookOpen className="w-4 h-4 mb-0.5" />
+            <span className="truncate text-[11px]">Aprender</span>
           </button>
         </div>
 
@@ -637,6 +683,96 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             >
               <Check className="w-4 h-4 stroke-[3]" />
               Agendar en el Calendario
+            </button>
+          </form>
+        )}
+
+        {/* Tab 5: Aprendizaje (YouTube & Fuentes de Estudio) */}
+        {activeTab === 'learning' && (
+          <form onSubmit={handleSaveLearning} className="p-5 sm:p-6 space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Título del recurso o video *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="Ej. Curso de Docker & Microservicios o Síntesis de Algoritmos"
+                value={resTitle}
+                onChange={(e) => setResTitle(e.target.value)}
+                autoFocus
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Tipo de Fuente
+                </label>
+                <select
+                  value={resType}
+                  onChange={(e) => setResType(e.target.value as ResourceType)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
+                >
+                  <option value="youtube">🎥 Video de YouTube</option>
+                  <option value="documentacion">📖 Documentación</option>
+                  <option value="articulo">📝 Artículo / Blog</option>
+                  <option value="libro">📚 Libro / PDF</option>
+                  <option value="texto">💡 Nota de Texto</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Semana Académica
+                </label>
+                <select
+                  value={resWeek}
+                  onChange={(e) => setResWeek(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
+                >
+                  {Array.from({ length: 16 }, (_, i) => i + 1).map((w) => (
+                    <option key={w} value={w}>
+                      Semana {w} {w === state.currentAcademicWeek ? '(Actual)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Enlace URL (YouTube o Web)
+              </label>
+              <input
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=... o https://docs..."
+                value={resUrl}
+                onChange={(e) => setResUrl(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                Nota clave o marca de tiempo
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. En el minuto 12:30 explica sharding vs particionado..."
+                value={resNotes}
+                onChange={(e) => setResNotes(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+            >
+              <Check className="w-4 h-4 stroke-[3]" />
+              Guardar en Aprendizaje Semanal
             </button>
           </form>
         )}

@@ -1,0 +1,60 @@
+{
+  "version": 3,
+  "skills": {
+    "ui-ux-pro-max": {
+      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
+      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
+      "skillFolderHash": "039881fb83556dfeb60b3cce276392ed47eb491b",
+      "installedAt": "2026-11-06T04:52:23.929Z",
+      "updatedAt": "2026-11-06T04:52:23.929Z"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/vercel-labs/skills.git",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "skillFolderHash": "76a98a285cb0434f3d39e1a873823556330e398b",
+      "installedAt": "2026-11-06T05:18:58.114Z",
+      "updatedAt": "2026-11-06T05:18:58.114Z"
+    },
+    "grill-me": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/mattpocock/skills.git",
+      "skillPath": "skills/productivity/grill-me/SKILL.md",
+      "skillFolderHash": "3df14e2d3a89459bf300614be9247e3ce74798f8",
+      "pluginName": "mattpocock-skills",
+      "installedAt": "2026-11-06T05:19:20.616Z",
+      "updatedAt": "2026-11-06T05:19:20.616Z"
+    },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/anthropics/skills.git",
+      "skillPath": "skills/frontend-design/SKILL.md",
+      "skillFolderHash": "d79e2a5bb4df4a386c2adcdd9ab8709bba28c3f6",
+      "pluginName": "example-skills",
+      "installedAt": "2026-11-06T05:52:49.484Z",
+      "updatedAt": "2026-11-06T05:52:49.484Z"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/currents-dev/playwright-best-practices-skill.git",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "skillFolderHash": "b4620eb2cfc6b58173cda800b7c7578190dfd632",
+      "installedAt": "2026-11-06T07:25:34.602Z",
+      "updatedAt": "2026-11-06T07:25:34.602Z"
+    },
+    "github-workflow-standards": {
+      "source": "local/github-workflow-standards",
+      "sourceType": "local",
+      "skillPath": "github-workflow-standards/SKILL.md",
+      "installedAt": "2026-11-06T08:22:00.000Z",
+      "updatedAt": "2026-11-06T08:22:00.000Z"
+    }
+  },
+  "dismissed": {}
+}

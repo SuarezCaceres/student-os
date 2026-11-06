@@ -9,7 +9,9 @@ import type {
   CalendarBlock, 
   DayOfWeek, 
   AssignmentStatus, 
-  KanbanStatus 
+  KanbanStatus,
+  WeeklyReflection,
+  LearningResource
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -19,13 +21,14 @@ import { KanbanBoard } from './components/kanban/KanbanBoard';
 import { UniversityView } from './components/university/UniversityView';
 import { GymTracker } from './components/gym/GymTracker';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
+import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
 
 export const App: React.FC = () => {
   const [state, setState, resetState] = useLocalStorage<AppState>('student_os_state_v1', initialData);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar'>('university');
+  const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
 
   // Handle Theme Toggle
   const isDark = state.theme === 'dark';
@@ -45,7 +48,7 @@ export const App: React.FC = () => {
   };
 
   // Quick Add Trigger Helper
-  const handleOpenQuickAdd = (tab: 'university' | 'gym' | 'kanban' | 'calendar' = 'university') => {
+  const handleOpenQuickAdd = (tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
     setQuickAddInitialTab(tab);
     setIsQuickAddOpen(true);
   };
@@ -185,16 +188,58 @@ export const App: React.FC = () => {
     }));
   };
 
+  // Learning / Reflection Handlers
+  const handleSaveReflection = (reflection: WeeklyReflection) => {
+    setState((prev) => ({
+      ...prev,
+      weeklyReflections: {
+        ...(prev.weeklyReflections || {}),
+        [reflection.week]: reflection,
+      },
+    }));
+  };
+
+  const handleAddLearningResource = (resource: LearningResource, week: number = state.currentAcademicWeek) => {
+    setState((prev) => {
+      const existingRef = prev.weeklyReflections?.[week] || {
+        week,
+        learnings: '',
+        keyConcepts: [],
+        resources: [],
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        weeklyReflections: {
+          ...(prev.weeklyReflections || {}),
+          [week]: {
+            ...existingRef,
+            resources: [resource, ...(existingRef.resources || [])],
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+  };
+
+  // Academic week & Free week status for live badges
+  const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === state.currentAcademicWeek);
+  const isFreeWeek = currentWeekAssignments.length > 0 && currentWeekAssignments.filter((a) => a.status !== 'entregado').length === 0;
+  const hasReflectionThisWeek = Boolean(state.weeklyReflections?.[state.currentAcademicWeek]?.learnings);
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#080c14] text-slate-900 dark:text-slate-100 transition-colors">
       {/* Top Navbar */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isDark={isDark}
         toggleTheme={toggleTheme}
-        onOpenQuickAdd={() => handleOpenQuickAdd('university')}
+        onOpenQuickAdd={(tab) => handleOpenQuickAdd(tab || 'university')}
         onResetData={resetState}
+        currentAcademicWeek={state.currentAcademicWeek}
+        isFreeWeek={isFreeWeek}
+        hasReflectionThisWeek={hasReflectionThisWeek}
       />
 
       {/* Main Content Area */}
@@ -253,6 +298,17 @@ export const App: React.FC = () => {
             onDeleteBlock={handleDeleteCalendarBlock}
           />
         )}
+
+        {activeTab === 'learning' && (
+          <LearningView
+            currentAcademicWeek={state.currentAcademicWeek}
+            assignments={state.universityAssignments}
+            gymRoutines={state.gymRoutines}
+            weeklyReflections={state.weeklyReflections}
+            onSaveReflection={handleSaveReflection}
+            onNavigateTab={setActiveTab}
+          />
+        )}
       </main>
 
       {/* Quick Add Modal */}
@@ -265,6 +321,7 @@ export const App: React.FC = () => {
         onAddGymExercise={handleAddGymExercise}
         onAddKanbanItem={handleAddKanbanItem}
         onAddCalendarBlock={handleAddCalendarBlock}
+        onAddLearningResource={handleAddLearningResource}
       />
     </div>
   );

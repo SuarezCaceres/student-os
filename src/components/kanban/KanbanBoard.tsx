@@ -1,25 +1,22 @@
 import React, { useState } from 'react';
 import { 
   Plus, 
-  Trash2, 
-  ArrowRight, 
-  ArrowLeft, 
-  CheckCircle2, 
-  Clock, 
-  Briefcase,
-  GraduationCap,
-  Dumbbell,
-  Sparkles,
-  Filter
+  Search, 
+  Sparkles, 
+  Briefcase, 
+  GraduationCap, 
+  Dumbbell 
 } from 'lucide-react';
 import type { KanbanItem, KanbanStatus, Category, Priority } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { KanbanCard } from './KanbanCard';
 
 interface KanbanBoardProps {
   items: KanbanItem[];
   onUpdateStatus: (id: string, newStatus: KanbanStatus) => void;
   onDeleteItem: (id: string) => void;
   onAddItem: (item: KanbanItem) => void;
+  onUpdateItem?: (item: KanbanItem) => void;
 }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
@@ -27,19 +24,65 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onUpdateStatus,
   onDeleteItem,
   onAddItem,
+  onUpdateItem,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category | 'todas'>('todas');
+  const [selectedPriority, setSelectedPriority] = useState<Priority | 'todas'>('todas');
+  const [searchQuery, setSearchQuery] = useState('');
   const [inlineTitles, setInlineTitles] = useState<{ [key in KanbanStatus]?: string }>({});
+  const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
 
-  const columns: { id: KanbanStatus; label: string; color: string; badgeBg: string }[] = [
-    { id: 'todo', label: 'Por Hacer', color: 'border-amber-500/30', badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
-    { id: 'in_progress', label: 'En Progreso', color: 'border-indigo-500/30', badgeBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' },
-    { id: 'done', label: 'Completado', color: 'border-emerald-500/30', badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
+  const columns: { id: KanbanStatus; label: string; color: string; badgeBg: string; activeBorder: string }[] = [
+    { 
+      id: 'todo', 
+      label: 'Por Hacer', 
+      color: 'border-amber-500/30', 
+      badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      activeBorder: 'border-amber-500 bg-amber-500/5'
+    },
+    { 
+      id: 'in_progress', 
+      label: 'En Progreso', 
+      color: 'border-indigo-500/30', 
+      badgeBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+      activeBorder: 'border-indigo-500 bg-indigo-500/5'
+    },
+    { 
+      id: 'done', 
+      label: 'Completado', 
+      color: 'border-emerald-500/30', 
+      badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      activeBorder: 'border-emerald-500 bg-emerald-500/5'
+    },
   ];
 
-  const filteredItems = selectedCategory === 'todas'
-    ? items
-    : items.filter((item) => item.category === selectedCategory);
+  // Safe update handler
+  const handleUpdateItemSafe = (updated: KanbanItem) => {
+    if (onUpdateItem) {
+      onUpdateItem(updated);
+    } else {
+      // Graceful fallback without touching App.tsx
+      onDeleteItem(updated.id);
+      onAddItem(updated);
+    }
+  };
+
+  // Filter items logic
+  const filteredItems = items.filter((item) => {
+    // Category filter
+    if (selectedCategory !== 'todas' && item.category !== selectedCategory) return false;
+    // Priority filter
+    if (selectedPriority !== 'todas' && item.priority !== selectedPriority) return false;
+    // Search text filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = item.title.toLowerCase().includes(q);
+      const matchDesc = item.description?.toLowerCase().includes(q) || false;
+      const matchTag = item.tags?.some((t) => t.toLowerCase().includes(q)) || false;
+      if (!matchTitle && !matchDesc && !matchTag) return false;
+    }
+    return true;
+  });
 
   const handleInlineAdd = (status: KanbanStatus) => {
     const title = (inlineTitles[status] || '').trim();
@@ -50,12 +93,45 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       title,
       status,
       category: selectedCategory === 'todas' ? 'trabajo' : selectedCategory,
-      priority: 'media',
+      priority: selectedPriority === 'todas' ? 'media' : selectedPriority,
       createdAt: new Date().toISOString().split('T')[0],
+      checklist: [],
     };
 
     onAddItem(newItem);
     setInlineTitles((prev) => ({ ...prev, [status]: '' }));
+  };
+
+  // Drag & Drop handlers
+  const handleDragOver = (e: React.DragEvent, colId: KanbanStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragOverCol !== colId) {
+      setDragOverCol(colId);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, colId: KanbanStatus) => {
+    // Only reset if leaving the column element itself
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    if (dragOverCol === colId) {
+      setDragOverCol(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetStatus: KanbanStatus) => {
+    e.preventDefault();
+    setDragOverCol(null);
+    const itemId = e.dataTransfer.getData('text/plain');
+    if (!itemId) return;
+
+    const targetItem = items.find((i) => i.id === itemId);
+    if (!targetItem || targetItem.status === targetStatus) return;
+
+    if (targetStatus === 'done') {
+      triggerConfetti();
+    }
+    onUpdateStatus(itemId, targetStatus);
   };
 
   const getCategoryBadge = (cat: Category) => {
@@ -100,45 +176,79 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header & Filter Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Header & Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
             Tablero Kanban de Trabajo & Proyectos
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Gestiona tus avances, proyectos de programación, freelance y pendientes
+            Arrastra tarjetas entre columnas, gestiona subtareas y busca rápidamente
           </p>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-          <Filter className="w-3.5 h-3.5 text-slate-400 mr-1 hidden sm:block" />
-          {(['todas', 'trabajo', 'universidad', 'gym', 'personal'] as const).map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] ${
-                selectedCategory === cat
-                  ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-800'
-              }`}
-            >
-              {cat === 'todas' ? 'Todas' : cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </button>
-          ))}
+        {/* Filters and Search Bar */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Instant Search Bar */}
+          <div className="relative w-full sm:w-56">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar tareas o tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[38px]"
+            />
+          </div>
+
+          {/* Priority Filter */}
+          <select
+            value={selectedPriority}
+            onChange={(e) => setSelectedPriority(e.target.value as Priority | 'todas')}
+            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 min-h-[38px] cursor-pointer"
+          >
+            <option value="todas">Todas las Prioridades</option>
+            <option value="alta">Prioridad Alta</option>
+            <option value="media">Prioridad Media</option>
+            <option value="baja">Prioridad Baja</option>
+          </select>
+
+          {/* Category Pills */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            {(['todas', 'trabajo', 'universidad', 'gym', 'personal'] as const).map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[32px] ${
+                  selectedCategory === cat
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {cat === 'todas' ? 'Todas' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* 3-Column Kanban Grid */}
+      {/* 3-Column Kanban Grid with Native Drag & Drop */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {columns.map((col) => {
           const colItems = filteredItems.filter((item) => item.status === col.id);
+          const isOverThisCol = dragOverCol === col.id;
 
           return (
             <div
               key={col.id}
-              className="flex flex-col rounded-3xl bg-slate-100/60 dark:bg-slate-900/40 p-4 border border-slate-200/80 dark:border-slate-800/80 min-h-[500px]"
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDragLeave={(e) => handleDragLeave(e, col.id)}
+              onDrop={(e) => handleDrop(e, col.id)}
+              className={`flex flex-col rounded-3xl p-4 border transition-all duration-200 min-h-[520px] ${
+                isOverThisCol
+                  ? `${col.activeBorder} shadow-lg ring-2 ring-indigo-500/40`
+                  : 'bg-slate-100/60 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800/80'
+              }`}
             >
               {/* Column Header */}
               <div className="flex items-center justify-between mb-3 px-1">
@@ -181,97 +291,32 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               {/* Cards List */}
               <div className="space-y-3 flex-1 overflow-y-auto pr-1">
                 {colItems.length === 0 ? (
-                  <div className="h-32 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 text-xs text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4">
-                    <span>No hay tareas aquí</span>
-                    <span className="text-[10px] text-slate-400 mt-0.5">Usa el campo arriba para escribir una</span>
+                  <div className={`h-36 flex flex-col items-center justify-center text-xs text-center border-2 border-dashed rounded-2xl p-4 transition-colors ${
+                    isOverThisCol
+                      ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 text-indigo-600 dark:text-indigo-300 font-bold'
+                      : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600'
+                  }`}>
+                    {isOverThisCol ? (
+                      <span>¡Suelta la tarjeta aquí!</span>
+                    ) : (
+                      <>
+                        <span>No hay tareas aquí</span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">Escribe arriba o arrastra una tarjeta</span>
+                      </>
+                    )}
                   </div>
                 ) : (
                   colItems.map((item) => (
-                    <div
+                    <KanbanCard
                       key={item.id}
-                      className="group p-4 rounded-2xl bg-white dark:bg-[#111827] border border-slate-200/90 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200"
-                    >
-                      {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5">
-                          {getCategoryBadge(item.category)}
-                          {getPriorityBadge(item.priority)}
-                        </div>
-
-                        {/* Delete button */}
-                        <button
-                          onClick={() => onDeleteItem(item.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-rose-500 rounded-lg transition-all cursor-pointer min-w-[28px] min-h-[28px] flex items-center justify-center"
-                          title="Eliminar tarea"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Title */}
-                      <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug mb-1">
-                        {item.title}
-                      </h3>
-
-                      {/* Optional Description */}
-                      {item.description && (
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">
-                          {item.description}
-                        </p>
-                      )}
-
-                      {/* Footer Actions: Move between columns */}
-                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-400">
-                        {item.dueDate ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium">
-                            <Clock className="w-3 h-3" />
-                            {item.dueDate}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400 font-normal">
-                            {item.createdAt}
-                          </span>
-                        )}
-
-                        <div className="flex items-center gap-1">
-                          {/* Move to Previous Status */}
-                          {col.id !== 'todo' && (
-                            <button
-                              onClick={() => {
-                                const prevStatus = col.id === 'done' ? 'in_progress' : 'todo';
-                                onUpdateStatus(item.id, prevStatus);
-                              }}
-                              className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                              title="Mover hacia atrás"
-                            >
-                              <ArrowLeft className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-
-                          {/* Move to Next Status */}
-                          {col.id !== 'done' && (
-                            <button
-                              onClick={() => {
-                                const nextStatus = col.id === 'todo' ? 'in_progress' : 'done';
-                                if (nextStatus === 'done') triggerConfetti();
-                                onUpdateStatus(item.id, nextStatus);
-                              }}
-                              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold text-[11px] transition-colors cursor-pointer"
-                              title="Avanzar etapa"
-                            >
-                              <span>{col.id === 'todo' ? 'Iniciar' : 'Finalizar'}</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          )}
-
-                          {col.id === 'done' && (
-                            <span className="inline-flex items-center gap-1 text-emerald-500 font-bold text-[11px]">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Listo
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                      item={item}
+                      status={col.id}
+                      onUpdateStatus={onUpdateStatus}
+                      onDeleteItem={onDeleteItem}
+                      onUpdateItem={handleUpdateItemSafe}
+                      getCategoryBadge={getCategoryBadge}
+                      getPriorityBadge={getPriorityBadge}
+                    />
                   ))
                 )}
               </div>
