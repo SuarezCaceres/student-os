@@ -10,7 +10,8 @@ import type {
   DayOfWeek, 
   AssignmentStatus, 
   KanbanStatus,
-  WeeklyReflection
+  WeeklyReflection,
+  LearningResource
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -27,7 +28,7 @@ export const App: React.FC = () => {
   const [state, setState, resetState] = useLocalStorage<AppState>('student_os_state_v1', initialData);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar'>('university');
+  const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
 
   // Handle Theme Toggle
   const isDark = state.theme === 'dark';
@@ -47,7 +48,7 @@ export const App: React.FC = () => {
   };
 
   // Quick Add Trigger Helper
-  const handleOpenQuickAdd = (tab: 'university' | 'gym' | 'kanban' | 'calendar' = 'university') => {
+  const handleOpenQuickAdd = (tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
     setQuickAddInitialTab(tab);
     setIsQuickAddOpen(true);
   };
@@ -198,6 +199,34 @@ export const App: React.FC = () => {
     }));
   };
 
+  const handleAddLearningResource = (resource: LearningResource, week: number = state.currentAcademicWeek) => {
+    setState((prev) => {
+      const existingRef = prev.weeklyReflections?.[week] || {
+        week,
+        learnings: '',
+        keyConcepts: [],
+        resources: [],
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        ...prev,
+        weeklyReflections: {
+          ...(prev.weeklyReflections || {}),
+          [week]: {
+            ...existingRef,
+            resources: [resource, ...(existingRef.resources || [])],
+            updatedAt: new Date().toISOString(),
+          },
+        },
+      };
+    });
+  };
+
+  // Academic week & Free week status for live badges
+  const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === state.currentAcademicWeek);
+  const isFreeWeek = currentWeekAssignments.length > 0 && currentWeekAssignments.filter((a) => a.status !== 'entregado').length === 0;
+  const hasReflectionThisWeek = Boolean(state.weeklyReflections?.[state.currentAcademicWeek]?.learnings);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#080c14] text-slate-900 dark:text-slate-100 transition-colors">
       {/* Top Navbar */}
@@ -206,8 +235,11 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab}
         isDark={isDark}
         toggleTheme={toggleTheme}
-        onOpenQuickAdd={() => handleOpenQuickAdd('university')}
+        onOpenQuickAdd={(tab) => handleOpenQuickAdd(tab || 'university')}
         onResetData={resetState}
+        currentAcademicWeek={state.currentAcademicWeek}
+        isFreeWeek={isFreeWeek}
+        hasReflectionThisWeek={hasReflectionThisWeek}
       />
 
       {/* Main Content Area */}
@@ -289,6 +321,7 @@ export const App: React.FC = () => {
         onAddGymExercise={handleAddGymExercise}
         onAddKanbanItem={handleAddKanbanItem}
         onAddCalendarBlock={handleAddCalendarBlock}
+        onAddLearningResource={handleAddLearningResource}
       />
     </div>
   );

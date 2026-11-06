@@ -74,13 +74,13 @@ student-os/
 │   │   │   ├── KanbanBoard.tsx          # Tablero Kanban con buscador en tiempo real y filtros
 │   │   │   └── KanbanCard.tsx           # Tarjeta con Drag & Drop nativo HTML5 y subtareas/checklist
 │   │   ├── layout/
-│   │   │   ├── Navbar.tsx               # Barra superior fija con el nuevo logo, pestaña Aprendizaje y dark mode
+│   │   │   ├── Navbar.tsx               # Barra superior pulida con prevención de text-wrapping, píldora de contexto semanal interactiva, badge de Semana Libre, tabs consistentes y dark mode
 │   │   │   └── StatsHero.tsx            # Hero con saludo dinámico según la hora, racha 🔥 y watermark
 │   │   ├── learning/
 │   │   │   ├── FreeWeekCelebrationCard.tsx # Tarjeta de celebración y sugerencias para semanas libres (0 tareas)
 │   │   │   └── LearningView.tsx         # Hub de Aprendizaje, Active Recall Feynman, fuentes de YouTube y gym check-in
 │   │   ├── quick-add/
-│   │   │   └── QuickAddModal.tsx        # Modal global de captura rápida multidisciplinaria
+│   │   │   └── QuickAddModal.tsx        # Modal global de captura rápida con 5 pestañas: Universidad, Gym, Kanban, Calendario y Aprendizaje (YouTube & Notas)
 │   │   └── university/
 │   │       ├── AssignmentDetailModal.tsx # Modal con Rúbrica interactiva (checklist) y link de entrega
 │   │       ├── GradesCalculatorModal.tsx # Calculadora de GPA (0-20), predicción de nota mínima requerida
