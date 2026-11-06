@@ -40,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/80 dark:bg-[#0b0f19]/80 border-b border-slate-200 dark:border-slate-800 transition-colors">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/85 dark:bg-[#080c14]/85 border-b border-slate-200/80 dark:border-white/[0.08] transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         
         {/* Brand / Logo */}
@@ -48,20 +48,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           onClick={() => setActiveTab('overview')}
           className="flex items-center gap-3 cursor-pointer select-none group"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5" />
+          <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-indigo-500/30 shadow-md shadow-indigo-500/20 group-hover:scale-105 group-hover:border-indigo-400 transition-all bg-slate-900 flex items-center justify-center shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="StudentOS Logo" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <div className="flex items-center gap-1.5">
               <span className="font-extrabold text-lg tracking-tight text-slate-900 dark:text-white">
                 Student<span className="text-indigo-600 dark:text-indigo-400">OS</span>
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60">
+              <span className="text-[10px] uppercase font-black tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-400/30">
                 PRO MAX
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium hidden sm:block">
-              Avance & Rutina Universitaria
+              Life, Gym & College Hub
             </p>
           </div>
         </div>
