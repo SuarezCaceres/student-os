@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Timer, 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  X, 
-  ChevronDown, 
-  ChevronUp, 
-  Volume2, 
-  VolumeX, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Timer,
+  Play,
+  Pause,
+  RotateCcw,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Volume2,
+  VolumeX,
   BellRing,
-  Plus,
-  Minus
 } from 'lucide-react';
 import { triggerConfetti } from '../../utils/confetti';
 
-interface RestTimerFloatingProps {
+export interface RestTimerFloatingProps {
   isOpen: boolean;
   onClose: () => void;
   defaultDuration?: number;
+  autoStart?: boolean;
 }
 
 const PRESETS = [
@@ -32,24 +31,26 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
   isOpen,
   onClose,
   defaultDuration = 90,
+  autoStart = false,
 }) => {
-  const [totalSeconds, setTotalSeconds] = useState(defaultDuration);
-  const [remainingSeconds, setRemainingSeconds] = useState(defaultDuration);
-  const [isRunning, setIsRunning] = useState(false);
+  const safeInitialDuration = Math.max(5, defaultDuration);
+  const [totalSeconds, setTotalSeconds] = useState(safeInitialDuration);
+  const [remainingSeconds, setRemainingSeconds] = useState(safeInitialDuration);
+  const [isRunning, setIsRunning] = useState(autoStart);
   const [isMinimized, setIsMinimized] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isFinished, setIsFinished] = useState(false);
 
-  const timerRef = useRef<number | null>(null);
+  const isFinished = remainingSeconds === 0;
 
-  // Web Audio synthesizer beep
-  const playBeep = () => {
+  const playBeep = useCallback(() => {
     if (!soundEnabled) return;
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
-      
+
       const playTone = (freq: number, start: number, duration: number) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -63,47 +64,38 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
         osc.stop(ctx.currentTime + start + duration);
       };
 
-      // Nice double chime: D5 then A5
-      playTone(587.33, 0, 0.25);
-      playTone(880, 0.22, 0.4);
+      playTone(587.33, 0, 0.24);
+      playTone(880, 0.22, 0.38);
     } catch {
-      // AudioContext unavailable or suspended
+      // AudioContext unavailable or blocked by browser policy
     }
-  };
+  }, [soundEnabled]);
 
   useEffect(() => {
-    if (isRunning) {
-      setIsFinished(false);
-      timerRef.current = window.setInterval(() => {
-        setRemainingSeconds((prev) => {
-          if (prev <= 1) {
-            setIsRunning(false);
-            setIsFinished(true);
-            playBeep();
-            triggerConfetti();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    }
+    if (!isRunning) return;
+
+    const intervalId = window.setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(intervalId);
+          setIsRunning(false);
+          playBeep();
+          triggerConfetti();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      window.clearInterval(intervalId);
     };
-  }, [isRunning, soundEnabled]);
+  }, [isRunning, playBeep]);
 
   const handleStart = () => {
     if (remainingSeconds === 0) {
       setRemainingSeconds(totalSeconds);
     }
-    setIsFinished(false);
     setIsRunning(true);
   };
 
@@ -113,14 +105,12 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
 
   const handleReset = () => {
     setIsRunning(false);
-    setIsFinished(false);
     setRemainingSeconds(totalSeconds);
   };
 
   const handleSelectPreset = (seconds: number) => {
     setTotalSeconds(seconds);
     setRemainingSeconds(seconds);
-    setIsFinished(false);
     setIsRunning(true);
   };
 
@@ -128,6 +118,8 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
     setRemainingSeconds((prev) => {
       const next = Math.max(5, prev + delta);
       if (!isRunning) {
+        setTotalSeconds(next);
+      } else if (next > totalSeconds) {
         setTotalSeconds(next);
       }
       return next;
@@ -140,74 +132,105 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
   const seconds = remainingSeconds % 60;
   const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-  const progressPercent = totalSeconds > 0 
-    ? Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100))
-    : 0;
+  const progressPercent =
+    totalSeconds > 0
+      ? Math.min(100, Math.max(0, ((totalSeconds - remainingSeconds) / totalSeconds) * 100))
+      : 0;
 
-  // Minimized floating bubble
+  // Minimized pill view (mobile-safe above bottom bar)
   if (isMinimized) {
     return (
-      <div className="fixed bottom-6 right-6 z-50 animate-bounce-subtle">
-        <div 
-          onClick={() => setIsMinimized(false)}
-          className={`flex items-center gap-3 px-4 py-2.5 rounded-2xl shadow-xl backdrop-blur-md cursor-pointer border transition-all duration-300 ${
+      <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 modal-panel-enter">
+        <div
+          className={`min-h-[48px] px-4 py-1.5 rounded-full bg-[var(--surface)] border shadow-2xl flex items-center gap-2.5 ${
             isFinished
-              ? 'bg-orange-500 text-white border-orange-400 animate-pulse ring-4 ring-orange-500/30'
+              ? 'border-[var(--gym)]'
               : isRunning
-              ? 'bg-slate-900/95 text-white border-orange-500/50 shadow-orange-500/20'
-              : 'bg-white/95 dark:bg-slate-900/95 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700'
+              ? 'border-[var(--action)]'
+              : 'border-[var(--line-strong)]'
           }`}
         >
-          <div className="relative flex items-center justify-center">
-            <Timer className={`w-5 h-5 ${isRunning ? 'text-orange-400 animate-spin-slow' : 'text-slate-400'}`} />
-          </div>
-          <span className="font-mono font-black text-sm tracking-wider">{formattedTime}</span>
-          <button 
+          <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsMinimized(false);
-            }}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors cursor-pointer"
-            title="Expandir temporizador"
+            onClick={isRunning ? handlePause : handleStart}
+            aria-label={isRunning ? 'Pausar cronómetro' : 'Iniciar cronómetro'}
+            title={isRunning ? 'Pausar' : 'Iniciar'}
+            className="w-9 h-9 rounded-full bg-[var(--surface-2)] hover:bg-[color-mix(in_oklab,var(--action)_16%,var(--surface-2))] border border-[var(--line)] text-[var(--ink)] inline-flex items-center justify-center cursor-pointer transition-colors active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)]"
           >
-            <ChevronUp className="w-4 h-4" />
+            {isRunning ? (
+              <Pause className="w-4 h-4 text-[var(--action)]" />
+            ) : (
+              <Play className="w-4 h-4 text-[var(--action)]" />
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            aria-label="Expandir cronómetro de descanso"
+            className="min-h-[40px] px-1.5 inline-flex items-center gap-2 cursor-pointer text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-[8px]"
+          >
+            <Timer
+              className={`w-4 h-4 ${
+                isFinished
+                  ? 'text-[var(--gym)]'
+                  : isRunning
+                  ? 'text-[var(--action)]'
+                  : 'text-[var(--muted)]'
+              }`}
+            />
+            <span className="t-num text-[15px] font-medium text-[var(--ink)]">
+              {formattedTime}
+            </span>
+            <ChevronUp className="w-4 h-4 text-[var(--muted)]" />
           </button>
         </div>
       </div>
     );
   }
 
-  // Expanded floating panel
+  // Expanded floating panel (mobile-safe above bottom navigation)
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-80 sm:w-88 rounded-3xl bg-white/95 dark:bg-[#111827]/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-2xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
+    <div
+      role="region"
+      aria-label="Cronómetro de descanso"
+      className="fixed bottom-20 md:bottom-6 right-4 left-4 sm:left-auto sm:w-[340px] md:right-6 z-40 t-card !border-[var(--line-strong)] !shadow-2xl p-5 modal-panel-enter"
+    >
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center">
+      <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-[var(--line)]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-[10px] bg-[var(--surface-2)] border border-[var(--line)] text-[var(--gym)] flex items-center justify-center shrink-0">
             <Timer className="w-4 h-4" />
           </div>
-          <div>
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
-              Rest Timer
+          <div className="min-w-0">
+            <h4 className="text-[15px] font-medium text-[var(--ink)] leading-tight truncate">
+              Descanso entre series
             </h4>
-            <span className="text-[10px] text-slate-400 font-semibold">Descanso entre series</span>
+            <p className="text-[13px] text-[var(--muted)] leading-snug">
+              {isFinished ? 'Tiempo cumplido' : isRunning ? 'En curso' : 'En pausa'}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0 -mr-1.5">
           <button
             type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title={soundEnabled ? 'Silenciar aviso' : 'Activar sonido'}
+            onClick={() => setSoundEnabled((prev) => !prev)}
+            className="t-btn t-btn-ghost t-btn-icon"
+            aria-label={soundEnabled ? 'Silenciar sonido al terminar' : 'Activar sonido al terminar'}
+            title={soundEnabled ? 'Sonido activado' : 'Sonido silenciado'}
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-orange-500" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-[var(--action)]" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-[var(--muted)]" />
+            )}
           </button>
           <button
             type="button"
             onClick={() => setIsMinimized(true)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="t-btn t-btn-ghost t-btn-icon"
+            aria-label="Minimizar cronómetro"
             title="Minimizar"
           >
             <ChevronDown className="w-4 h-4" />
@@ -215,68 +238,65 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Cerrar temporizador"
+            className="t-btn t-btn-ghost t-btn-icon hover:!text-[var(--danger)]"
+            aria-label="Cerrar cronómetro"
+            title="Cerrar"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main Counter Display */}
-      <div className="py-5 text-center flex flex-col items-center">
-        {isFinished ? (
-          <div className="mb-2 flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400 text-xs font-black animate-pulse">
-            <BellRing className="w-4 h-4" />
-            <span>¡Tiempo cumplido! A por la siguiente serie 💪</span>
+      {/* Main Clock & +/-15s Controls */}
+      <div className="py-5 flex flex-col items-center">
+        {isFinished && (
+          <div className="t-badge t-badge-gym mb-3">
+            <BellRing className="w-3.5 h-3.5" />
+            <span>Descanso listo · Siguiente serie</span>
           </div>
-        ) : (
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">
-            {isRunning ? 'Descansando...' : 'En pausa'}
-          </span>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="w-full flex items-center justify-between sm:justify-center gap-3">
           <button
             type="button"
             onClick={() => adjustTime(-15)}
-            className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-orange-500 hover:border-orange-400 transition-colors cursor-pointer"
-            title="-15 segundos"
+            aria-label="Restar 15 segundos"
+            className="min-w-[48px] min-h-[44px] px-2.5 rounded-[12px] bg-[var(--surface-2)] hover:bg-[color-mix(in_oklab,var(--ink)_8%,var(--surface-2))] border border-[var(--line-strong)] t-num text-[13px] font-medium text-[var(--ink)] inline-flex items-center justify-center cursor-pointer transition-colors active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)]"
           >
-            <Minus className="w-3.5 h-3.5" />
+            -15s
           </button>
 
-          <span className={`font-mono text-4xl sm:text-5xl font-black tracking-tighter ${
-            isFinished
-              ? 'text-orange-500'
-              : isRunning
-              ? 'text-slate-900 dark:text-white'
-              : 'text-slate-600 dark:text-slate-400'
-          }`}>
+          <span
+            className={`t-num text-4xl sm:text-5xl font-medium tracking-tight ${
+              isFinished ? 'text-[var(--gym)]' : 'text-[var(--ink)]'
+            }`}
+          >
             {formattedTime}
           </span>
 
           <button
             type="button"
             onClick={() => adjustTime(15)}
-            className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-orange-500 hover:border-orange-400 transition-colors cursor-pointer"
-            title="+15 segundos"
+            aria-label="Sumar 15 segundos"
+            className="min-w-[48px] min-h-[44px] px-2.5 rounded-[12px] bg-[var(--surface-2)] hover:bg-[color-mix(in_oklab,var(--ink)_8%,var(--surface-2))] border border-[var(--line-strong)] t-num text-[13px] font-medium text-[var(--ink)] inline-flex items-center justify-center cursor-pointer transition-colors active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)]"
           >
-            <Plus className="w-3.5 h-3.5" />
+            +15s
           </button>
         </div>
 
         {/* Progress Bar */}
-        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 mt-4 overflow-hidden">
-          <div 
-            className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-300"
+        <div className="w-full h-2 rounded-full bg-[var(--surface-2)] mt-4 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-300 ${
+              isFinished ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
+            }`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
       </div>
 
-      {/* Preset Buttons */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      {/* Presets (45s, 60s, 90s, 120s) */}
+      <div className="grid grid-cols-4 gap-2 mb-4" role="group" aria-label="Tiempos rápidos de descanso">
         {PRESETS.map((preset) => {
           const isCurrent = totalSeconds === preset.seconds;
           return (
@@ -284,10 +304,11 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
               key={preset.seconds}
               type="button"
               onClick={() => handleSelectPreset(preset.seconds)}
-              className={`py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              aria-pressed={isCurrent}
+              className={`min-h-[44px] rounded-[12px] t-num text-[14px] font-medium border transition-colors cursor-pointer active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                 isCurrent
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-sm shadow-orange-500/30'
-                  : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-orange-400'
+                  ? 'bg-[color-mix(in_oklab,var(--action)_14%,transparent)] text-[var(--action)] border-[color-mix(in_oklab,var(--action)_35%,transparent)]'
+                  : 'bg-[var(--surface-2)] text-[var(--muted)] hover:text-[var(--ink)] border-[var(--line)]'
               }`}
             >
               {preset.label}
@@ -296,35 +317,36 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
         })}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      {/* Primary Controls */}
+      <div className="flex items-center gap-2.5">
         {isRunning ? (
           <button
             type="button"
             onClick={handlePause}
-            className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 transition-all cursor-pointer min-h-[44px]"
+            className="flex-1 t-btn t-btn-secondary"
           >
-            <Pause className="w-4 h-4 fill-current" />
+            <Pause className="w-4 h-4" />
             <span>Pausar</span>
           </button>
         ) : (
           <button
             type="button"
             onClick={handleStart}
-            className="flex-1 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-orange-600/30 transition-all cursor-pointer min-h-[44px]"
+            className="flex-1 t-btn t-btn-primary"
           >
-            <Play className="w-4 h-4 fill-current" />
-            <span>{remainingSeconds === 0 ? 'Reiniciar' : 'Iniciar'}</span>
+            <Play className="w-4 h-4" />
+            <span>Iniciar</span>
           </button>
         )}
 
         <button
           type="button"
           onClick={handleReset}
-          className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-400 font-bold text-xs flex items-center justify-center transition-colors cursor-pointer min-h-[44px]"
-          title="Reiniciar a tiempo base"
+          className="t-btn t-btn-secondary !px-3.5"
+          title="Reiniciar al tiempo seleccionado"
         >
           <RotateCcw className="w-4 h-4" />
+          <span>Reiniciar</span>
         </button>
       </div>
     </div>

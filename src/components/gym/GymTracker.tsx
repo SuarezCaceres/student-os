@@ -1,28 +1,52 @@
-import React, { useState } from 'react';
-import { 
-  Dumbbell, 
-  Check, 
-  Plus, 
-  Trash2, 
+import React, { useState, useId } from 'react';
+import {
+  Dumbbell,
+  Check,
+  Plus,
+  Trash2,
   Trophy,
   Timer,
   TrendingUp,
-  Sparkles
 } from 'lucide-react';
 import type { GymRoutine, GymExercise, DayOfWeek } from '../../types';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
+import { SectionHeader } from '../common/SectionHeader';
+import { ModalShell } from '../common/ModalShell';
 import { RestTimerFloating } from './RestTimerFloating';
 import { ExerciseProgressModal } from './ExerciseProgressModal';
 
-interface GymTrackerProps {
+export interface GymTrackerProps {
   routines: GymRoutine[];
   onToggleSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onAddExercise: (day: DayOfWeek, exercise: GymExercise) => void;
   onDeleteExercise: (routineId: string, exerciseId: string) => void;
   onFinishWorkout: () => void;
+  onUpdateExercise?: (day: DayOfWeek, updated: GymExercise) => void;
 }
 
-const DAYS_LIST: DayOfWeek[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAYS_LIST: DayOfWeek[] = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+];
+
+const JS_DAYS_MAP: DayOfWeek[] = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
+
+function getTodayDayOfWeek(): DayOfWeek {
+  return JS_DAYS_MAP[new Date().getDay()];
+}
 
 export const GymTracker: React.FC<GymTrackerProps> = ({
   routines,
@@ -30,27 +54,33 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   onAddExercise,
   onDeleteExercise,
   onFinishWorkout,
+  onUpdateExercise,
 }) => {
-  // Auto-select today
-  const daysMap: DayOfWeek[] = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const todayDay = daysMap[new Date().getDay()];
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(todayDay);
+  const formId = useId();
+
+  // Purity-safe lazy state initialization for today's day
+  const [todayDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
 
   // Rest Timer state
   const [isTimerOpen, setIsTimerOpen] = useState(false);
   const [autoTimerEnabled, setAutoTimerEnabled] = useState(true);
+  const [timerAutoStart, setTimerAutoStart] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
 
-  // Exercise Progress Modal state
-  const [selectedExerciseForModal, setSelectedExerciseForModal] = useState<GymExercise | null>(null);
-  const [exerciseOverrides, setExerciseOverrides] = useState<Record<string, Partial<GymExercise>>>({});
+  // Exercise Progress Modal & fallback local overrides (used when onUpdateExercise is not passed)
+  const [selectedExerciseIdForModal, setSelectedExerciseIdForModal] = useState<string | null>(null);
+  const [exerciseOverrides, setExerciseOverrides] = useState<
+    Record<string, Omit<Partial<GymExercise>, 'completedSets'>>
+  >({});
 
-  // Quick add form state for this day
-  const [newExName, setNewExName] = useState('');
-  const [newExSets, setNewExSets] = useState(4);
-  const [newExReps, setNewExReps] = useState('10-12 reps');
-  const [newExWeight, setNewExWeight] = useState<number | ''>(20);
+  // Add Exercise Modal state
   const [showAddForm, setShowAddForm] = useState(false);
+  const [newExName, setNewExName] = useState('');
+  const [newExSets, setNewExSets] = useState<number>(4);
+  const [newExReps, setNewExReps] = useState('8-10 reps');
+  const [newExWeight, setNewExWeight] = useState<number | ''>(20);
+  const [newExNotes, setNewExNotes] = useState('');
 
   const rawRoutine = routines.find((r) => r.dayOfWeek === selectedDay) || {
     id: `gym-${selectedDay}`,
@@ -60,14 +90,19 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     exercises: [],
   };
 
-  // Merge any local overrides (e.g. updated PR or history)
-  const currentRoutine = {
+  // Merge local overrides only when parent hasn't connected onUpdateExercise yet
+  const currentRoutine: GymRoutine = {
     ...rawRoutine,
     exercises: rawRoutine.exercises.map((ex) => ({
       ...ex,
-      ...(exerciseOverrides[ex.id] || {}),
+      ...(onUpdateExercise ? {} : exerciseOverrides[ex.id] || {}),
     })),
   };
+
+  const selectedExerciseForModal =
+    selectedExerciseIdForModal
+      ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForModal) || null
+      : null;
 
   // Calculate day progress
   let totalSets = 0;
@@ -79,13 +114,19 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
   const progressPercent = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
-  const handleToggleSetWithTimer = (routineId: string, exerciseId: string, setIndex: number, currentlyDone: boolean) => {
+  const handleToggleSetWithTimer = (
+    routineId: string,
+    exerciseId: string,
+    setIndex: number,
+    currentlyDone: boolean
+  ) => {
     onToggleSet(routineId, exerciseId, setIndex);
-    
-    // If we just marked a set as completed (was false, turning true)
+
+    // Trigger celebration & auto rest timer when completing a set
     if (!currentlyDone) {
       triggerConfetti();
       if (autoTimerEnabled) {
+        setTimerAutoStart(true);
         setIsTimerOpen(true);
         setTimerKey((k) => k + 1);
       }
@@ -93,27 +134,35 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   };
 
   const handleUpdateExerciseFromModal = (updated: GymExercise) => {
+    if (onUpdateExercise) {
+      onUpdateExercise(selectedDay, updated);
+      return;
+    }
+
+    // Fallback when App.tsx hasn't passed onUpdateExercise yet
+    const { completedSets: _ignoredSets, ...restUpdated } = updated;
+    void _ignoredSets;
     setExerciseOverrides((prev) => ({
       ...prev,
-      [updated.id]: updated,
+      [updated.id]: restUpdated,
     }));
-    setSelectedExerciseForModal(updated);
 
-    // Also persist into student_os_state_v1 in localStorage if possible
     try {
       const raw = localStorage.getItem('student_os_state_v1');
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed.gymRoutines) {
+        if (Array.isArray(parsed.gymRoutines)) {
           parsed.gymRoutines = parsed.gymRoutines.map((r: GymRoutine) => ({
             ...r,
-            exercises: r.exercises.map((e: GymExercise) => (e.id === updated.id ? { ...e, ...updated } : e)),
+            exercises: r.exercises.map((e: GymExercise) =>
+              e.id === updated.id ? { ...e, ...restUpdated } : e
+            ),
           }));
           localStorage.setItem('student_os_state_v1', JSON.stringify(parsed));
         }
       }
     } catch {
-      // ignore
+      // Ignore storage errors in restricted environments
     }
   };
 
@@ -121,84 +170,89 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     e.preventDefault();
     if (!newExName.trim()) return;
 
+    const setsCount = Math.max(1, Math.min(12, Number(newExSets) || 3));
+    const parsedWeight = newExWeight !== '' && Number(newExWeight) > 0 ? Number(newExWeight) : undefined;
+
     const exercise: GymExercise = {
       id: `ex-${Date.now()}`,
       name: newExName.trim(),
-      sets: Number(newExSets) || 3,
+      sets: setsCount,
       reps: newExReps.trim() || '10 reps',
-      weightKg: newExWeight ? Number(newExWeight) : undefined,
-      completedSets: Array(Number(newExSets) || 3).fill(false),
-      personalRecordKg: newExWeight ? Number(newExWeight) : undefined,
+      weightKg: parsedWeight,
+      completedSets: Array(setsCount).fill(false),
+      personalRecordKg: parsedWeight,
+      notes: newExNotes.trim() || undefined,
     };
 
     onAddExercise(selectedDay, exercise);
     setNewExName('');
+    setNewExNotes('');
     setShowAddForm(false);
     triggerConfetti();
   };
 
   return (
     <div className="space-y-6">
-      {/* Header & Streak Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            Gym & Fitness Tracker
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Control de rutinas, registro de series, pesos, cronómetro de descanso y récords personales
-          </p>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Rest Timer Button */}
-          <button
-            onClick={() => setIsTimerOpen(!isTimerOpen)}
-            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl border font-bold text-xs transition-all cursor-pointer min-h-[44px] ${
-              isTimerOpen
-                ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/25'
-                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-orange-400'
-            }`}
-            title="Abrir cronómetro de descanso"
-          >
-            <Timer className="w-4 h-4 text-orange-400" />
-            <span>Rest Timer</span>
-          </button>
-
-          {/* Auto Timer Toggle Checkbox */}
-          <button
-            type="button"
-            onClick={() => setAutoTimerEnabled(!autoTimerEnabled)}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold border transition-colors cursor-pointer ${
-              autoTimerEnabled
-                ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent'
-            }`}
-            title="Activar o desactivar inicio automático del timer al marcar serie"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Auto-timer: {autoTimerEnabled ? 'ON' : 'OFF'}</span>
-          </button>
-
-          {/* Finish Workout CTA */}
-          {totalSets > 0 && (
+      {/* Header */}
+      <SectionHeader
+        title="Entrenamiento y gimnasio"
+        subtitle="Marca tus series en un toque, controla tus descansos y supera tus marcas."
+        actions={
+          <>
             <button
+              type="button"
               onClick={() => {
-                triggerBigCelebration();
-                onFinishWorkout();
+                setTimerAutoStart(false);
+                setIsTimerOpen((prev) => !prev);
               }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs sm:text-sm shadow-lg shadow-orange-500/25 transition-all cursor-pointer min-h-[44px]"
+              aria-pressed={isTimerOpen}
+              className={`t-btn t-btn-secondary ${
+                isTimerOpen ? '!border-[var(--action)] !text-[var(--action)]' : ''
+              }`}
             >
-              <Trophy className="w-4 h-4" />
-              <span>Finalizar Rutina del Día</span>
+              <Timer className="w-4 h-4" />
+              <span>Cronómetro</span>
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* Days Selector Pills (Lunes a Domingo) */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoTimerEnabled}
+              onClick={() => setAutoTimerEnabled((prev) => !prev)}
+              className={`min-h-[44px] px-3.5 rounded-[12px] border text-[14px] font-medium inline-flex items-center gap-2.5 cursor-pointer select-none transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
+                autoTimerEnabled
+                  ? 'bg-[color-mix(in_oklab,var(--action)_12%,var(--surface))] border-[color-mix(in_oklab,var(--action)_32%,transparent)] text-[var(--ink)]'
+                  : 'bg-[var(--surface)] border-[var(--line-strong)] text-[var(--muted)] hover:text-[var(--ink)]'
+              }`}
+              title="Abrir el cronómetro automáticamente al completar una serie"
+            >
+              <span
+                aria-hidden="true"
+                className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                  autoTimerEnabled ? 'bg-[var(--ok)]' : 'bg-[var(--muted)] opacity-45'
+                }`}
+              />
+              <span>Descanso automático</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="t-btn t-btn-primary"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Agregar ejercicio</span>
+            </button>
+          </>
+        }
+      />
+
+      {/* Tactile Day Selector (Lunes - Domingo, >=44px height) */}
+      <div
+        role="tablist"
+        aria-label="Seleccionar día de entrenamiento"
+        className="flex md:grid md:grid-cols-7 items-center gap-1.5 p-1.5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line)] overflow-x-auto no-scrollbar"
+      >
         {DAYS_LIST.map((day) => {
           const isToday = day === todayDay;
           const isSelected = day === selectedDay;
@@ -206,254 +260,346 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           return (
             <button
               key={day}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
               onClick={() => setSelectedDay(day)}
-              className={`flex flex-col items-center justify-center px-4 py-2.5 rounded-2xl transition-all cursor-pointer min-w-[76px] min-h-[56px] border ${
+              className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                 isSelected
-                  ? 'bg-orange-500 text-white border-orange-500 shadow-md shadow-orange-500/30 scale-105'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                  ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
+                  : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
-              <span className="text-xs font-black uppercase tracking-wider">{day.slice(0, 3)}</span>
-              <span className={`text-[10px] font-semibold mt-0.5 ${
-                isSelected ? 'text-orange-100' : isToday ? 'text-orange-500 font-bold' : 'text-slate-400'
-              }`}>
-                {isToday ? '• Hoy •' : day}
-              </span>
+              <span className="sm:hidden">{day.slice(0, 3)}</span>
+              <span className="hidden sm:inline">{day}</span>
+              {isToday && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none font-medium ${
+                    isSelected
+                      ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
+                      : 'bg-[var(--surface)] text-[var(--muted)] border border-[var(--line)]'
+                  }`}
+                >
+                  Hoy
+                </span>
+              )}
             </button>
           );
         })}
       </div>
 
-      {/* Routine Detail Card */}
-      <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
-        
-        {/* Routine Title & Stats */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-400">
-                {currentRoutine.tag}
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">• {selectedDay}</span>
+      {/* Main Routine Card */}
+      <section className="t-card p-6">
+        {/* Routine Header & Progress */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-[var(--line)]">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
+              <span className="text-[13px] text-[var(--muted)]">· {selectedDay}</span>
             </div>
-            <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
+            <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug">
               {currentRoutine.name}
             </h3>
           </div>
 
-          {/* Progress Bar in Routine */}
-          <div className="w-full md:w-64">
-            <div className="flex items-center justify-between text-xs font-bold mb-1.5">
-              <span className="text-slate-500 dark:text-slate-400">Progreso de hoy</span>
-              <span className="text-orange-600 dark:text-orange-400">{progressPercent}%</span>
+          <div className="w-full md:w-72 shrink-0">
+            <div className="flex items-center justify-between gap-2 text-[13px] mb-2">
+              <span className="text-[var(--muted)]">Progreso del día</span>
+              <span className="t-num font-medium text-[var(--ink)]">
+                {completedSets}/{totalSets} series · {progressPercent}%
+              </span>
             </div>
-            <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full transition-all duration-300"
+            <div className="w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  progressPercent === 100 ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
+                }`}
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">
-              {completedSets} de {totalSets} series completadas
-            </p>
           </div>
         </div>
 
-        {/* Exercises List */}
-        <div className="space-y-4 pt-6">
+        {/* Exercises List (clean .t-row separation, zero triple nesting) */}
+        <div className="pt-4">
           {currentRoutine.exercises.length === 0 ? (
-            <div className="py-10 text-center text-slate-400 text-sm">
-              <Dumbbell className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
-              <span>No hay ejercicios registrados para el {selectedDay}.</span>
-              <p className="text-xs mt-1">¡Añade uno con el botón inferior!</p>
+            <div className="py-12 text-center">
+              <Dumbbell className="w-8 h-8 mx-auto text-[var(--muted)] mb-3" />
+              <p className="text-[16px] font-medium text-[var(--ink)]">
+                No hay ejercicios programados para el {selectedDay}
+              </p>
+              <p className="text-[14px] text-[var(--muted)] mt-1">
+                Agrega un ejercicio para registrar tus series y cargas.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowAddForm(true)}
+                className="t-btn t-btn-secondary mt-4"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Agregar ejercicio</span>
+              </button>
             </div>
           ) : (
-            currentRoutine.exercises.map((exercise) => {
-              const allSetsCompleted = exercise.completedSets.every(Boolean);
-              const prValue = exercise.personalRecordKg || (exercise.weightKg ? Math.round(exercise.weightKg * 1.1) : undefined);
+            <div>
+              {currentRoutine.exercises.map((exercise) => {
+                const allSetsCompleted =
+                  exercise.sets > 0 &&
+                  exercise.completedSets.slice(0, exercise.sets).filter(Boolean).length ===
+                    exercise.sets;
 
-              return (
-                <div
-                  key={exercise.id}
-                  className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
-                    allSetsCompleted
-                      ? 'bg-emerald-50/20 dark:bg-emerald-950/10 border-emerald-500/30'
-                      : 'bg-slate-50/70 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800'
-                  }`}
-                >
-                  {/* Left: Name, Reps, Weight & PR Badge */}
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">
-                        {exercise.name}
-                      </h4>
-                      {allSetsCompleted && (
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                          <Check className="w-3 h-3 stroke-[3]" /> Completado
+                return (
+                  <div
+                    key={exercise.id}
+                    className="t-row flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+                  >
+                    {/* Exercise Info */}
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-[16px] sm:text-[18px] font-medium text-[var(--ink)] leading-snug">
+                          {exercise.name}
+                        </h4>
+
+                        {allSetsCompleted && (
+                          <span className="t-badge t-badge-ok">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Completado</span>
+                          </span>
+                        )}
+
+                        {exercise.personalRecordKg !== undefined && (
+                          <span className="t-badge t-badge-gym t-num">
+                            <Trophy className="w-3.5 h-3.5" />
+                            <span>PR {exercise.personalRecordKg} kg</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[14px] text-[var(--muted)]">
+                        <span className="t-num font-medium text-[var(--ink)]">
+                          {exercise.weightKg !== undefined
+                            ? `${exercise.weightKg} kg · ${exercise.reps}`
+                            : `${exercise.sets} ${exercise.sets === 1 ? 'serie' : 'series'} · ${exercise.reps}`}
                         </span>
-                      )}
-                      {prValue && (
+                        {exercise.weightKg !== undefined && (
+                          <span className="t-num text-[13px] text-[var(--muted)]">
+                            · {exercise.sets} {exercise.sets === 1 ? 'serie' : 'series'}
+                          </span>
+                        )}
+                        {exercise.notes && (
+                          <span className="text-[13px] text-[var(--muted)]">
+                            · {exercise.notes}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Interactive Set Bubbles (S1..S4) + Progress/1RM + Delete */}
+                    <div className="flex flex-wrap items-center justify-between sm:justify-start lg:justify-end gap-2.5 shrink-0">
+                      <div
+                        className="flex items-center gap-2 flex-wrap"
+                        role="group"
+                        aria-label={`Series de ${exercise.name}`}
+                      >
+                        {Array.from({ length: exercise.sets }).map((_, setIdx) => {
+                          const isDone = Boolean(exercise.completedSets[setIdx]);
+
+                          return (
+                            <button
+                              key={setIdx}
+                              type="button"
+                              aria-pressed={isDone}
+                              aria-label={`Serie ${setIdx + 1} de ${exercise.name}: ${
+                                isDone ? 'completada' : 'pendiente'
+                              }`}
+                              onClick={() =>
+                                handleToggleSetWithTimer(
+                                  currentRoutine.id,
+                                  exercise.id,
+                                  setIdx,
+                                  isDone
+                                )
+                              }
+                              className={`min-w-[48px] min-h-[48px] rounded-[12px] t-num text-[14px] font-medium inline-flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none border transition-all active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
+                                isDone
+                                  ? 'bg-[var(--ok)] text-[#0a0d14] border-[var(--ok)]'
+                                  : 'bg-[var(--surface-2)] text-[var(--ink)] border-[var(--line-strong)] hover:border-[var(--action)]'
+                              }`}
+                            >
+                              <span>S{setIdx + 1}</span>
+                              {isDone && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => setSelectedExerciseForModal(exercise)}
-                          className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors flex items-center gap-1 cursor-pointer"
-                          title="Ver progreso y cálculo de 1RM"
+                          onClick={() => setSelectedExerciseIdForModal(exercise.id)}
+                          className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px]"
+                          title="Ver récord personal, calculadora 1RM e historial"
                         >
-                          <Trophy className="w-3 h-3" /> PR: {prValue} kg
+                          <TrendingUp className="w-4 h-4 text-[var(--action)]" />
+                          <span>Ver progreso / 1RM</span>
                         </button>
-                      )}
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">
-                        {exercise.sets} series × {exercise.reps}
-                      </span>
-                      {exercise.weightKg && (
-                        <>
-                          <span>•</span>
-                          <span className="font-bold text-orange-600 dark:text-orange-400">
-                            {exercise.weightKg} kg
-                          </span>
-                        </>
-                      )}
-                      {exercise.notes && (
-                        <>
-                          <span>•</span>
-                          <span className="italic">{exercise.notes}</span>
-                        </>
-                      )}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
+                          className="t-btn t-btn-ghost t-btn-icon hover:!text-[var(--danger)]"
+                          aria-label={`Eliminar ${exercise.name}`}
+                          title="Eliminar ejercicio"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Right: Interactive Series Bubbles, Progress/1RM Modal button & Delete */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {Array.from({ length: exercise.sets }).map((_, setIdx) => {
-                        const isDone = exercise.completedSets[setIdx] || false;
-
-                        return (
-                          <button
-                            key={setIdx}
-                            onClick={() => handleToggleSetWithTimer(currentRoutine.id, exercise.id, setIdx, isDone)}
-                            className={`w-10 h-10 rounded-xl font-bold text-xs flex flex-col items-center justify-center transition-all cursor-pointer ${
-                              isDone
-                                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30 scale-105'
-                                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-orange-400'
-                            }`}
-                            title={`Serie ${setIdx + 1}: Haz clic para alternar`}
-                          >
-                            <span>S{setIdx + 1}</span>
-                            {isDone && <Check className="w-3 h-3 stroke-[3] -mt-0.5" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Open Progress & 1RM Calculator */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedExerciseForModal(exercise)}
-                      className="p-2 text-slate-400 hover:text-orange-500 hover:bg-orange-500/10 rounded-xl transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                      title="Historial de cargas y calculadora 1RM"
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                    </button>
-
-                    {/* Delete exercise button */}
-                    <button
-                      type="button"
-                      onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
-                      className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-colors cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center"
-                      title="Eliminar ejercicio"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Quick Add Exercise Section */}
-        <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-          {!showAddForm ? (
+        {/* Routine Footer CTA */}
+        {currentRoutine.exercises.length > 0 && (
+          <div className="mt-6 pt-5 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <p className="text-[14px] text-[var(--muted)]">
+              {progressPercent === 100
+                ? 'Completaste todas las series programadas para este día.'
+                : 'Registra tu entrenamiento al terminar para sumar un día más a tu racha.'}
+            </p>
             <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-orange-400/50 hover:border-orange-500 text-orange-600 dark:text-orange-400 text-xs font-bold transition-all cursor-pointer w-full justify-center min-h-[44px]"
+              type="button"
+              onClick={() => {
+                triggerBigCelebration();
+                onFinishWorkout();
+              }}
+              className="t-btn t-btn-primary w-full sm:w-auto"
+            >
+              <Trophy className="w-4 h-4" />
+              <span>Terminar rutina de hoy</span>
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* Add Exercise Modal */}
+      <ModalShell
+        isOpen={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        badge={selectedDay}
+        title="Agregar ejercicio a la rutina"
+        subtitle={`Se añadirá a "${currentRoutine.name}"`}
+        icon={<Dumbbell className="w-5 h-5" />}
+        maxWidth="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(false)}
+              className="t-btn t-btn-ghost"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={`${formId}-add-exercise`}
+              className="t-btn t-btn-primary"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Agregar Ejercicio a {selectedDay}</span>
+              <span>Guardar ejercicio</span>
             </button>
-          ) : (
-            <form onSubmit={handleQuickAdd} className="p-4 rounded-2xl bg-orange-50/50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-orange-700 dark:text-orange-300">
-                  Nuevo ejercicio para {selectedDay}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
-                >
-                  Cancelar
-                </button>
-              </div>
+          </>
+        }
+      >
+        <form
+          id={`${formId}-add-exercise`}
+          onSubmit={handleQuickAdd}
+          className="space-y-4"
+        >
+          <div>
+            <label htmlFor={`${formId}-name`} className="t-label">
+              Nombre del ejercicio
+            </label>
+            <input
+              id={`${formId}-name`}
+              type="text"
+              required
+              placeholder="Ej. Press inclinado con mancuernas"
+              value={newExName}
+              onChange={(e) => setNewExName(e.target.value)}
+              className="t-input"
+            />
+          </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                <div className="sm:col-span-2">
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nombre del ejercicio (ej. Hip Thrust)"
-                    value={newExName}
-                    onChange={(e) => setNewExName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    placeholder="Series (4)"
-                    value={newExSets}
-                    onChange={(e) => setNewExSets(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="text"
-                    placeholder="Reps (ej. 10-12)"
-                    value={newExReps}
-                    onChange={(e) => setNewExReps(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-                <div>
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    placeholder="Peso kg"
-                    value={newExWeight}
-                    onChange={(e) => setNewExWeight(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor={`${formId}-sets`} className="t-label">
+                Series
+              </label>
+              <input
+                id={`${formId}-sets`}
+                type="number"
+                min={1}
+                max={12}
+                required
+                value={newExSets}
+                onChange={(e) => setNewExSets(Number(e.target.value))}
+                className="t-input t-num"
+              />
+            </div>
 
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-orange-600/30"
-              >
-                Guardar Ejercicio
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
+            <div>
+              <label htmlFor={`${formId}-reps`} className="t-label">
+                Repeticiones
+              </label>
+              <input
+                id={`${formId}-reps`}
+                type="text"
+                required
+                placeholder="Ej. 8-10 reps"
+                value={newExReps}
+                onChange={(e) => setNewExReps(e.target.value)}
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor={`${formId}-weight`} className="t-label">
+                Peso en kg (opcional)
+              </label>
+              <input
+                id={`${formId}-weight`}
+                type="number"
+                min={0}
+                step={0.5}
+                placeholder="Ej. 30"
+                value={newExWeight}
+                onChange={(e) =>
+                  setNewExWeight(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                className="t-input t-num"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor={`${formId}-notes`} className="t-label">
+              Nota técnica (opcional)
+            </label>
+            <input
+              id={`${formId}-notes`}
+              type="text"
+              placeholder="Ej. Controlar la bajada durante 2 segundos"
+              value={newExNotes}
+              onChange={(e) => setNewExNotes(e.target.value)}
+              className="t-input"
+            />
+          </div>
+        </form>
+      </ModalShell>
 
       {/* Floating Rest Timer */}
       <RestTimerFloating
@@ -461,13 +607,15 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         isOpen={isTimerOpen}
         onClose={() => setIsTimerOpen(false)}
         defaultDuration={90}
+        autoStart={timerAutoStart}
       />
 
       {/* Exercise Progress & 1RM Modal */}
       <ExerciseProgressModal
+        key={selectedExerciseForModal?.id ?? 'closed'}
         exercise={selectedExerciseForModal}
         isOpen={Boolean(selectedExerciseForModal)}
-        onClose={() => setSelectedExerciseForModal(null)}
+        onClose={() => setSelectedExerciseIdForModal(null)}
         onUpdateExercise={handleUpdateExerciseFromModal}
       />
     </div>
