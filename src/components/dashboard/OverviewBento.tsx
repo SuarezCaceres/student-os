@@ -1,34 +1,57 @@
 import React, { useState } from 'react';
-import { 
-  GraduationCap, 
-  Dumbbell, 
-  KanbanSquare, 
-  CalendarDays, 
-  CheckCircle2, 
-  Clock, 
-  ArrowRight, 
+import {
+  GraduationCap,
+  Dumbbell,
+  KanbanSquare,
+  CalendarDays,
+  Check,
+  Clock,
+  ArrowRight,
   Plus,
   Database,
   BookOpen,
-  Sparkles,
-  Palmtree,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
-import type { AppState, DayOfWeek, AssignmentStatus, KanbanStatus } from '../../types';
+import { SectionHeader } from '../common/SectionHeader';
+import type {
+  AppState,
+  DayOfWeek,
+  AssignmentStatus,
+  KanbanStatus,
+  DailyHabits,
+  Category,
+  ReflectionMood,
+} from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import type { NavTab } from '../layout/Navbar';
 import { DailyHabitsCard } from './DailyHabitsCard';
 import { BackupModal } from './BackupModal';
 
-interface OverviewBentoProps {
+export interface OverviewBentoProps {
   state: AppState;
   onNavigateTab: (tab: NavTab) => void;
   onToggleGymSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onUpdateUniStatus: (id: string, status: AssignmentStatus) => void;
   onUpdateKanbanStatus: (id: string, status: KanbanStatus) => void;
-  onOpenQuickAdd: (tab?: 'university' | 'gym' | 'kanban' | 'calendar') => void;
+  onOpenQuickAdd: (tab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning') => void;
+  onHabitsChange?: (habits: DailyHabits) => void;
+  onRestoreState?: (restored: AppState) => void;
 }
+
+const CATEGORY_LABELS: Record<Category, string> = {
+  universidad: 'Universidad',
+  trabajo: 'Trabajo',
+  gym: 'Gym',
+  personal: 'Personal',
+};
+
+const MOOD_LABELS: Record<ReflectionMood, string> = {
+  increible: 'Increíble',
+  productivo: 'Productivo',
+  cansado: 'Cansado',
+  despejado: 'Despejado',
+};
 
 export const OverviewBento: React.FC<OverviewBentoProps> = ({
   state,
@@ -37,33 +60,39 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   onUpdateUniStatus,
   onUpdateKanbanStatus,
   onOpenQuickAdd,
+  onHabitsChange,
+  onRestoreState,
 }) => {
   const [isBackupOpen, setIsBackupOpen] = useState(false);
 
-  // Current day
-  const daysMap: DayOfWeek[] = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const todayDay = daysMap[new Date().getDay()];
+  const [todayDay] = useState<DayOfWeek>(() => {
+    const daysMap: DayOfWeek[] = [
+      'Domingo',
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+    ];
+    return daysMap[new Date().getDay()];
+  });
 
-  // Today's Gym routine
   const todayRoutine = state.gymRoutines.find((r) => r.dayOfWeek === todayDay);
 
-  // Urgent / current week university assignments (not yet delivered)
   const urgentAssignments = state.universityAssignments
     .filter((a) => a.status !== 'entregado' && a.week <= state.currentAcademicWeek + 1)
     .sort((a, b) => a.week - b.week || (a.dueDate || '').localeCompare(b.dueDate || ''))
     .slice(0, 4);
 
-  // Kanban in progress
   const inProgressKanban = state.kanbanItems
     .filter((k) => k.status === 'in_progress')
     .slice(0, 4);
 
-  // Today's calendar blocks
   const todayBlocks = state.calendarBlocks
     .filter((b) => b.day === todayDay)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  // Current week learning & free week status
   const currentWeek = state.currentAcademicWeek;
   const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === currentWeek);
   const currentWeekPending = currentWeekAssignments.filter((a) => a.status !== 'entregado');
@@ -72,80 +101,69 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-            Resumen General (Bento Dashboard)
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Vista unificada de prioridades académicas, entrenamiento físico, hábitos y proyectos de hoy
-          </p>
-        </div>
-
-        {/* Header Actions */}
-        <div className="flex items-center gap-2">
+      <SectionHeader
+        title="Tu día de hoy"
+        subtitle="Lo importante de hoy en clases, entrenamiento, hábitos y proyectos."
+        actions={
           <button
             type="button"
             onClick={() => setIsBackupOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs shadow-sm transition-all cursor-pointer min-h-[44px]"
-            title="Exportar o importar copia de seguridad en JSON"
+            className="t-btn t-btn-secondary"
+            title="Descargar o restaurar copia de seguridad en JSON"
           >
-            <Database className="w-4 h-4 text-indigo-500" />
-            <span>Backup / Restaurar</span>
+            <Database className="w-4 h-4 text-[var(--action)] shrink-0" />
+            <span>Respaldo JSON</span>
           </button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* Bento Grid Container (3 Columns) */}
+      {/* Bento Grid (Strict Two-Level Hierarchy: .t-card + .t-row) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {/* Bento Card 1: Entregas Universitarias Prioritarias */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
+        {/* Card 1: Entregas por vencer */}
+        <div className="t-card p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
-                  <GraduationCap className="w-4 h-4" />
-                </div>
-                <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                  Entregas Universitarias
+            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <GraduationCap className="w-4 h-4 text-[var(--action)] shrink-0" />
+                <h3 className="text-base font-medium text-[var(--ink)] truncate">
+                  Entregas por vencer
                 </h3>
               </div>
+
               <button
                 type="button"
                 onClick={() => onNavigateTab('university')}
-                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                className="t-btn t-btn-ghost px-2.5 text-[13px] shrink-0"
               >
-                Ver todas <ArrowRight className="w-3 h-3" />
+                <span>Ver todas</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              {urgentAssignments.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 italic">
-                  No hay entregas pendientes urgentes. ¡Buen trabajo! 🎉
-                </div>
-              ) : (
-                urgentAssignments.map((a) => (
+            {urgentAssignments.length === 0 ? (
+              <p className="py-8 text-[14px] text-[var(--muted)]">
+                No tienes entregas próximas pendientes. Estás al día.
+              </p>
+            ) : (
+              <div>
+                {urgentAssignments.map((a) => (
                   <div
                     key={a.id}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-3"
+                    className="t-row flex items-center justify-between gap-3"
                   >
                     <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                      <div className="flex items-center gap-1.5 text-[13px] text-[var(--muted)]">
+                        <span className="t-num font-medium text-[var(--action)] shrink-0">
                           Sem. {a.week}
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-500 truncate">
-                          {a.course}
-                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span className="truncate">{a.course}</span>
                       </div>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                      <h4 className="text-[15px] font-medium text-[var(--ink)] truncate mt-0.5">
                         {a.title}
                       </h4>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
-                        Entrega: {a.dueDate}
+                      <p className="text-[13px] text-[var(--muted)] mt-0.5">
+                        Vence <span className="t-num">{a.dueDate}</span>
                       </p>
                     </div>
 
@@ -155,78 +173,74 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                         triggerConfetti();
                         onUpdateUniStatus(a.id, 'entregado');
                       }}
-                      className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-white transition-all cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center shrink-0"
-                      title="Marcar como entregado"
+                      className="t-btn t-btn-secondary t-btn-icon shrink-0"
+                      title="Marcar como entregada"
+                      aria-label={`Marcar ${a.title} como entregada`}
                     >
-                      <CheckCircle2 className="w-4 h-4" />
+                      <Check className="w-4 h-4 text-[var(--ok)]" />
                     </button>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <button
             type="button"
             onClick={() => onOpenQuickAdd('university')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+            className="t-btn t-btn-secondary w-full mt-5"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Nueva Entrega</span>
+            <Plus className="w-4 h-4" />
+            <span>Agregar entrega</span>
           </button>
         </div>
 
-        {/* Bento Card 2: Rutina Gym de Hoy */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
+        {/* Card 2: Entrenamiento de hoy */}
+        <div className="t-card p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-                  <Dumbbell className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                    Gym Hoy ({todayDay})
+            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4 text-[var(--gym)] shrink-0" />
+                  <h3 className="text-base font-medium text-[var(--ink)] truncate">
+                    Entrenamiento de hoy ({todayDay})
                   </h3>
-                  <span className="text-[10px] text-orange-500 font-bold uppercase tracking-wider">
-                    {todayRoutine ? todayRoutine.tag : 'Descanso'}
-                  </span>
                 </div>
+                <p className="text-[13px] text-[var(--muted)] mt-0.5">
+                  {todayRoutine ? todayRoutine.tag : 'Día de descanso'}
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => onNavigateTab('gym')}
-                className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline flex items-center gap-1 cursor-pointer"
+                className="t-btn t-btn-ghost px-2.5 text-[13px] shrink-0"
               >
-                Ver rutina <ArrowRight className="w-3 h-3" />
+                <span>Ver rutina</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-3">
-              {!todayRoutine || todayRoutine.exercises.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 italic">
-                  Día de descanso o sin ejercicios configurados hoy.
-                </div>
-              ) : (
-                todayRoutine.exercises.slice(0, 3).map((ex) => (
-                  <div
-                    key={ex.id}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+            {!todayRoutine || todayRoutine.exercises.length === 0 ? (
+              <p className="py-8 text-[14px] text-[var(--muted)]">
+                Hoy toca descanso o aún no hay ejercicios cargados.
+              </p>
+            ) : (
+              <div>
+                {todayRoutine.exercises.slice(0, 3).map((ex) => (
+                  <div key={ex.id} className="t-row">
+                    <div className="flex items-baseline justify-between gap-2 mb-2.5">
+                      <h4 className="text-[15px] font-medium text-[var(--ink)] truncate">
                         {ex.name}
                       </h4>
-                      <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400">
-                        {ex.weightKg ? `${ex.weightKg} kg` : ex.reps}
+                      <span className="t-num text-[13px] font-medium text-[var(--muted)] shrink-0">
+                        {ex.weightKg ? `${ex.weightKg} kg · ${ex.reps}` : ex.reps}
                       </span>
                     </div>
 
-                    {/* Interactive Series click right here */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       {Array.from({ length: ex.sets }).map((_, sIdx) => {
-                        const isDone = ex.completedSets[sIdx];
+                        const isDone = Boolean(ex.completedSets[sIdx]);
                         return (
                           <button
                             key={sIdx}
@@ -235,12 +249,13 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                               if (!isDone) triggerConfetti();
                               onToggleGymSet(todayRoutine.id, ex.id, sIdx);
                             }}
-                            className={`w-7 h-7 rounded-lg text-[10px] font-bold flex items-center justify-center transition-all cursor-pointer ${
+                            aria-pressed={isDone}
+                            aria-label={`${ex.name}, serie ${sIdx + 1}`}
+                            className={`min-w-[44px] min-h-[44px] px-2.5 rounded-[10px] t-num text-[13px] font-medium border inline-flex items-center justify-center cursor-pointer select-none transition-colors duration-[150ms] focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                               isDone
-                                ? 'bg-emerald-500 text-white shadow-sm'
-                                : 'bg-white dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700 hover:border-orange-400'
+                                ? 'bg-[color-mix(in_oklab,var(--ok)_16%,transparent)] border-[color-mix(in_oklab,var(--ok)_40%,transparent)] text-[var(--ok)]'
+                                : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
                             }`}
-                            title={`Serie ${sIdx + 1}`}
                           >
                             S{sIdx + 1}
                           </button>
@@ -248,328 +263,330 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                       })}
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <button
             type="button"
             onClick={() => onNavigateTab('gym')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-orange-400 text-slate-500 hover:text-orange-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+            className="t-btn t-btn-secondary w-full mt-5"
           >
-            <span>Ir al Tracker del Gym</span>
-            <ArrowRight className="w-3.5 h-3.5" />
+            <span>Abrir rutina completa</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Bento Card 3: Horario de Hoy */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col justify-between">
+        {/* Card 3: Agenda de hoy */}
+        <div className="t-card p-6 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center">
-                  <CalendarDays className="w-4 h-4" />
-                </div>
-                <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                  Horario de {todayDay}
+            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <CalendarDays className="w-4 h-4 text-[var(--action)] shrink-0" />
+                <h3 className="text-base font-medium text-[var(--ink)] truncate">
+                  Agenda de {todayDay}
                 </h3>
               </div>
+
               <button
                 type="button"
                 onClick={() => onNavigateTab('calendar')}
-                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                className="t-btn t-btn-ghost px-2.5 text-[13px] shrink-0"
               >
-                Semana completa <ArrowRight className="w-3 h-3" />
+                <span>Horario</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="space-y-2.5">
-              {todayBlocks.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400 italic">
-                  No hay clases o eventos para hoy. ¡Día despejado!
-                </div>
-              ) : (
-                todayBlocks.map((b) => (
-                  <div
-                    key={b.id}
-                    className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex items-center justify-between gap-2"
-                  >
-                    <div>
-                      <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mb-0.5">
-                        <Clock className="w-3 h-3" /> {b.startTime} - {b.endTime}
+            {todayBlocks.length === 0 ? (
+              <p className="py-8 text-[14px] text-[var(--muted)]">
+                No tienes clases ni bloques agendados para hoy.
+              </p>
+            ) : (
+              <div>
+                {todayBlocks.map((b) => (
+                  <div key={b.id} className="t-row">
+                    <div className="t-num text-[13px] font-medium text-[var(--action)] flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {b.startTime} – {b.endTime}
                       </span>
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">
-                        {b.title}
-                      </h4>
-                      {b.location && (
-                        <p className="text-[10px] text-slate-400">{b.location}</p>
-                      )}
                     </div>
+                    <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
+                      {b.title}
+                    </h4>
+                    {b.location && (
+                      <p className="text-[13px] text-[var(--muted)] mt-0.5">{b.location}</p>
+                    )}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <button
             type="button"
             onClick={() => onOpenQuickAdd('calendar')}
-            className="mt-4 w-full py-2.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 hover:border-violet-400 text-slate-500 hover:text-violet-600 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[40px]"
+            className="t-btn t-btn-secondary w-full mt-5"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Agendar Bloque</span>
+            <Plus className="w-4 h-4" />
+            <span>Agendar bloque</span>
           </button>
         </div>
 
-        {/* Bento Card 4: Hábitos Diarios (Agua, Sueño, Pomodoro) */}
-        <DailyHabitsCard initialHabits={state.dailyHabits} />
+        {/* Card 4: Hábitos diarios */}
+        <DailyHabitsCard
+          initialHabits={state.dailyHabits}
+          onHabitsChange={onHabitsChange}
+        />
 
-        {/* Bento Card 5 (2 Cols on lg): Proyectos & Tareas en Progreso (Kanban) */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm lg:col-span-2 flex flex-col justify-between">
+        {/* Card 5 (2 Cols on lg): Proyectos en foco (Kanban) */}
+        <div className="t-card p-6 lg:col-span-2 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <KanbanSquare className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">
-                    Trabajos en Progreso (Kanban)
+            <div className="flex items-center justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <KanbanSquare className="w-4 h-4 text-[var(--action)] shrink-0" />
+                  <h3 className="text-base font-medium text-[var(--ink)] truncate">
+                    Proyectos en foco
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Tareas activas en las que estás enfocado actualmente
-                  </p>
                 </div>
+                <p className="text-[13px] text-[var(--muted)] mt-0.5">
+                  Tareas que tienes en curso ahora mismo en tu tablero Kanban
+                </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => onNavigateTab('kanban')}
-                className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                className="t-btn t-btn-ghost px-2.5 text-[13px] shrink-0"
               >
-                Tablero completo <ArrowRight className="w-3 h-3" />
+                <span>Ver tablero</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {inProgressKanban.length === 0 ? (
-                <div className="col-span-full py-6 text-center text-xs text-slate-400 italic">
-                  No hay tareas en progreso actualmente. ¡Mueve una desde el tablero Kanban!
-                </div>
-              ) : (
-                inProgressKanban.map((k) => (
+            {inProgressKanban.length === 0 ? (
+              <p className="py-8 text-[14px] text-[var(--muted)]">
+                No tienes tareas en curso ahora mismo. Mueve una tarjeta a &ldquo;En progreso&rdquo; o crea una nueva.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+                {inProgressKanban.map((k) => (
                   <div
                     key={k.id}
-                    className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between"
+                    className="py-4 border-b border-[var(--line)] last:border-b-0 flex flex-col justify-between gap-3"
                   >
                     <div>
-                      <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 inline-block mb-1.5">
-                        {k.category}
-                      </span>
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="t-badge">{CATEGORY_LABELS[k.category]}</span>
+                        <span className="text-[13px] text-[var(--muted)] t-num">
+                          {k.dueDate ? `Vence ${k.dueDate}` : 'Sin fecha límite'}
+                        </span>
+                      </div>
+                      <h4 className="text-[15px] font-medium text-[var(--ink)] mt-2 leading-snug">
                         {k.title}
                       </h4>
                       {k.description && (
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-2">
+                        <p className="text-[13px] text-[var(--muted)] mt-1 line-clamp-2">
                           {k.description}
                         </p>
                       )}
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200/60 dark:border-slate-800/60 mt-3 flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400">
-                        {k.dueDate ? `Límite: ${k.dueDate}` : 'Sin fecha'}
-                      </span>
+                    <div>
                       <button
                         type="button"
                         onClick={() => {
                           triggerConfetti();
                           onUpdateKanbanStatus(k.id, 'done');
                         }}
-                        className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-transform active:scale-95 min-h-[32px]"
+                        className="t-btn t-btn-secondary px-3.5 text-[14px]"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Completar</span>
+                        <Check className="w-4 h-4 text-[var(--ok)]" />
+                        <span>Marcar listo</span>
                       </button>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Bento Card 6 (Col Span 3): Bitácora de Aprendizaje & Active Recall Semanal */}
-        <div className="rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-sm col-span-1 md:col-span-2 lg:col-span-3">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-5 gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <BookOpen className="w-5 h-5" />
+        {/* Card 6 (Full Width): Aprendizaje de la semana */}
+        <div className="t-card p-6 col-span-1 md:col-span-2 lg:col-span-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[var(--line)] mb-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0" />
+                <h3 className="text-base sm:text-lg font-medium text-[var(--ink)]">
+                  Aprendizaje de la semana <span className="t-num">{currentWeek}</span>
+                </h3>
+                {isFreeWeek && <span className="t-badge t-badge-ok">Semana libre</span>}
+                {currentReflection?.mood && (
+                  <span className="t-badge">Estado: {MOOD_LABELS[currentReflection.mood]}</span>
+                )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-extrabold text-base sm:text-lg text-slate-900 dark:text-white">
-                    Bitácora de Aprendizaje & Active Recall
-                  </h3>
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                    Semana {currentWeek}
-                  </span>
-                  {isFreeWeek && (
-                    <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      <Palmtree className="w-3 h-3" />
-                      Semana Libre
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  ¿Qué has aprendido hoy en la semana realmente? ¿De qué te acuerdas?
-                </p>
-              </div>
+              <p className="text-[14px] text-[var(--muted)] mt-1">
+                Resume con tus palabras lo más importante que aprendiste esta semana.
+              </p>
             </div>
 
             <button
               type="button"
               onClick={() => onNavigateTab('learning')}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 font-bold text-xs transition-all cursor-pointer min-h-[44px] self-start lg:self-auto"
+              className="t-btn t-btn-secondary self-start sm:self-auto shrink-0"
             >
-              <span>Abrir Módulo de Aprendizaje</span>
+              <span>Abrir aprendizaje</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* Left 2 Cols: Active Recall Reflection or prompt */}
-            <div className="lg:col-span-2 space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
+            {/* Left Column: Active Recall Summary */}
+            <div className="lg:border-r lg:border-[var(--line)] lg:pr-8 flex flex-col justify-between">
               {currentReflection?.learnings ? (
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                      Síntesis Feynman registrada
-                    </span>
-                    {currentReflection.mood && (
-                      <span className="text-[11px] font-bold capitalize px-2 py-0.5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        Estado: {currentReflection.mood}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed line-clamp-3">
-                    "{currentReflection.learnings}"
+                <div>
+                  <p className="text-[13px] font-medium text-[var(--muted)] mb-2">
+                    Tu síntesis registrada
                   </p>
+                  <p className="text-[15px] text-[var(--ink)] leading-relaxed">
+                    {currentReflection.learnings}
+                  </p>
+
                   {currentReflection.keyConcepts && currentReflection.keyConcepts.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-800/60">
-                      {currentReflection.keyConcepts.map((c, i) => (
-                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-medium">
-                          #{c}
+                    <div className="flex flex-wrap gap-2 mt-4">
+                      {currentReflection.keyConcepts.map((concept, idx) => (
+                        <span key={idx} className="t-badge t-badge-accent">
+                          #{concept}
                         </span>
                       ))}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-500/5 to-violet-500/5 border border-dashed border-indigo-300 dark:border-indigo-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                      Aún no has registrado tu Active Recall de la semana {currentWeek}
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Explica con tus propias palabras lo que aprendiste para consolidar la memoria a largo plazo.
-                    </p>
-                  </div>
+                <div>
+                  <h4 className="text-[15px] font-medium text-[var(--ink)]">
+                    Todavía no escribiste tu resumen de la semana{' '}
+                    <span className="t-num">{currentWeek}</span>
+                  </h4>
+                  <p className="text-[14px] text-[var(--muted)] mt-1 mb-4 leading-relaxed">
+                    Explicar un tema sin mirar apuntes te ayuda a detectar huecos antes de los exámenes.
+                  </p>
                   <button
                     type="button"
                     onClick={() => onNavigateTab('learning')}
-                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shrink-0 cursor-pointer shadow-sm transition-all min-h-[40px]"
+                    className="t-btn t-btn-primary"
                   >
-                    Escribir Reflexión
+                    <span>Escribir resumen</span>
                   </button>
                 </div>
               )}
 
-              {/* Free week indicator if active */}
               {isFreeWeek && (
-                <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300">
-                    <Palmtree className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    <span>
-                      <strong>¡Semana Libre activa!</strong> No tienes tareas universitarias pendientes para la semana {currentWeek}.
-                    </span>
-                  </div>
+                <div className="mt-5 pt-4 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-3">
+                  <span className="text-[13px] font-medium text-[var(--ok)]">
+                    Cerraste todas las entregas de la semana <span className="t-num">{currentWeek}</span>.
+                  </span>
                   <button
                     type="button"
                     onClick={() => onNavigateTab('gym')}
-                    className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 underline shrink-0 cursor-pointer"
+                    className="t-btn t-btn-ghost px-3 text-[13px]"
                   >
-                    Entrenar Gym
+                    <span>Ir al Gym</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Right 1 Col: YouTube & Study Sources preview */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-slate-800 flex flex-col justify-between">
+            {/* Right Column: YouTube & Saved Study Links */}
+            <div className="flex flex-col justify-between">
               <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <YoutubeIcon className="w-4 h-4 text-red-500" />
-                    Fuentes & YouTube
-                  </span>
-                  <span className="text-[11px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
+                    <YoutubeIcon className="w-4 h-4 text-[var(--danger)] shrink-0" />
+                    <span>Videos y fuentes guardadas</span>
+                  </div>
+                  <span className="t-badge t-num">
                     {currentReflection?.resources?.length || 0}
                   </span>
                 </div>
 
                 {currentReflection?.resources && currentReflection.resources.length > 0 ? (
-                  <div className="space-y-2">
-                    {currentReflection.resources.slice(0, 2).map((res) => (
-                      <a
-                        key={res.id}
-                        href={res.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group block p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 hover:border-red-400 transition-all text-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-slate-900 dark:text-white truncate group-hover:text-red-500 transition-colors">
-                            {res.title}
-                          </span>
-                          <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-red-500 shrink-0 ml-1.5" />
+                  <div>
+                    {currentReflection.resources.slice(0, 3).map((res) =>
+                      res.url ? (
+                        <a
+                          key={res.id}
+                          href={res.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="t-row group flex items-center justify-between gap-3 min-h-[44px]"
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            {res.type === 'youtube' ? (
+                              <YoutubeIcon className="w-4 h-4 text-[var(--danger)] shrink-0 mt-1" />
+                            ) : (
+                              <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-[14px] font-medium text-[var(--ink)] group-hover:text-[var(--action)] transition-colors truncate">
+                                {res.title}
+                              </div>
+                              {res.notes && (
+                                <p className="text-[13px] text-[var(--muted)] truncate mt-0.5">
+                                  {res.notes}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <ExternalLink className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--action)] shrink-0" />
+                        </a>
+                      ) : (
+                        <div key={res.id} className="t-row flex items-start gap-2.5">
+                          <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                          <div className="min-w-0">
+                            <div className="text-[14px] font-medium text-[var(--ink)] truncate">
+                              {res.title}
+                            </div>
+                            {res.notes && (
+                              <p className="text-[13px] text-[var(--muted)] truncate mt-0.5">
+                                {res.notes}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        {res.notes && (
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                            {res.notes}
-                          </p>
-                        )}
-                      </a>
-                    ))}
+                      )
+                    )}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-400 italic py-4 text-center">
-                    No has guardado links de YouTube o apuntes de texto esta semana aún.
+                  <p className="text-[14px] text-[var(--muted)] py-4">
+                    Aún no guardaste videos de YouTube ni apuntes esta semana.
                   </p>
                 )}
               </div>
 
               <button
                 type="button"
-                onClick={() => onNavigateTab('learning')}
-                className="mt-3 w-full py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs border border-slate-200 dark:border-slate-700 flex items-center justify-center gap-1.5 cursor-pointer min-h-[38px] transition-all"
+                onClick={() => onOpenQuickAdd('learning')}
+                className="t-btn t-btn-secondary w-full mt-4"
               >
-                <Plus className="w-3.5 h-3.5 text-indigo-500" />
-                <span>+ Agregar Enlace o Apunte</span>
+                <Plus className="w-4 h-4" />
+                <span>Guardar recurso</span>
               </button>
             </div>
           </div>
         </div>
-
       </div>
 
-      {/* Backup & Restore Modal */}
       <BackupModal
         isOpen={isBackupOpen}
         onClose={() => setIsBackupOpen(false)}
         currentState={state}
+        onRestoreState={onRestoreState}
       />
     </div>
   );
