@@ -319,8 +319,8 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[var(--line)]">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold text-[var(--ink)] t-num">
-                      Semana {weekNum}
+                    <h3 className="text-lg font-semibold text-[var(--ink)]">
+                      Semana <span className="t-num">{weekNum}</span>
                     </h3>
 
                     {isCurrent && (

@@ -208,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 aria-current={isActive ? 'page' : undefined}
-                className={`relative min-h-[56px] py-1.5 px-0.5 flex flex-col items-center justify-center gap-1 cursor-pointer select-none transition-colors duration-[150ms] focus-visible:outline-2 focus-visible:outline-[var(--action)] -outline-offset-2 ${
+                className={`relative min-w-0 min-h-[56px] py-1.5 px-0.5 flex flex-col items-center justify-center gap-1 cursor-pointer select-none transition-colors duration-[150ms] focus-visible:outline-2 focus-visible:outline-[var(--action)] -outline-offset-2 ${
                   isActive
                     ? 'text-[var(--action)]'
                     : 'text-[var(--muted)] hover:text-[var(--ink)]'

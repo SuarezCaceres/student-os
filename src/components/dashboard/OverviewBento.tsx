@@ -459,7 +459,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                   {currentReflection.keyConcepts && currentReflection.keyConcepts.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-4">
                       {currentReflection.keyConcepts.map((concept, idx) => (
-                        <span key={idx} className="t-badge t-badge-accent">
+                        <span key={idx} className="t-badge t-badge-accent max-w-full whitespace-normal break-words leading-snug">
                           #{concept}
                         </span>
                       ))}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Timer,
   Play,
@@ -126,7 +127,7 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
     });
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -139,7 +140,7 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
 
   // Minimized pill view (mobile-safe above bottom bar)
   if (isMinimized) {
-    return (
+    return createPortal(
       <div className="fixed bottom-20 md:bottom-6 right-4 md:right-6 z-40 modal-panel-enter">
         <div
           className={`min-h-[48px] px-4 py-1.5 rounded-full bg-[var(--surface)] border shadow-2xl flex items-center gap-2.5 ${
@@ -185,12 +186,13 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
             <ChevronUp className="w-4 h-4 text-[var(--muted)]" />
           </button>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // Expanded floating panel (mobile-safe above bottom navigation)
-  return (
+  return createPortal(
     <div
       role="region"
       aria-label="Cronómetro de descanso"
@@ -349,6 +351,7 @@ export const RestTimerFloating: React.FC<RestTimerFloatingProps> = ({
           <span>Reiniciar</span>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
