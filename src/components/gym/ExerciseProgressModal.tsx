@@ -1,23 +1,38 @@
-import React, { useState } from 'react';
-import { 
-  X, 
-  Trophy, 
-  Calculator, 
-  TrendingUp, 
-  Calendar, 
-  Plus, 
-  Award, 
-  Sparkles,
-  Dumbbell
+import React, { useState, useId } from 'react';
+import {
+  Trophy,
+  Calculator,
+  TrendingUp,
+  Calendar,
+  Plus,
+  Award,
+  Dumbbell,
 } from 'lucide-react';
 import type { GymExercise, ExerciseHistoryEntry } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { ModalShell } from '../common/ModalShell';
 
-interface ExerciseProgressModalProps {
+export interface ExerciseProgressModalProps {
   exercise: GymExercise | null;
   isOpen: boolean;
   onClose: () => void;
   onUpdateExercise?: (updated: GymExercise) => void;
+}
+
+const INTENSITY_ZONES = [
+  { pct: 95, reps: '2 reps' },
+  { pct: 90, reps: '3-4 reps' },
+  { pct: 85, reps: '5-6 reps' },
+  { pct: 80, reps: '7-8 reps' },
+  { pct: 75, reps: '9-10 reps' },
+  { pct: 70, reps: '11-12 reps' },
+];
+
+// Epley formula: 1RM = Weight * (1 + Reps / 30)
+function calculateEpley1RM(weight: number, reps: number): number {
+  if (reps <= 0 || weight <= 0) return 0;
+  if (reps === 1) return Math.round(weight);
+  return Math.round(weight * (1 + reps / 30));
 }
 
 export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
@@ -26,80 +41,93 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
   onClose,
   onUpdateExercise,
 }) => {
-  // Initial values for 1RM calculator
+  const baseId = useId();
   const initialWeight = exercise?.weightKg || 60;
   const initialReps = parseInt(exercise?.reps.match(/\d+/)?.[0] || '8', 10);
+  const currentPR =
+    exercise?.personalRecordKg ||
+    (exercise?.weightKg ? Math.round(exercise.weightKg * 1.1) : 80);
 
   const [calcWeight, setCalcWeight] = useState<number>(initialWeight);
   const [calcReps, setCalcReps] = useState<number>(initialReps);
 
-  // New history entry state
-  const [newHistWeight, setNewHistWeight] = useState<number>(initialWeight);
-  const [newHistReps, setNewHistReps] = useState<string>(`${initialReps} reps`);
-  const [showAddHistory, setShowAddHistory] = useState(false);
-
-  // PR state
-  const currentPR = exercise?.personalRecordKg || (exercise?.weightKg ? Math.round(exercise.weightKg * 1.1) : 80);
   const [editingPR, setEditingPR] = useState(false);
   const [prInput, setPrInput] = useState<number>(currentPR);
 
+  const [showAddHistory, setShowAddHistory] = useState(false);
+  const [newHistWeight, setNewHistWeight] = useState<number>(initialWeight);
+  const [newHistReps, setNewHistReps] = useState<string>(`${initialReps} reps`);
+
   if (!isOpen || !exercise) return null;
 
-  // Epley formula: 1RM = Weight * (1 + Reps / 30)
-  const calculate1RM = (weight: number, reps: number) => {
-    if (reps <= 0 || weight <= 0) return 0;
-    if (reps === 1) return weight;
-    return Math.round(weight * (1 + reps / 30));
+  const estimated1RM = calculateEpley1RM(calcWeight, calcReps);
+
+  const historyEntries: ExerciseHistoryEntry[] =
+    exercise.history && exercise.history.length > 0
+      ? exercise.history
+      : [
+          {
+            date: '2026-10-15',
+            weightKg: Math.round(initialWeight * 0.9),
+            reps: '8 reps',
+          },
+          {
+            date: '2026-10-22',
+            weightKg: Math.round(initialWeight * 0.95),
+            reps: '8 reps',
+          },
+          {
+            date: '2026-10-29',
+            weightKg: initialWeight,
+            reps: exercise.reps,
+          },
+        ];
+
+  const handleOpenEditPR = () => {
+    setPrInput(currentPR);
+    setEditingPR(true);
   };
 
-  const estimated1RM = calculate1RM(calcWeight, calcReps);
-
-  const percentages = [
-    { pct: 95, reps: '2 reps' },
-    { pct: 90, reps: '3 - 4 reps' },
-    { pct: 85, reps: '5 - 6 reps' },
-    { pct: 80, reps: '7 - 8 reps' },
-    { pct: 75, reps: '9 - 10 reps' },
-    { pct: 70, reps: '11 - 12 reps' },
-  ];
-
-  const historyEntries: ExerciseHistoryEntry[] = exercise.history && exercise.history.length > 0
-    ? exercise.history
-    : [
-        { date: '2026-10-15', weightKg: Math.round(initialWeight * 0.9), reps: '8 reps' },
-        { date: '2026-10-22', weightKg: Math.round(initialWeight * 0.95), reps: '8 reps' },
-        { date: '2026-10-29', weightKg: initialWeight, reps: exercise.reps },
-      ];
-
-  const handleSavePR = () => {
+  const handleSavePR = (e: React.FormEvent) => {
+    e.preventDefault();
     if (onUpdateExercise && prInput > 0) {
       onUpdateExercise({
         ...exercise,
-        personalRecordKg: prInput,
+        personalRecordKg: Number(prInput),
       });
       triggerConfetti();
     }
     setEditingPR(false);
   };
 
+  const handleToggleAddHistory = () => {
+    if (!showAddHistory) {
+      setNewHistWeight(exercise.weightKg || initialWeight);
+      setNewHistReps(`${initialReps} reps`);
+    }
+    setShowAddHistory((prev) => !prev);
+  };
+
   const handleAddHistoryEntry = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHistWeight || !newHistReps.trim()) return;
 
+    const weightValue = Number(newHistWeight);
     const newEntry: ExerciseHistoryEntry = {
       date: new Date().toISOString().split('T')[0],
-      weightKg: Number(newHistWeight),
+      weightKg: weightValue,
       reps: newHistReps.trim(),
     };
 
     const updatedHistory = [...(exercise.history || historyEntries), newEntry];
-    const isNewPR = newHistWeight > currentPR;
+    const isNewPR = weightValue > currentPR;
 
     if (onUpdateExercise) {
       onUpdateExercise({
         ...exercise,
+        weightKg: weightValue,
         history: updatedHistory,
-        personalRecordKg: isNewPR ? newHistWeight : currentPR,
+        personalRecordKg: isNewPR ? weightValue : currentPR,
       });
       triggerConfetti();
     }
@@ -108,166 +136,156 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div 
-        className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 shadow-2xl p-6 sm:p-8 space-y-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center">
-              <Dumbbell className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
-                  Progreso & Cargas
-                </span>
-                <span className="text-xs text-slate-400 font-semibold">
-                  {exercise.sets} series × {exercise.reps}
-                </span>
-              </div>
-              <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white">
-                {exercise.name}
-              </h3>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* PR Card & Highlights */}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      badge={`${exercise.sets} series · ${exercise.reps}`}
+      title={exercise.name}
+      subtitle="Tu récord personal, estimación de fuerza máxima (1RM) e historial de pesos"
+      icon={<Dumbbell className="w-5 h-5" />}
+      maxWidth="2xl"
+    >
+      <div className="space-y-6">
+        {/* Top Summary: 2 clean panels */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-transparent border border-orange-500/30 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
-                <Trophy className="w-5 h-5" />
+          {/* Panel 1: Personal Record (PR) */}
+          <div className="bg-[var(--surface-2)] rounded-[14px] p-4 border border-[var(--line)] flex flex-col justify-between gap-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--muted)]">
+                <Trophy className="w-4 h-4 text-[var(--gym)] shrink-0" />
+                <span>Récord personal (PR)</span>
               </div>
-              <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                  Récord Personal (PR)
-                </span>
-                {editingPR ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="number"
-                      value={prInput}
-                      onChange={(e) => setPrInput(Number(e.target.value))}
-                      className="w-20 px-2 py-1 rounded-lg bg-white dark:bg-slate-800 border border-orange-400 text-xs font-bold"
-                    />
-                    <button
-                      onClick={handleSavePR}
-                      className="px-2 py-1 rounded-lg bg-orange-600 text-white text-[11px] font-bold cursor-pointer"
-                    >
-                      Guardar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <span className="text-2xl font-black text-slate-900 dark:text-white">
-                      {currentPR}
-                    </span>
-                    <span className="text-xs font-bold text-slate-400">kg</span>
-                  </div>
-                )}
-              </div>
+              {!editingPR && (
+                <button
+                  type="button"
+                  onClick={handleOpenEditPR}
+                  className="t-btn t-btn-ghost !px-3 !text-[13px] -my-1.5"
+                >
+                  Editar
+                </button>
+              )}
             </div>
 
-            {!editingPR && (
-              <button
-                onClick={() => setEditingPR(true)}
-                className="text-xs font-bold text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
-              >
-                Editar
-              </button>
+            {editingPR ? (
+              <form onSubmit={handleSavePR} className="space-y-2.5">
+                <label htmlFor={`${baseId}-pr`} className="sr-only">
+                  Récord personal en kilogramos
+                </label>
+                <input
+                  id={`${baseId}-pr`}
+                  type="number"
+                  min={1}
+                  step={0.5}
+                  value={prInput}
+                  onChange={(e) => setPrInput(Number(e.target.value))}
+                  className="t-input t-num !bg-[var(--surface)]"
+                />
+                <div className="flex items-center gap-2">
+                  <button type="submit" className="t-btn t-btn-primary flex-1 !px-3 !text-[14px]">
+                    Guardar PR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingPR(false)}
+                    className="t-btn t-btn-ghost !px-3 !text-[14px]"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div>
+                <div className="t-num text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
+                  {currentPR} kg
+                </div>
+                <p className="text-[13px] text-[var(--muted)] mt-1">
+                  Mejor marca personal registrada
+                </p>
+              </div>
             )}
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-orange-500/15 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
-              <Calculator className="w-5 h-5" />
+          {/* Panel 2: Estimated 1RM */}
+          <div className="bg-[var(--surface-2)] rounded-[14px] p-4 border border-[var(--line)] flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--muted)]">
+              <Calculator className="w-4 h-4 text-[var(--action)] shrink-0" />
+              <span>1RM estimado</span>
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                1RM Teórico Estimado
-              </span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-2xl font-black text-orange-600 dark:text-orange-400">
-                  {estimated1RM}
-                </span>
-                <span className="text-xs font-bold text-slate-400">kg (Fórmula Epley)</span>
+              <div className="t-num text-2xl sm:text-3xl font-semibold text-[var(--action)] tracking-tight">
+                {estimated1RM} kg
               </div>
+              <p className="text-[13px] text-[var(--muted)] mt-1">
+                Peso máximo estimado a 1 repetición
+              </p>
             </div>
           </div>
         </div>
 
-        {/* 1RM Calculator Section */}
-        <div className="p-5 rounded-3xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/70 dark:border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-orange-500" />
-              <h4 className="text-sm font-black text-slate-900 dark:text-white">
-                Calculadora Dinámica de 1RM
-              </h4>
-            </div>
-            <span className="text-[10px] text-slate-400">
-              1RM = Peso × (1 + Reps / 30)
+        {/* Interactive 1RM Calculator & Intensity Zones */}
+        <div className="pt-5 border-t border-[var(--line)] space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+            <h3 className="text-[16px] font-medium text-[var(--ink)]">
+              Calculadora de fuerza y zonas de carga
+            </h3>
+            <span className="t-num text-[13px] text-[var(--muted)]">
+              1RM = peso × (1 + reps / 30)
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
+              <label htmlFor={`${baseId}-calc-weight`} className="t-label">
                 Peso levantado (kg)
               </label>
               <input
+                id={`${baseId}-calc-weight`}
                 type="number"
                 min={1}
+                step={0.5}
                 value={calcWeight}
-                onChange={(e) => setCalcWeight(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-white"
+                onChange={(e) => setCalcWeight(Math.max(0, Number(e.target.value)))}
+                className="t-input t-num"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Repeticiones realizadas
+              <label htmlFor={`${baseId}-calc-reps`} className="t-label">
+                Repeticiones logradas
               </label>
               <input
+                id={`${baseId}-calc-reps`}
                 type="number"
                 min={1}
                 max={30}
                 value={calcReps}
-                onChange={(e) => setCalcReps(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-900 dark:text-white"
+                onChange={(e) => setCalcReps(Math.max(1, Math.min(30, Number(e.target.value))))}
+                className="t-input t-num"
               />
             </div>
           </div>
 
-          {/* Percentage zones table */}
           <div>
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-              Subdivisiones de Intensidad por Repetición
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {percentages.map((p) => {
-                const targetKg = Math.round(estimated1RM * (p.pct / 100));
+            <p className="text-[13px] font-medium text-[var(--muted)] mb-2.5">
+              Cargas sugeridas según tu objetivo de repeticiones
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              {INTENSITY_ZONES.map((zone) => {
+                const targetKg = Math.round(estimated1RM * (zone.pct / 100));
                 return (
                   <div
-                    key={p.pct}
-                    className="p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700/80 flex items-center justify-between text-xs"
+                    key={zone.pct}
+                    className="bg-[var(--surface-2)] rounded-[12px] px-3.5 py-2.5 border border-[var(--line)] flex items-center justify-between gap-2"
                   >
                     <div>
-                      <span className="font-bold text-slate-900 dark:text-white">{p.pct}%</span>
-                      <span className="text-[10px] text-slate-400 block">{p.reps}</span>
+                      <span className="t-num text-[14px] font-medium text-[var(--ink)] block">
+                        {zone.pct}%
+                      </span>
+                      <span className="t-num text-[13px] text-[var(--muted)] block">
+                        {zone.reps}
+                      </span>
                     </div>
-                    <span className="font-mono font-black text-orange-600 dark:text-orange-400">
+                    <span className="t-num text-[15px] font-semibold text-[var(--action)]">
                       {targetKg} kg
                     </span>
                   </div>
@@ -278,84 +296,101 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
         </div>
 
         {/* Load History Section */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="pt-5 border-t border-[var(--line)] space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-500" />
-              <h4 className="text-sm font-black text-slate-900 dark:text-white">
-                Historial de Cargas Registradas
-              </h4>
+              <TrendingUp className="w-4 h-4 text-[var(--ok)] shrink-0" />
+              <h3 className="text-[16px] font-medium text-[var(--ink)]">
+                Historial de cargas
+              </h3>
             </div>
 
             <button
-              onClick={() => setShowAddHistory(!showAddHistory)}
-              className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+              type="button"
+              onClick={handleToggleAddHistory}
+              className="t-btn t-btn-secondary !px-3.5 !text-[14px]"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Registrar Sesión</span>
+              <Plus className="w-4 h-4" />
+              <span>Registrar serie de hoy</span>
             </button>
           </div>
 
           {showAddHistory && (
-            <form onSubmit={handleAddHistoryEntry} className="p-3.5 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
+            <form
+              onSubmit={handleAddHistoryEntry}
+              className="bg-[var(--surface-2)] rounded-[14px] p-4 border border-[var(--line)] space-y-3.5"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500">Peso (kg)</label>
+                  <label htmlFor={`${baseId}-hist-weight`} className="t-label">
+                    Peso trabajado (kg)
+                  </label>
                   <input
+                    id={`${baseId}-hist-weight`}
                     type="number"
+                    min={1}
+                    step={0.5}
+                    required
                     value={newHistWeight}
                     onChange={(e) => setNewHistWeight(Number(e.target.value))}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                    className="t-input t-num !bg-[var(--surface)]"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500">Repeticiones</label>
+                  <label htmlFor={`${baseId}-hist-reps`} className="t-label">
+                    Repeticiones realizadas
+                  </label>
                   <input
+                    id={`${baseId}-hist-reps`}
                     type="text"
+                    required
+                    placeholder="ej. 8 reps"
                     value={newHistReps}
                     onChange={(e) => setNewHistReps(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold"
+                    className="t-input t-num !bg-[var(--surface)]"
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  className="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold cursor-pointer"
-                >
-                  Guardar Registro
-                </button>
+
+              <div className="flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAddHistory(false)}
-                  className="px-3 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 text-xs"
+                  className="t-btn t-btn-ghost"
                 >
                   Cancelar
+                </button>
+                <button type="submit" className="t-btn t-btn-primary">
+                  Guardar registro
                 </button>
               </div>
             </form>
           )}
 
-          <div className="space-y-2">
+          <div>
             {historyEntries.map((entry, idx) => (
               <div
-                key={idx}
-                className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-slate-800 flex items-center justify-between text-xs"
+                key={`${entry.date}-${idx}`}
+                className="t-row flex items-center justify-between gap-3"
               >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="font-semibold text-slate-500">{entry.date}</span>
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Calendar className="w-4 h-4 text-[var(--muted)] shrink-0" />
+                  <span className="t-num text-[14px] text-[var(--muted)]">
+                    {entry.date}
+                  </span>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-600 dark:text-slate-300 font-medium">
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="t-num text-[14px] text-[var(--muted)]">
                     {entry.reps}
                   </span>
-                  <span className="font-black text-slate-900 dark:text-white px-2 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <span className="t-num text-[15px] font-medium text-[var(--ink)]">
                     {entry.weightKg} kg
                   </span>
                   {entry.weightKg >= currentPR && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <Award className="w-3 h-3" /> PR
+                    <span className="t-badge t-badge-gym t-num">
+                      <Award className="w-3.5 h-3.5" />
+                      PR
                     </span>
                   )}
                 </div>
@@ -364,6 +399,6 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };
