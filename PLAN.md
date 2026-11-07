@@ -9,15 +9,15 @@
 
 ## Estructura de Fases y Git Worktrees para Agentes en Simultáneo
 
-| Fase | Rol / Agente | Rama Git | Directorio de Trabajo (Worktree) | Alcance Exclusivo de Archivos |
+| Fase | Rol / Agente | Rama Git | Directorio de Trabajo (Worktree) | Estado |
 | :--- | :--- | :--- | :--- | :--- |
-| **Fase 0** | **Arquitecto Base (Completada)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | `index.html`, `src/index.css`, `src/types/index.ts`, `src/components/common/**` |
-| **Fase 1 — WT1** | **Agente 1: Shell, Nav, QuickAdd & Dashboard** | `feat/wt1-shell-dashboard` | `C:\Users\mateo\Documents\proyects\student-os-wt1-shell` | `src/components/layout/**`, `src/components/quick-add/**`, `src/components/dashboard/**` |
-| **Fase 1 — WT2** | **Agente 2: Universidad & Aprendizaje** | `feat/wt2-academic-learning` | `C:\Users\mateo\Documents\proyects\student-os-wt2-academic` | `src/components/university/**`, `src/components/learning/**` |
-| **Fase 1 — WT3** | **Agente 3: Kanban & Horario Semanal** | `feat/wt3-kanban-calendar` | `C:\Users\mateo\Documents\proyects\student-os-wt3-planning` | `src/components/kanban/**`, `src/components/calendar/**` |
-| **Fase 1 — WT4** | **Agente 4: Gym Tracker, Timer & 1RM** | `feat/wt4-gym-fitness` | `C:\Users\mateo\Documents\proyects\student-os-wt4-gym` | `src/components/gym/**` |
-| **Fase 2** | **Integrador Central (`App.tsx`)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | `src/App.tsx`, `src/data/initialData.ts` |
-| **Fase 3** | **Auditoría Responsive, QA & PR** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | `memories.md`, `PLAN.md`, limpieza de worktrees y Pull Request |
+| **Fase 0** | **Arquitecto Base (`03f1c95`)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
+| **Fase 1 — WT1** | **Agente 1: Shell, Nav, QuickAdd & Dashboard (`a30c298`)** | `feat/wt1-shell-dashboard` | Fusionado y limpiado (`182bcb9`) | **Completada** |
+| **Fase 1 — WT2** | **Agente 2: Universidad & Aprendizaje (`d4f8ff0`)** | `feat/wt2-academic-learning` | Fusionado y limpiado (`d6e5604`) | **Completada** |
+| **Fase 1 — WT3** | **Agente 3: Kanban & Horario Semanal (`4bd4451`)** | `feat/wt3-kanban-calendar` | Fusionado y limpiado (`5d87f71`) | **Completada** |
+| **Fase 1 — WT4** | **Agente 4: Gym Tracker, Timer & 1RM (`9477508`)** | `feat/wt4-gym-fitness` | Fusionado y limpiado (`f1fe3b8`) | **Completada** |
+| **Fase 2** | **Integrador Central (`App.tsx`)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
+| **Fase 3** | **Auditoría Responsive, QA & Documentación** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
 
 ---
 
