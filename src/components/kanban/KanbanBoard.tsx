@@ -1,23 +1,56 @@
 import React, { useState } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Sparkles, 
-  Briefcase, 
-  GraduationCap, 
-  Dumbbell 
+import {
+  Plus,
+  Search,
+  X,
+  Briefcase,
+  GraduationCap,
+  Dumbbell,
+  User,
 } from 'lucide-react';
 import type { KanbanItem, KanbanStatus, Category, Priority } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { SectionHeader } from '../common/SectionHeader';
+import { SegmentedControl } from '../common/SegmentedControl';
+import type { SegmentOption } from '../common/SegmentedControl';
 import { KanbanCard } from './KanbanCard';
 
-interface KanbanBoardProps {
+export interface KanbanBoardProps {
   items: KanbanItem[];
   onUpdateStatus: (id: string, newStatus: KanbanStatus) => void;
   onDeleteItem: (id: string) => void;
   onAddItem: (item: KanbanItem) => void;
   onUpdateItem?: (item: KanbanItem) => void;
 }
+
+const COLUMNS: { id: KanbanStatus; label: string; shortLabel: string; dotColor: string }[] = [
+  {
+    id: 'todo',
+    label: 'Por hacer',
+    shortLabel: 'Por hacer',
+    dotColor: 'var(--warn)',
+  },
+  {
+    id: 'in_progress',
+    label: 'En progreso',
+    shortLabel: 'En curso',
+    dotColor: 'var(--action)',
+  },
+  {
+    id: 'done',
+    label: 'Completado',
+    shortLabel: 'Listo',
+    dotColor: 'var(--ok)',
+  },
+];
+
+const CATEGORY_OPTIONS: SegmentOption<Category | 'todas'>[] = [
+  { id: 'todas', label: 'Todas' },
+  { id: 'universidad', label: 'Uni', icon: <GraduationCap className="w-4 h-4" /> },
+  { id: 'trabajo', label: 'Trabajo', icon: <Briefcase className="w-4 h-4" /> },
+  { id: 'gym', label: 'Gym', icon: <Dumbbell className="w-4 h-4" /> },
+  { id: 'personal', label: 'Personal', icon: <User className="w-4 h-4" /> },
+];
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   items,
@@ -31,49 +64,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [inlineTitles, setInlineTitles] = useState<{ [key in KanbanStatus]?: string }>({});
   const [dragOverCol, setDragOverCol] = useState<KanbanStatus | null>(null);
+  const [mobileCol, setMobileCol] = useState<KanbanStatus>('todo');
 
-  const columns: { id: KanbanStatus; label: string; color: string; badgeBg: string; activeBorder: string }[] = [
-    { 
-      id: 'todo', 
-      label: 'Por Hacer', 
-      color: 'border-amber-500/30', 
-      badgeBg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-      activeBorder: 'border-amber-500 bg-amber-500/5'
-    },
-    { 
-      id: 'in_progress', 
-      label: 'En Progreso', 
-      color: 'border-indigo-500/30', 
-      badgeBg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
-      activeBorder: 'border-indigo-500 bg-indigo-500/5'
-    },
-    { 
-      id: 'done', 
-      label: 'Completado', 
-      color: 'border-emerald-500/30', 
-      badgeBg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-      activeBorder: 'border-emerald-500 bg-emerald-500/5'
-    },
-  ];
-
-  // Safe update handler
   const handleUpdateItemSafe = (updated: KanbanItem) => {
     if (onUpdateItem) {
       onUpdateItem(updated);
     } else {
-      // Graceful fallback without touching App.tsx
       onDeleteItem(updated.id);
       onAddItem(updated);
     }
   };
 
-  // Filter items logic
   const filteredItems = items.filter((item) => {
-    // Category filter
     if (selectedCategory !== 'todas' && item.category !== selectedCategory) return false;
-    // Priority filter
     if (selectedPriority !== 'todas' && item.priority !== selectedPriority) return false;
-    // Search text filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchTitle = item.title.toLowerCase().includes(q);
@@ -83,6 +87,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
     return true;
   });
+
+  const hasActiveFilters =
+    selectedCategory !== 'todas' ||
+    selectedPriority !== 'todas' ||
+    searchQuery.trim().length > 0;
+
+  const handleResetFilters = () => {
+    setSelectedCategory('todas');
+    setSelectedPriority('todas');
+    setSearchQuery('');
+  };
 
   const handleInlineAdd = (status: KanbanStatus) => {
     const title = (inlineTitles[status] || '').trim();
@@ -98,11 +113,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       checklist: [],
     };
 
+    if (status === 'done') {
+      triggerConfetti();
+    }
+
     onAddItem(newItem);
     setInlineTitles((prev) => ({ ...prev, [status]: '' }));
   };
 
-  // Drag & Drop handlers
   const handleDragOver = (e: React.DragEvent, colId: KanbanStatus) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -112,7 +130,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   const handleDragLeave = (e: React.DragEvent, colId: KanbanStatus) => {
-    // Only reset if leaving the column element itself
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     if (dragOverCol === colId) {
       setDragOverCol(null);
@@ -138,26 +155,30 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     switch (cat) {
       case 'universidad':
         return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">
-            <GraduationCap className="w-3 h-3" /> Uni
+          <span className="t-badge t-badge-accent">
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Uni</span>
           </span>
         );
       case 'trabajo':
         return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-            <Briefcase className="w-3 h-3" /> Trabajo
+          <span className="t-badge t-badge-ok">
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Trabajo</span>
           </span>
         );
       case 'gym':
         return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-800">
-            <Dumbbell className="w-3 h-3" /> Gym
+          <span className="t-badge t-badge-gym">
+            <Dumbbell className="w-3.5 h-3.5" />
+            <span>Gym</span>
           </span>
         );
       case 'personal':
         return (
-          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-            <Sparkles className="w-3 h-3" /> Personal
+          <span className="t-badge text-[var(--ink)]">
+            <User className="w-3.5 h-3.5" />
+            <span>Personal</span>
           </span>
         );
     }
@@ -166,77 +187,127 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const getPriorityBadge = (p: Priority) => {
     switch (p) {
       case 'alta':
-        return <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400">ALTA</span>;
+        return <span className="t-badge t-badge-danger">Alta</span>;
       case 'media':
-        return <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400">MEDIA</span>;
+        return <span className="t-badge t-badge-warn">Media</span>;
       case 'baja':
-        return <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-500/10 text-slate-600 dark:text-slate-400">BAJA</span>;
+        return <span className="t-badge">Baja</span>;
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            Tablero Kanban de Trabajo & Proyectos
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Arrastra tarjetas entre columnas, gestiona subtareas y busca rápidamente
-          </p>
-        </div>
+  const mobileColumnOptions: SegmentOption<KanbanStatus>[] = COLUMNS.map((col) => ({
+    id: col.id,
+    label: col.label,
+    shortLabel: col.shortLabel,
+    badge: filteredItems.filter((item) => item.status === col.id).length,
+  }));
 
-        {/* Filters and Search Bar */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Instant Search Bar */}
-          <div className="relative w-full sm:w-56">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3 pointer-events-none" />
+  const pendingCount = items.filter((item) => item.status !== 'done').length;
+
+  return (
+    <section className="space-y-5">
+      {/* Header */}
+      <SectionHeader
+        title="Tablero de proyectos"
+        subtitle="Mueve tus pendientes de la universidad, trabajo o proyectos personales sin complicarte."
+        badge={
+          <span className="t-badge t-badge-accent t-num">
+            {pendingCount} {pendingCount === 1 ? 'pendiente activo' : 'pendientes activos'}
+          </span>
+        }
+      />
+
+      {/* Toolbar: Search, Category SegmentedControl, Priority Filter */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-0 sm:max-w-sm">
+            <Search
+              className="w-4 h-4 text-[var(--muted)] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+              aria-hidden="true"
+            />
             <input
               type="text"
-              placeholder="Buscar tareas o tags..."
+              placeholder="Buscar por título, nota o etiqueta..."
+              aria-label="Buscar tareas en el tablero"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[38px]"
+              className="t-input pl-10 min-h-[44px]"
+              style={{
+                minHeight: '44px',
+                paddingLeft: '2.5rem',
+                paddingRight: searchQuery ? '2.5rem' : '0.875rem',
+              }}
             />
-          </div>
-
-          {/* Priority Filter */}
-          <select
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value as Priority | 'todas')}
-            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 min-h-[38px] cursor-pointer"
-          >
-            <option value="todas">Todas las Prioridades</option>
-            <option value="alta">Prioridad Alta</option>
-            <option value="media">Prioridad Media</option>
-            <option value="baja">Prioridad Baja</option>
-          </select>
-
-          {/* Category Pills */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            {(['todas', 'trabajo', 'universidad', 'gym', 'personal'] as const).map((cat) => (
+            {searchQuery && (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[32px] ${
-                  selectedCategory === cat
-                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="t-btn t-btn-ghost absolute right-1 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)]"
+                style={{ minWidth: '36px', minHeight: '36px', padding: 0 }}
+                aria-label="Limpiar búsqueda"
               >
-                {cat === 'todas' ? 'Todas' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+                <X className="w-4 h-4" />
               </button>
-            ))}
+            )}
           </div>
+
+          {/* Priority Select */}
+          <div className="w-full sm:w-[205px] shrink-0">
+            <select
+              aria-label="Filtrar por prioridad"
+              value={selectedPriority}
+              onChange={(e) => setSelectedPriority(e.target.value as Priority | 'todas')}
+              className="t-input w-auto min-h-[44px] cursor-pointer"
+              style={{ minHeight: '44px', width: '100%' }}
+            >
+              <option value="todas">Todas las prioridades</option>
+              <option value="alta">Prioridad alta</option>
+              <option value="media">Prioridad media</option>
+              <option value="baja">Prioridad baja</option>
+            </select>
+          </div>
+
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="t-btn t-btn-ghost text-[14px] shrink-0"
+              style={{ minHeight: '44px' }}
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
+        {/* Category Filter */}
+        <div className="overflow-x-auto no-scrollbar">
+          <SegmentedControl
+            ariaLabel="Filtrar por categoría"
+            options={CATEGORY_OPTIONS}
+            value={selectedCategory}
+            onChange={setSelectedCategory}
+          />
         </div>
       </div>
 
-      {/* 3-Column Kanban Grid with Native Drag & Drop */}
+      {/* Mobile Quick Column Switcher (<768px) */}
+      <div className="md:hidden">
+        <SegmentedControl
+          fullWidth
+          ariaLabel="Seleccionar columna del tablero"
+          options={mobileColumnOptions}
+          value={mobileCol}
+          onChange={setMobileCol}
+        />
+      </div>
+
+      {/* 3-Column Kanban Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {columns.map((col) => {
+        {COLUMNS.map((col) => {
           const colItems = filteredItems.filter((item) => item.status === col.id);
           const isOverThisCol = dragOverCol === col.id;
+          const isVisibleOnMobile = mobileCol === col.id;
 
           return (
             <div
@@ -244,64 +315,83 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDragOver={(e) => handleDragOver(e, col.id)}
               onDragLeave={(e) => handleDragLeave(e, col.id)}
               onDrop={(e) => handleDrop(e, col.id)}
-              className={`flex flex-col rounded-3xl p-4 border transition-all duration-200 min-h-[520px] ${
+              className={`${
+                isVisibleOnMobile ? 'flex' : 'hidden md:flex'
+              } flex-col rounded-[20px] p-4 border transition-colors duration-150 min-h-[480px] ${
                 isOverThisCol
-                  ? `${col.activeBorder} shadow-lg ring-2 ring-indigo-500/40`
-                  : 'bg-slate-100/60 dark:bg-slate-900/40 border-slate-200/80 dark:border-slate-800/80'
+                  ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_6%,var(--surface-2))]'
+                  : 'bg-[var(--surface-2)]/60 border-[var(--line)]'
               }`}
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs uppercase font-extrabold px-2.5 py-1 rounded-xl ${col.badgeBg}`}>
+              <div className="flex items-center justify-between gap-2 mb-3 px-0.5">
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: col.dotColor }}
+                    aria-hidden="true"
+                  />
+                  <h3 className="text-[15px] font-medium text-[var(--ink)]">
                     {col.label}
-                  </span>
-                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500">
-                    {colItems.length}
-                  </span>
+                  </h3>
                 </div>
+                <span className="t-badge t-num">
+                  {colItems.length}
+                </span>
               </div>
 
-              {/* Quick Inline Add Field (zero friction!) */}
-              <div className="mb-3">
-                <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500">
-                  <input
-                    type="text"
-                    placeholder={`+ Agregar a ${col.label}...`}
-                    value={inlineTitles[col.id] || ''}
-                    onChange={(e) => setInlineTitles((prev) => ({ ...prev, [col.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleInlineAdd(col.id);
-                      }
-                    }}
-                    className="w-full px-2 py-1 text-xs bg-transparent text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => handleInlineAdd(col.id)}
-                    className="p-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-transform active:scale-90"
-                    title="Añadir rápido"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              {/* Quick Inline Add Input */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleInlineAdd(col.id);
+                }}
+                className="flex items-center gap-2 mb-4"
+              >
+                <input
+                  type="text"
+                  placeholder="Escribe una tarea y pulsa Enter..."
+                  aria-label={`Agregar tarea en ${col.label}`}
+                  value={inlineTitles[col.id] || ''}
+                  onChange={(e) =>
+                    setInlineTitles((prev) => ({ ...prev, [col.id]: e.target.value }))
+                  }
+                  className="t-input min-h-[44px]"
+                  style={{ minHeight: '44px' }}
+                />
+                <button
+                  type="submit"
+                  disabled={!(inlineTitles[col.id] || '').trim()}
+                  className="t-btn t-btn-secondary t-btn-icon shrink-0"
+                  aria-label={`Guardar tarea en ${col.label}`}
+                  title={`Agregar en ${col.label}`}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </form>
 
               {/* Cards List */}
-              <div className="space-y-3 flex-1 overflow-y-auto pr-1">
+              <div className="space-y-3 flex-1">
                 {colItems.length === 0 ? (
-                  <div className={`h-36 flex flex-col items-center justify-center text-xs text-center border-2 border-dashed rounded-2xl p-4 transition-colors ${
-                    isOverThisCol
-                      ? 'border-indigo-400 dark:border-indigo-500 bg-indigo-50/20 text-indigo-600 dark:text-indigo-300 font-bold'
-                      : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-600'
-                  }`}>
+                  <div
+                    className={`min-h-[150px] flex flex-col items-center justify-center text-center border border-dashed rounded-[14px] p-5 transition-colors ${
+                      isOverThisCol
+                        ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_8%,transparent)] text-[var(--action)]'
+                        : 'border-[var(--line-strong)] text-[var(--muted)]'
+                    }`}
+                  >
                     {isOverThisCol ? (
-                      <span>¡Suelta la tarjeta aquí!</span>
+                      <span className="text-[14px] font-medium">
+                        Suelta la tarjeta aquí
+                      </span>
                     ) : (
                       <>
-                        <span>No hay tareas aquí</span>
-                        <span className="text-[10px] text-slate-400 mt-0.5">Escribe arriba o arrastra una tarjeta</span>
+                        <span className="text-[14px] font-medium text-[var(--ink)]">
+                          Sin tareas en esta columna
+                        </span>
+                        <span className="text-[13px] text-[var(--muted)] mt-1">
+                          Escribe arriba y pulsa Enter o arrastra una tarjeta.
+                        </span>
                       </>
                     )}
                   </div>
@@ -324,6 +414,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           );
         })}
       </div>
-    </div>
+    </section>
   );
 };

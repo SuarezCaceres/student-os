@@ -1,89 +1,132 @@
-import React, { useState } from 'react';
-import { 
-  Clock, 
-  MapPin, 
-  Plus, 
-  Trash2, 
-  Sparkles,
+import React, { useId, useState } from 'react';
+import {
+  MapPin,
+  Plus,
+  Trash2,
   GraduationCap,
   Dumbbell,
   Briefcase,
+  User,
   Download,
   Calendar,
   LayoutGrid,
-  Columns3
+  Columns3,
+  AlertTriangle,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek, Category } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import { exportCalendarToICS } from '../../utils/icsExport';
+import { SectionHeader } from '../common/SectionHeader';
+import { SegmentedControl } from '../common/SegmentedControl';
+import { ModalShell } from '../common/ModalShell';
 import { CalendarTimelineGrid } from './CalendarTimelineGrid';
 
-interface WeeklyCalendarProps {
+export interface WeeklyCalendarProps {
   blocks: CalendarBlock[];
   onAddBlock: (block: CalendarBlock) => void;
   onDeleteBlock: (id: string) => void;
 }
 
-const DAYS_OF_WEEK: DayOfWeek[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAYS_OF_WEEK: DayOfWeek[] = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+];
+
+const DAYS_INDEX_MAP: DayOfWeek[] = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
+
+function timeToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
+  return (h || 0) * 60 + (m || 0);
+}
+
+function checkBlockCollision(a: CalendarBlock, b: CalendarBlock): boolean {
+  if (a.id === b.id || a.day !== b.day) return false;
+  const startA = timeToMinutes(a.startTime);
+  const endA = timeToMinutes(a.endTime);
+  const startB = timeToMinutes(b.startTime);
+  const endB = timeToMinutes(b.endTime);
+
+  return startA < endB && startB < endA;
+}
 
 export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   blocks,
   onAddBlock,
   onDeleteBlock,
 }) => {
-  // Detect today's day of week
-  const daysIndexMap: DayOfWeek[] = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const todayDay = daysIndexMap[new Date().getDay()];
-
-  // View mode switcher: 'grid' (timeline 07:00-22:00) vs 'columns' (card list)
+  const [todayDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
   const [viewMode, setViewMode] = useState<'grid' | 'columns'>('grid');
+  const [mobileDay, setMobileDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
 
-  // Inline add state per day (for column view)
-  const [activeAddDay, setActiveAddDay] = useState<DayOfWeek | null>(null);
-  const [inlineTitle, setInlineTitle] = useState('');
-  const [inlineStart, setInlineStart] = useState('09:00');
-  const [inlineEnd, setInlineEnd] = useState('11:00');
-  const [inlineCat, setInlineCat] = useState<Category>('universidad');
+  // Add Block Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formTitle, setFormTitle] = useState('');
+  const [formDay, setFormDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
+  const [formStart, setFormStart] = useState('09:00');
+  const [formEnd, setFormEnd] = useState('11:00');
+  const [formLocation, setFormLocation] = useState('');
+  const [formCategory, setFormCategory] = useState<Category>('universidad');
+  const [timeError, setTimeError] = useState('');
 
-  // Global quick add modal/popover state for grid view
-  const [showGlobalAdd, setShowGlobalAdd] = useState(false);
-  const [globalDay, setGlobalDay] = useState<DayOfWeek>(todayDay);
+  const formId = useId();
+  const titleInputId = useId();
+  const daySelectId = useId();
+  const catSelectId = useId();
+  const startInputId = useId();
+  const endInputId = useId();
+  const locInputId = useId();
 
-  const handleInlineSave = (day: DayOfWeek) => {
-    if (!inlineTitle.trim()) return;
-
-    const newBlock: CalendarBlock = {
-      id: `cb-${Date.now()}`,
-      day,
-      startTime: inlineStart,
-      endTime: inlineEnd,
-      title: inlineTitle.trim(),
-      category: inlineCat,
-    };
-
-    onAddBlock(newBlock);
-    triggerConfetti();
-    setInlineTitle('');
-    setActiveAddDay(null);
+  const openAddModal = (defaultDay: DayOfWeek) => {
+    setFormDay(defaultDay);
+    setTimeError('');
+    setIsModalOpen(true);
   };
 
-  const handleGlobalAddSave = (e: React.FormEvent) => {
+  const closeAddModal = () => {
+    setIsModalOpen(false);
+    setTimeError('');
+  };
+
+  const handleSaveBlock = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inlineTitle.trim()) return;
+    const trimmedTitle = formTitle.trim();
+    if (!trimmedTitle) return;
+
+    if (timeToMinutes(formEnd) <= timeToMinutes(formStart)) {
+      setTimeError('La hora de fin debe ser posterior a la hora de inicio.');
+      return;
+    }
 
     const newBlock: CalendarBlock = {
       id: `cb-${Date.now()}`,
-      day: globalDay,
-      startTime: inlineStart,
-      endTime: inlineEnd,
-      title: inlineTitle.trim(),
-      category: inlineCat,
+      day: formDay,
+      startTime: formStart,
+      endTime: formEnd,
+      title: trimmedTitle,
+      category: formCategory,
+      location: formLocation.trim() ? formLocation.trim() : undefined,
     };
 
     onAddBlock(newBlock);
     triggerConfetti();
-    setInlineTitle('');
-    setShowGlobalAdd(false);
+    setMobileDay(formDay);
+    setFormTitle('');
+    setFormLocation('');
+    setTimeError('');
+    setIsModalOpen(false);
   };
 
   const handleExportICS = () => {
@@ -91,244 +134,135 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     triggerConfetti();
   };
 
-  const getCategoryStyles = (cat: Category) => {
+  const getCategoryMeta = (cat: Category) => {
     switch (cat) {
       case 'universidad':
         return {
-          badge: 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800',
-          border: 'border-l-4 border-l-cyan-500',
+          label: 'Uni',
+          badgeClass: 't-badge t-badge-accent',
+          dotColor: 'var(--action)',
           icon: GraduationCap,
-        };
-      case 'gym':
-        return {
-          badge: 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
-          border: 'border-l-4 border-l-orange-500',
-          icon: Dumbbell,
         };
       case 'trabajo':
         return {
-          badge: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800',
-          border: 'border-l-4 border-l-indigo-500',
+          label: 'Trabajo',
+          badgeClass: 't-badge t-badge-ok',
+          dotColor: 'var(--ok)',
           icon: Briefcase,
+        };
+      case 'gym':
+        return {
+          label: 'Gym',
+          badgeClass: 't-badge t-badge-gym',
+          dotColor: 'var(--gym)',
+          icon: Dumbbell,
         };
       case 'personal':
       default:
         return {
-          badge: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
-          border: 'border-l-4 border-l-purple-500',
-          icon: Sparkles,
+          label: 'Personal',
+          badgeClass: 't-badge text-[var(--ink)]',
+          dotColor: 'var(--muted)',
+          icon: User,
         };
     }
   };
 
+  // Preview conflict inside modal before saving
+  const previewCandidate: CalendarBlock = {
+    id: '__preview__',
+    day: formDay,
+    startTime: formStart,
+    endTime: formEnd,
+    title: formTitle || 'Nuevo bloque',
+    category: formCategory,
+  };
+  const modalConflicts =
+    timeToMinutes(formEnd) > timeToMinutes(formStart)
+      ? blocks.filter((existing) => checkBlockCollision(previewCandidate, existing))
+      : [];
+
   return (
-    <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-            Horario Semanal: Lunes a Domingo
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Visualiza tu rutina completa semanal: clases universitarias, gimnasio, bloques de trabajo y ocio
-          </p>
-        </div>
+    <section className="space-y-5">
+      {/* Header & Primary Controls */}
+      <SectionHeader
+        title="Horario de la semana"
+        subtitle="Tus clases, entrenamientos y bloques de estudio de lunes a domingo."
+        actions={
+          <>
+            <SegmentedControl
+              ariaLabel="Cambiar vista del horario"
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                {
+                  id: 'grid',
+                  label: 'Grilla horaria',
+                  shortLabel: 'Grilla',
+                  icon: <LayoutGrid className="w-4 h-4" />,
+                },
+                {
+                  id: 'columns',
+                  label: 'Vista por días',
+                  shortLabel: 'Por días',
+                  icon: <Columns3 className="w-4 h-4" />,
+                },
+              ]}
+            />
 
-        {/* View Switcher & Export Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* View Toggle */}
-          <div className="p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'grid'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              onClick={handleExportICS}
+              className="t-btn t-btn-secondary"
+              title="Descargar archivo .ics compatible con Google Calendar, Apple Calendar y Outlook"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Grilla Horaria</span>
+              <Download className="w-4 h-4" />
+              <span>Exportar .ics</span>
             </button>
+
             <button
               type="button"
-              onClick={() => setViewMode('columns')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                viewMode === 'columns'
-                  ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-              }`}
+              onClick={() => openAddModal(viewMode === 'grid' ? mobileDay : todayDay)}
+              className="t-btn t-btn-primary"
             >
-              <Columns3 className="w-3.5 h-3.5" />
-              <span>Lista Columnas</span>
+              <Plus className="w-4 h-4" />
+              <span>Agendar bloque</span>
             </button>
-          </div>
-
-          {/* Quick Add Block Button */}
-          <button
-            type="button"
-            onClick={() => setShowGlobalAdd(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/25 transition-all cursor-pointer min-h-[40px]"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Bloque</span>
-          </button>
-
-          {/* Export to .ics Button */}
-          <button
-            type="button"
-            onClick={handleExportICS}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/60 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 font-bold text-xs transition-all shadow-sm cursor-pointer min-h-[40px]"
-            title="Descargar archivo .ics compatible con Google Calendar y Apple Calendar"
-          >
-            <Download className="w-4 h-4 text-indigo-500" />
-            <span>Exportar Calendario (.ics)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Global Add Form Modal */}
-      {showGlobalAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <form 
-            onSubmit={handleGlobalAddSave} 
-            className="w-full max-w-md rounded-3xl bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4"
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">
-                  Añadir Bloque Horario
-                </h4>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGlobalAdd(false)}
-                className="text-slate-400 hover:text-slate-600 text-sm cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                Título de la actividad
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Taller de Algoritmos"
-                value={inlineTitle}
-                onChange={(e) => setInlineTitle(e.target.value)}
-                autoFocus
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Día
-                </label>
-                <select
-                  value={globalDay}
-                  onChange={(e) => setGlobalDay(e.target.value as DayOfWeek)}
-                  className="w-full px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                >
-                  {DAYS_OF_WEEK.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Categoría
-                </label>
-                <select
-                  value={inlineCat}
-                  onChange={(e) => setInlineCat(e.target.value as Category)}
-                  className="w-full px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                >
-                  <option value="universidad">🎓 Universidad</option>
-                  <option value="gym">🏋️ Gym</option>
-                  <option value="trabajo">💼 Trabajo</option>
-                  <option value="personal">🌟 Ocio</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Hora Inicio
-                </label>
-                <input
-                  type="time"
-                  value={inlineStart}
-                  onChange={(e) => setInlineStart(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                  Hora Fin
-                </label>
-                <input
-                  type="time"
-                  value={inlineEnd}
-                  onChange={(e) => setInlineEnd(e.target.value)}
-                  className="w-full px-2.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer shadow-md shadow-indigo-600/25"
-              >
-                Guardar Bloque
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowGlobalAdd(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 text-xs font-semibold cursor-pointer"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          </>
+        }
+      />
 
       {/* Category Legend */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400 font-bold border border-cyan-200 dark:border-cyan-800">
-          <span className="w-2 h-2 rounded-full bg-cyan-500" /> Universidad
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="t-badge t-badge-accent">
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span>Universidad</span>
         </span>
-        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/50 text-orange-600 dark:text-orange-400 font-bold border border-orange-200 dark:border-orange-800">
-          <span className="w-2 h-2 rounded-full bg-orange-500" /> Gym
+        <span className="t-badge t-badge-ok">
+          <Briefcase className="w-3.5 h-3.5" />
+          <span>Trabajo</span>
         </span>
-        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-bold border border-indigo-200 dark:border-indigo-800">
-          <span className="w-2 h-2 rounded-full bg-indigo-500" /> Trabajo
+        <span className="t-badge t-badge-gym">
+          <Dumbbell className="w-3.5 h-3.5" />
+          <span>Gym</span>
         </span>
-        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 font-bold border border-purple-200 dark:border-purple-800">
-          <span className="w-2 h-2 rounded-full bg-purple-500" /> Ocio
+        <span className="t-badge text-[var(--ink)]">
+          <User className="w-3.5 h-3.5" />
+          <span>Personal</span>
         </span>
       </div>
 
-      {/* Main View Display */}
+      {/* Main Content: Timeline Grid vs Day Columns */}
       {viewMode === 'grid' ? (
         <CalendarTimelineGrid
           blocks={blocks}
           onDeleteBlock={onDeleteBlock}
+          selectedMobileDay={mobileDay}
+          onSelectMobileDay={setMobileDay}
+          onRequestAddBlock={openAddModal}
         />
       ) : (
-        /* 7-Days Column Cards View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {DAYS_OF_WEEK.map((day) => {
             const isToday = day === todayDay;
             const dayBlocks = blocks
@@ -336,160 +270,279 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
             return (
-              <div
+              <article
                 key={day}
-                className={`rounded-3xl border flex flex-col justify-between transition-all duration-200 ${
-                  isToday
-                    ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-400/60 shadow-lg shadow-indigo-500/10 ring-2 ring-indigo-500/20'
-                    : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800 shadow-sm'
-                } p-4 min-h-[460px]`}
+                style={isToday ? { borderColor: 'var(--action)' } : undefined}
+                className={`t-card p-4 flex flex-col justify-between min-h-[340px] ${
+                  isToday ? 'border-[var(--action)]' : ''
+                }`}
               >
-                {/* Day Header */}
                 <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                  {/* Day Card Header */}
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--line)]">
                     <div>
-                      <h3 className={`text-sm font-extrabold uppercase tracking-wide ${
-                        isToday ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'
-                      }`}>
+                      <h3 className="text-[16px] font-medium text-[var(--ink)] leading-tight">
                         {day}
                       </h3>
-                      <p className="text-[11px] text-slate-400">
-                        {dayBlocks.length} {dayBlocks.length === 1 ? 'actividad' : 'actividades'}
+                      <p className="text-[13px] text-[var(--muted)] t-num mt-0.5">
+                        {dayBlocks.length} {dayBlocks.length === 1 ? 'bloque' : 'bloques'}
                       </p>
                     </div>
 
                     {isToday && (
-                      <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-indigo-600 text-white shadow-sm">
-                        HOY
+                      <span className="t-badge t-badge-accent">
+                        Hoy
                       </span>
                     )}
                   </div>
 
-                  {/* Blocks for this day */}
-                  <div className="space-y-2.5">
-                    {dayBlocks.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-xs italic">
-                        Sin bloques programados
-                      </div>
-                    ) : (
-                      dayBlocks.map((block) => {
-                        const styles = getCategoryStyles(block.category);
-                        const Icon = styles.icon;
+                  {/* Day Rows (.t-row inside .t-card — max 2 box levels) */}
+                  {dayBlocks.length === 0 ? (
+                    <div className="py-10 text-center">
+                      <p className="text-[14px] text-[var(--muted)]">
+                        Día despejado, sin bloques agendados.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-3">
+                      {dayBlocks.map((block) => {
+                        const meta = getCategoryMeta(block.category);
+                        const hasConflict = dayBlocks.some((other) =>
+                          checkBlockCollision(block, other)
+                        );
 
                         return (
                           <div
                             key={block.id}
-                            className={`group p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/60 dark:border-slate-700/60 ${styles.border} transition-all hover:shadow-sm`}
+                            className="t-row group flex items-start justify-between gap-2.5"
                           >
-                            <div className="flex items-center justify-between gap-1 mb-1">
-                              <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {block.startTime} - {block.endTime}
-                              </span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{
+                                    backgroundColor: hasConflict ? 'var(--danger)' : meta.dotColor,
+                                  }}
+                                  aria-hidden="true"
+                                />
+                                <span
+                                  className={`t-num text-[13px] font-medium ${
+                                    hasConflict ? 'text-[var(--danger)]' : 'text-[var(--muted)]'
+                                  }`}
+                                >
+                                  {block.startTime} – {block.endTime}
+                                </span>
+                                <span className={meta.badgeClass}>
+                                  {meta.label}
+                                </span>
+                                {hasConflict && (
+                                  <span className="t-badge t-badge-danger">
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    <span>Cruce</span>
+                                  </span>
+                                )}
+                              </div>
 
-                              {/* Delete block */}
-                              <button
-                                type="button"
-                                onClick={() => onDeleteBlock(block.id)}
-                                className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-rose-500 rounded transition-all cursor-pointer"
-                                title="Eliminar bloque"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <Icon className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                              <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+                              <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">
                                 {block.title}
                               </h4>
+
+                              {block.location && (
+                                <p className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] mt-1 truncate">
+                                  <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span className="truncate">{block.location}</span>
+                                </p>
+                              )}
                             </div>
 
-                            {block.location && (
-                              <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1 truncate">
-                                <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                <span className="truncate">{block.location}</span>
-                              </div>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => onDeleteBlock(block.id)}
+                              className="t-btn t-btn-ghost t-btn-icon -mr-1.5 text-[var(--muted)] hover:text-[var(--danger)] sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 shrink-0"
+                              aria-label={`Eliminar bloque: ${block.title}`}
+                              title="Eliminar bloque"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                {/* Bottom Quick Add for this day */}
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 mt-3">
-                  {activeAddDay !== day ? (
-                    <button
-                      type="button"
-                      onClick={() => setActiveAddDay(day)}
-                      className="w-full py-2 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-400 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer min-h-[38px]"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Bloque</span>
-                    </button>
-                  ) : (
-                    <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 space-y-2 text-xs">
-                      <input
-                        type="text"
-                        placeholder="Nombre de la actividad"
-                        value={inlineTitle}
-                        onChange={(e) => setInlineTitle(e.target.value)}
-                        autoFocus
-                        className="w-full px-2 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
-                      />
-
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <input
-                          type="time"
-                          value={inlineStart}
-                          onChange={(e) => setInlineStart(e.target.value)}
-                          className="w-full px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px]"
-                        />
-                        <input
-                          type="time"
-                          value={inlineEnd}
-                          onChange={(e) => setInlineEnd(e.target.value)}
-                          className="w-full px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px]"
-                        />
-                      </div>
-
-                      <select
-                        value={inlineCat}
-                        onChange={(e) => setInlineCat(e.target.value as Category)}
-                        className="w-full px-1.5 py-1 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[11px]"
-                      >
-                        <option value="universidad">🎓 Universidad</option>
-                        <option value="gym">🏋️ Gym</option>
-                        <option value="trabajo">💼 Trabajo</option>
-                        <option value="personal">🌟 Ocio</option>
-                      </select>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => handleInlineSave(day)}
-                          className="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white font-bold text-[11px] cursor-pointer"
-                        >
-                          Añadir
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveAddDay(null)}
-                          className="px-2 py-1.5 rounded-lg text-slate-400 hover:text-slate-600 text-[11px] cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
+                      })}
                     </div>
                   )}
                 </div>
-              </div>
+
+                {/* Bottom Quick Add for this Day (44px min-height) */}
+                <div className="pt-3 mt-3 border-t border-[var(--line)]">
+                  <button
+                    type="button"
+                    onClick={() => openAddModal(day)}
+                    className="t-btn t-btn-secondary w-full text-[14px]"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Agregar en {day}</span>
+                  </button>
+                </div>
+              </article>
             );
           })}
         </div>
       )}
-    </div>
+
+      {/* ModalShell: Agendar bloque */}
+      <ModalShell
+        isOpen={isModalOpen}
+        onClose={closeAddModal}
+        title="Agendar bloque"
+        subtitle="Suma una clase, entrenamiento o sesión de estudio a tu semana."
+        icon={<Calendar className="w-5 h-5" />}
+        maxWidth="md"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={closeAddModal}
+              className="t-btn t-btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              className="t-btn t-btn-primary"
+            >
+              Guardar bloque
+            </button>
+          </>
+        }
+      >
+        <form id={formId} onSubmit={handleSaveBlock} className="space-y-4">
+          <div>
+            <label htmlFor={titleInputId} className="t-label">
+              Actividad o clase
+            </label>
+            <input
+              id={titleInputId}
+              type="text"
+              required
+              autoFocus
+              placeholder="Ej. Taller de Arquitectura de Software"
+              value={formTitle}
+              onChange={(e) => setFormTitle(e.target.value)}
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor={daySelectId} className="t-label">
+                Día de la semana
+              </label>
+              <select
+                id={daySelectId}
+                value={formDay}
+                onChange={(e) => setFormDay(e.target.value as DayOfWeek)}
+                className="t-input cursor-pointer"
+              >
+                {DAYS_OF_WEEK.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor={catSelectId} className="t-label">
+                Categoría
+              </label>
+              <select
+                id={catSelectId}
+                value={formCategory}
+                onChange={(e) => setFormCategory(e.target.value as Category)}
+                className="t-input cursor-pointer"
+              >
+                <option value="universidad">Universidad</option>
+                <option value="trabajo">Trabajo</option>
+                <option value="gym">Gym</option>
+                <option value="personal">Personal</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor={startInputId} className="t-label">
+                Hora inicio
+              </label>
+              <input
+                id={startInputId}
+                type="time"
+                required
+                value={formStart}
+                onChange={(e) => {
+                  setFormStart(e.target.value);
+                  if (timeError) setTimeError('');
+                }}
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor={endInputId} className="t-label">
+                Hora fin
+              </label>
+              <input
+                id={endInputId}
+                type="time"
+                required
+                value={formEnd}
+                onChange={(e) => {
+                  setFormEnd(e.target.value);
+                  if (timeError) setTimeError('');
+                }}
+                className="t-input t-num"
+              />
+            </div>
+          </div>
+
+          {timeError && (
+            <p role="alert" className="text-[13px] font-medium text-[var(--danger)]">
+              {timeError}
+            </p>
+          )}
+
+          {!timeError && modalConflicts.length > 0 && (
+            <div className="rounded-[12px] border border-[color-mix(in_oklab,var(--warn)_38%,var(--line))] bg-[color-mix(in_oklab,var(--warn)_10%,var(--surface))] px-3.5 py-2.5 flex items-start gap-2.5 text-[13px] text-[var(--ink)]">
+              <AlertTriangle
+                className="w-4 h-4 text-[var(--warn)] shrink-0 mt-0.5"
+                aria-hidden="true"
+              />
+              <span>
+                Este horario se cruza con{' '}
+                <strong className="font-medium">{modalConflicts[0].title}</strong> (
+                <span className="t-num">
+                  {modalConflicts[0].startTime}–{modalConflicts[0].endTime}
+                </span>
+                ).
+              </span>
+            </div>
+          )}
+
+          <div>
+            <label htmlFor={locInputId} className="t-label">
+              Ubicación o aula (opcional)
+            </label>
+            <input
+              id={locInputId}
+              type="text"
+              placeholder="Ej. Pabellón B - Aula 402 o enlace de clase"
+              value={formLocation}
+              onChange={(e) => setFormLocation(e.target.value)}
+              className="t-input"
+            />
+          </div>
+        </form>
+      </ModalShell>
+    </section>
   );
 };
