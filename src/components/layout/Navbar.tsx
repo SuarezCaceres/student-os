@@ -164,7 +164,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="t-btn t-btn-secondary px-2.5 sm:px-3 text-xs"
                 title="Ver Landing Page informativa y Manifiesto"
               >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <Sparkles className="w-3.5 h-3.5 text-[var(--action)] shrink-0" />
                 <span className="hidden sm:inline">Landing</span>
               </button>
             )}
