@@ -34,11 +34,11 @@
   --color-text-main: var(--ink);
   --color-text-dim: var(--muted);
 
-  /* Functional status tokens (used sparingly for real state only, never violet) */
-  --ok: #0f9f6e;
-  --warn: #d97706;
+  /* Functional status tokens (WCAG AA >= 4.5:1 contrast on white) */
+  --ok: #0a8459;
+  --warn: #b45309;
   --danger: #dc2626;
-  --gym: #e04f16;
+  --gym: #c2410c;
 
   /* Radii (data-radius="soft") */
   --r-lg: 20px;
@@ -517,8 +517,19 @@ html:not([data-motion="off"]) .t-btn:active {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 0.01ms !important;
+    animation-duration: 0.05s !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.05s !important;
+    scroll-behavior: auto !important;
+  }
+
+  .view-enter,
+  .hero-enter,
+  .modal-backdrop-enter,
+  .modal-panel-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 
   .t-card-lift:hover,

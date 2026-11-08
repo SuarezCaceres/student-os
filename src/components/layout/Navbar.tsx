@@ -119,7 +119,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span className="text-[17px] sm:text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">
+              <span className="text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">
                 StudentOS
               </span>
             </button>
@@ -217,11 +217,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={onLogout}
-                    className="t-btn t-btn-ghost t-btn-icon !h-8 !w-8"
+                    className="t-btn t-btn-ghost t-btn-icon"
                     title="Cerrar sesión"
                     aria-label="Cerrar sesión"
                   >
-                    <LogOut className="w-3.5 h-3.5 text-[var(--muted)] hover:text-red-400" />
+                    <LogOut className="w-4 h-4 text-[var(--muted)] hover:text-red-400" />
                   </button>
                 )}
               </div>
@@ -270,7 +270,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     />
                   )}
                 </span>
-                <span className="text-[12px] sm:text-[13px] font-medium leading-none truncate max-w-full">
+                <span className="text-xs sm:text-[13px] font-medium leading-none truncate max-w-full">
                   {tab.label}
                 </span>
               </button>
