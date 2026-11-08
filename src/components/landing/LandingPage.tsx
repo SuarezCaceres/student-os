@@ -36,7 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] selection:bg-[var(--action)] selection:text-[var(--action-ink)] transition-colors">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] selection:bg-[var(--action)] selection:text-white transition-colors">
       {/* Top Sticky Navbar */}
       <LandingNavbar
         onOpenAuth={handleOpenAuth}
