@@ -93,9 +93,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-md rounded-2xl border border-cyan-500/30 bg-[#091122] p-6 sm:p-8 shadow-[0_16px_60px_rgba(0,0,0,0.8)] backdrop-blur-xl"
+        className="relative w-full max-w-md rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] p-6 sm:p-8 shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
@@ -104,7 +104,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+          className="absolute right-4 top-4 t-btn t-btn-ghost t-btn-icon"
           aria-label="Cerrar ventana de autenticación"
         >
           <X className="h-5 w-5" />
@@ -112,13 +112,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Modal Header */}
         <div className="text-center mb-6">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-cyan-950 border border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)] text-[var(--action)]">
             <GraduationCap className="h-6 w-6" />
           </div>
-          <h2 id="auth-modal-title" className="font-sans text-2xl font-bold text-white">
+          <h2 id="auth-modal-title" className="text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]">
             {mode === 'login' ? 'Iniciar Sesión' : 'Crear tu Cuenta'}
           </h2>
-          <p className="mt-1 text-xs text-slate-300 font-mono">
+          <p className="mt-1 text-xs sm:text-sm text-[var(--muted)]">
             {mode === 'login'
               ? 'Accede a tus entregas y rutinas de StudentOS'
               : 'Únete a miles de estudiantes con control total'}
@@ -126,17 +126,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </div>
 
         {/* Mode Toggle Pills */}
-        <div className="grid grid-cols-2 rounded-xl bg-slate-900/90 p-1 mb-5 border border-slate-800 font-mono text-xs">
+        <div className="grid grid-cols-2 rounded-xl bg-[var(--surface-2)] p-1 mb-5 border border-[var(--line)] text-xs font-medium">
           <button
             type="button"
             onClick={() => {
               setMode('login');
               setError(null);
             }}
-            className={`py-2 rounded-lg font-semibold transition-all cursor-pointer ${
+            className={`py-2 rounded-lg transition-colors cursor-pointer ${
               mode === 'login'
-                ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line)] shadow-xs font-semibold'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
             }`}
           >
             Iniciar Sesión
@@ -147,10 +147,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setMode('register');
               setError(null);
             }}
-            className={`py-2 rounded-lg font-semibold transition-all cursor-pointer ${
+            className={`py-2 rounded-lg transition-colors cursor-pointer ${
               mode === 'register'
-                ? 'bg-cyan-500 text-black shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line)] shadow-xs font-semibold'
+                : 'text-[var(--muted)] hover:text-[var(--ink)]'
             }`}
           >
             Registrarte
@@ -159,7 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Error message alert */}
         {error && (
-          <div className="mb-4 rounded-lg border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs text-red-300 font-mono flex items-center gap-2">
+          <div className="mb-4 rounded-xl border border-[color-mix(in_oklab,var(--danger)_36%,var(--line))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--surface))] px-3.5 py-2.5 text-xs text-[var(--danger)] flex items-center gap-2">
             <span>⚠️</span>
             <span>{error}</span>
           </div>
@@ -169,60 +169,60 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === 'register' && (
             <div>
-              <label className="block text-xs font-mono font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-[var(--ink)] mb-1.5">
                 Tu Nombre o Apodo
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                <User className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--muted)]" />
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="ej. Mateo C."
-                  className="w-full rounded-xl border border-slate-700 bg-[#060c18] pl-9 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                  className="t-input pl-10"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-mono font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-[var(--ink)] mb-1.5">
               Correo Electrónico
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--muted)]" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="estudiante@universidad.edu"
-                className="w-full rounded-xl border border-slate-700 bg-[#060c18] pl-9 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                className="t-input pl-10"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-mono font-medium text-slate-300 mb-1">
+            <label className="block text-xs font-medium text-[var(--ink)] mb-1.5">
               Contraseña
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Lock className="absolute left-3.5 top-3.5 h-4 w-4 text-[var(--muted)]" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full rounded-xl border border-slate-700 bg-[#060c18] pl-9 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                className="t-input pl-10"
               />
             </div>
           </div>
 
           {mode === 'register' && (
             <div>
-              <label className="block text-xs font-mono font-medium text-slate-300 mb-1">
+              <label className="block text-xs font-medium text-[var(--ink)] mb-1.5">
                 Carrera / Universidad (Opcional)
               </label>
               <input
@@ -230,7 +230,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={major}
                 onChange={(e) => setMajor(e.target.value)}
                 placeholder="ej. Ingeniería de Sistemas"
-                className="w-full rounded-xl border border-slate-700 bg-[#060c18] px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+                className="t-input"
               />
             </div>
           )}
@@ -239,7 +239,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl border border-cyan-400 bg-cyan-400 py-3 font-mono text-sm font-bold text-black shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:bg-cyan-300 active:scale-98 transition-all cursor-pointer disabled:opacity-50"
+            className="t-btn t-btn-primary w-full mt-2"
           >
             <span>{isSubmitting ? 'Procesando...' : mode === 'login' ? 'Entrar a StudentOS' : 'Crear Cuenta Gratis'}</span>
             <ArrowRight className="h-4 w-4" />
@@ -247,23 +247,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         </form>
 
         {/* Divider & Guest Demo Button */}
-        <div className="mt-5 pt-4 border-t border-slate-800 text-center">
-          <p className="text-xs text-slate-400 font-mono mb-2">
+        <div className="mt-5 pt-4 border-t border-[var(--line)] text-center">
+          <p className="text-xs text-[var(--muted)] mb-2">
             ¿Solo quieres explorar sin registrarte?
           </p>
           <button
             type="button"
             onClick={onEnterDemo}
-            className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--action)] hover:underline cursor-pointer"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            <span>Entrar al Dashboard en Modo Demo (1 Clic)</span>
+            <span>Entrar al Workspace en Modo Demo (1 Clic)</span>
           </button>
         </div>
 
         {/* Privacy Note */}
-        <div className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-500 text-center">
-          <CheckCircle2 className="h-3 w-3 text-cyan-500" />
+        <div className="mt-4 flex items-center justify-center gap-1.5 text-xs text-[var(--muted)] text-center">
+          <CheckCircle2 className="h-3.5 w-3.5 text-[var(--ok)]" />
           <span>Tus datos se guardan 100% en tu navegador (Offline-First)</span>
         </div>
       </div>

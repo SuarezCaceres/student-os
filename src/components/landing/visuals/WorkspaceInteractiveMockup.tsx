@@ -42,25 +42,25 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
   return (
     <div className={`w-full select-none ${className}`}>
       {/* Real Window Shell */}
-      <div className="rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] shadow-[0_16px_40px_-12px_rgba(0,0,0,0.5)] overflow-hidden transition-all">
+      <div className="rounded-2xl border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] overflow-hidden transition-all">
         {/* Top Window Titlebar */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--line)] bg-[var(--surface-2)]">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full bg-[#ff5f56] inline-block border border-[#e0443e]" />
-            <span className="h-3 w-3 rounded-full bg-[#ffbd2e] inline-block border border-[#dea123]" />
-            <span className="h-3 w-3 rounded-full bg-[#27c93f] inline-block border border-[#1aab29]" />
-            <span className="ml-2 font-mono text-xs text-[var(--muted)] truncate">
+          <div className="flex items-center gap-2.5">
+            <div className="w-5 h-5 rounded-[6px] overflow-hidden border border-[var(--line)] bg-[var(--surface)] flex items-center justify-center shrink-0">
+              <img src="/logo.png" alt="StudentOS" className="w-full h-full object-cover" />
+            </div>
+            <span className="text-xs font-medium text-[var(--ink)] tracking-[-0.01em]">
               student-os / workspace / semana-05
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-mono text-[var(--ok)] bg-[color-mix(in_oklab,var(--ok)_12%,transparent)] border border-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)] animate-pulse" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-[var(--ok)] bg-[color-mix(in_oklab,var(--ok)_12%,transparent)] border border-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" />
               100% Offline
             </span>
-            <span className="px-2 py-0.5 rounded text-xs font-mono font-medium text-[var(--action)] bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)]">
-              EN VIVO
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium text-[var(--action)] bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)]">
+              En vivo
             </span>
           </div>
         </div>
@@ -77,7 +77,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                   : 'text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
-              Hoy (Bento)
+              Hoy
             </button>
             <button
               type="button"
@@ -88,7 +88,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                   : 'text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
-              Universidad (S5)
+              Universidad
             </button>
             <button
               type="button"
@@ -99,14 +99,14 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                   : 'text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
-              Gym (Push)
+              Gym
             </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-[var(--muted)]">
-            <span>Racha: <strong className="text-[var(--gym)] font-medium">🔥 24d</strong></span>
+          <div className="hidden sm:flex items-center gap-2 text-xs text-[var(--muted)]">
+            <span>Racha: <strong className="text-[var(--gym)] font-medium t-num">🔥 24d</strong></span>
             <span>·</span>
-            <span>GPA: <strong className="text-[var(--action)] font-medium">17.8</strong></span>
+            <span>GPA: <strong className="text-[var(--action)] font-medium t-num">17.8</strong></span>
           </div>
         </div>
 
@@ -122,7 +122,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                     <span className="font-medium text-[var(--ink)]">Cálculo Multivariable</span>
                     <span>· Sem. 5</span>
                   </div>
-                  <span className="font-mono text-xs text-[var(--warn)] font-medium">
+                  <span className="t-badge t-badge-warn text-xs">
                     Vence en 2 días
                   </span>
                 </div>
@@ -132,13 +132,13 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                       Lab 3: Multiplicadores de Lagrange y Gradiente
                     </div>
                     <div className="text-xs text-[var(--muted)] mt-0.5">
-                      Ponderación: 20% nota final · Rúbrica 4/4 criterios
+                      Ponderación: <span className="t-num">20%</span> nota final · Rúbrica <span className="t-num">4/4</span> criterios
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => setTaskDone(!taskDone)}
-                    className={`h-8 px-3 rounded-lg text-xs font-medium border inline-flex items-center gap-1.5 cursor-pointer transition-all ${
+                    className={`min-h-[44px] px-3.5 rounded-lg text-xs font-medium border inline-flex items-center gap-1.5 cursor-pointer transition-all ${
                       taskDone
                         ? 'bg-[color-mix(in_oklab,var(--ok)_16%,transparent)] border-[var(--ok)] text-[var(--ok)]'
                         : 'bg-[var(--surface)] border-[var(--line-strong)] text-[var(--ink)] hover:border-[var(--action)]'
@@ -159,7 +159,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                     <span className="font-medium text-[var(--ink)]">Entrenamiento de hoy</span>
                     <span>· Push Power</span>
                   </div>
-                  <span className="font-mono text-xs text-[var(--gym)] font-medium">
+                  <span className="t-badge t-badge-gym text-xs t-num">
                     Rest Timer: 60s
                   </span>
                 </div>
@@ -168,8 +168,8 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                     <div className="text-sm font-medium text-[var(--ink)]">
                       Press de Banca Plano
                     </div>
-                    <div className="text-xs font-mono text-[var(--muted)] mt-0.5">
-                      80 kg · 4 series de 8-10 reps · 1RM: 104 kg
+                    <div className="text-xs text-[var(--muted)] mt-0.5">
+                      <span className="t-num">80 kg</span> · <span className="t-num">4</span> series de <span className="t-num">8-10 reps</span> · 1RM: <span className="t-num">104 kg</span>
                     </div>
                   </div>
 
@@ -182,7 +182,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                           key={idx}
                           type="button"
                           onClick={() => toggleSet(idx)}
-                          className={`h-8 w-9 rounded-lg font-mono text-xs font-medium border inline-flex items-center justify-center cursor-pointer transition-all ${
+                          className={`min-h-[44px] min-w-[44px] rounded-lg t-num text-xs font-medium border inline-flex items-center justify-center cursor-pointer transition-all ${
                             isDone
                               ? 'bg-[color-mix(in_oklab,var(--gym)_18%,transparent)] border-[var(--gym)] text-[var(--gym)] shadow-xs'
                               : 'bg-[var(--surface)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
@@ -199,12 +199,12 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
 
               {/* Added note or Inline Add Bar */}
               {addedNote ? (
-                <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-2.5 flex items-center justify-between text-xs text-[var(--ink)]">
+                <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3 flex items-center justify-between text-xs text-[var(--ink)]">
                   <span className="truncate">✓ Recordatorio registrado: &ldquo;{addedNote}&rdquo;</span>
                   <button
                     type="button"
                     onClick={() => setAddedNote(null)}
-                    className="text-[var(--muted)] hover:text-[var(--ink)] text-xs ml-2 shrink-0 cursor-pointer"
+                    className="text-[var(--muted)] hover:text-[var(--ink)] text-xs ml-2 shrink-0 cursor-pointer min-h-[44px] inline-flex items-center px-2"
                   >
                     Borrar
                   </button>
@@ -216,11 +216,11 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                     value={quickNote}
                     onChange={(e) => setQuickNote(e.target.value)}
                     placeholder="+ Escribe un pendiente rápido y presiona Enter..."
-                    className="flex-1 min-h-[38px] px-3 rounded-lg text-xs bg-[var(--surface-2)] border border-[var(--line)] text-[var(--ink)] placeholder-[var(--muted)] focus:outline-none focus:border-[var(--action)]"
+                    className="t-input min-h-[44px] py-2 text-xs flex-1"
                   />
                   <button
                     type="submit"
-                    className="h-[38px] px-3 rounded-lg text-xs font-medium bg-[var(--surface-2)] border border-[var(--line)] text-[var(--ink)] hover:border-[var(--action)] cursor-pointer inline-flex items-center gap-1"
+                    className="t-btn t-btn-secondary min-h-[44px] text-xs px-3.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Guardar</span>
@@ -234,7 +234,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-[var(--muted)] pb-2 border-b border-[var(--line)]">
                 <span>Ciclo Académico 2026-II · 4 Cursos Registrados</span>
-                <span className="font-mono text-[var(--action)] font-semibold">Semana 5 de 16</span>
+                <span className="text-[var(--action)] font-semibold t-num">Semana 5 de 16</span>
               </div>
 
               <div className="space-y-2">
@@ -250,13 +250,13 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                   >
                     <div>
                       <div className="font-medium text-[var(--ink)]">{c.name}</div>
-                      <div className="text-xs font-mono text-[var(--muted)]">{c.code} · Ponderación {c.weight}</div>
+                      <div className="text-xs text-[var(--muted)]">{c.code} · Ponderación <span className="t-num">{c.weight}</span></div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--line)] text-[var(--muted)]">
+                      <span className="text-xs px-2 py-0.5 rounded bg-[var(--surface)] border border-[var(--line)] text-[var(--muted)]">
                         {c.state}
                       </span>
-                      <span className="font-mono font-semibold text-sm text-[var(--action)]">
+                      <span className="t-num font-semibold text-sm text-[var(--action)]">
                         {c.note}
                       </span>
                     </div>
@@ -266,7 +266,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
 
               <div className="pt-2 flex items-center justify-between text-xs border-t border-[var(--line)]">
                 <span className="text-[var(--muted)]">Promedio Ponderado Acumulado (GPA):</span>
-                <span className="font-mono font-bold text-sm text-[var(--ink)]">17.82 / 20.00</span>
+                <span className="t-num font-bold text-sm text-[var(--ink)]">17.82 / 20.00</span>
               </div>
             </div>
           )}
@@ -275,7 +275,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-[var(--muted)] pb-2 border-b border-[var(--line)]">
                 <span>Rutina de Hoy · Push Power (Pecho, Hombro, Tríceps)</span>
-                <span className="font-mono text-[var(--gym)] font-semibold">Semana 5 · Día 1</span>
+                <span className="text-[var(--gym)] font-semibold t-num">Semana 5 · Día 1</span>
               </div>
 
               <div className="space-y-2">
@@ -293,8 +293,8 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
                       <div className="font-medium text-[var(--ink)]">{ex.name}</div>
                       <div className="text-xs text-[var(--muted)]">{ex.target}</div>
                     </div>
-                    <div className="text-right font-mono">
-                      <div className="font-semibold text-[var(--gym)]">{ex.load}</div>
+                    <div className="text-right">
+                      <div className="t-num font-semibold text-[var(--gym)]">{ex.load}</div>
                       <div className="text-xs text-[var(--muted)]">{ex.reps}</div>
                     </div>
                   </div>
@@ -303,18 +303,18 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
 
               <div className="pt-2 flex items-center justify-between text-xs border-t border-[var(--line)]">
                 <span className="text-[var(--muted)]">Calculadora 1RM (Epley): 80kg × (1 + 10/30) =</span>
-                <span className="font-mono font-bold text-sm text-[var(--gym)]">104.0 kg</span>
+                <span className="t-num font-bold text-sm text-[var(--gym)]">104.0 kg</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer info bar */}
-        <div className="px-4 py-2.5 border-t border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-between text-xs text-[var(--muted)] font-mono">
+        <div className="px-4 py-2.5 border-t border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-between text-xs text-[var(--muted)]">
           <div className="flex items-center gap-2">
             <span className="text-[var(--ink)] font-medium">Arquitectura Zero-Burocracia</span>
             <span>·</span>
-            <span>0.0s latencia</span>
+            <span className="t-num">0.0s latencia</span>
           </div>
 
           {onEnterApp && (

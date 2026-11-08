@@ -10,7 +10,6 @@ import {
   Sun,
   RotateCcw,
   BookOpen,
-  Sparkles,
   LogOut,
 } from 'lucide-react';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -161,11 +160,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onNavigateLanding}
-                className="t-btn t-btn-secondary px-2.5 sm:px-3 text-xs"
-                title="Ver Landing Page informativa y Manifiesto"
+                className="t-btn t-btn-ghost px-2.5 sm:px-3 text-xs"
+                title="Ver portal de presentación de StudentOS"
               >
-                <Sparkles className="w-3.5 h-3.5 text-[var(--action)] shrink-0" />
-                <span className="hidden sm:inline">Landing</span>
+                <span>Portal</span>
               </button>
             )}
 

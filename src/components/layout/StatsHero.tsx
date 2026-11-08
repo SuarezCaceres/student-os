@@ -45,17 +45,21 @@ export const StatsHero: React.FC<StatsHeroProps> = ({ state, onOpenQuickAddWithT
   }
 
   return (
-    <section data-enter className="t-card hero-enter p-6 sm:p-8 mb-8">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 lg:gap-8">
+    <section data-enter className="t-card hero-enter p-5 sm:p-6 mb-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 lg:gap-8">
         {/* Left Column: Direct Greeting without banned kickers/eyebrows */}
         <div className="max-w-xl min-w-0">
-          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-[-0.03em] text-[var(--ink)] leading-tight">
-            {timeGreeting}, {state.studentName}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-[-0.028em] text-[var(--ink)] leading-tight">
+              {timeGreeting}, {state.studentName}
+            </h1>
+            <span className="t-badge t-badge-accent t-num">
+              Semana {state.currentAcademicWeek}
+            </span>
+          </div>
 
-          <p className="text-[15px] sm:text-base text-[var(--muted)] mt-2 leading-relaxed">
-            {state.career} · <span className="t-num font-medium text-[var(--ink)]">Semana {state.currentAcademicWeek}</span>.
-            {' '}
+          <p className="text-sm sm:text-[15px] text-[var(--muted)] mt-1.5 leading-relaxed">
+            {state.career} ·{' '}
             {currentWeekTasks.length > 0 ? (
               <>
                 Tienes{' '}
@@ -63,16 +67,14 @@ export const StatsHero: React.FC<StatsHeroProps> = ({ state, onOpenQuickAddWithT
                   {currentWeekTasks.length}{' '}
                   {currentWeekTasks.length === 1 ? 'entrega pendiente' : 'entregas pendientes'}
                 </span>{' '}
-                esta semana.
+                esta semana lectiva.
               </>
             ) : (
-              <>
-                Todas las entregas al día para esta semana lectiva.
-              </>
+              <>Todas las entregas al día para esta semana lectiva.</>
             )}
           </p>
 
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mt-6">
+          <div className="flex flex-wrap items-center gap-2.5 mt-4">
             <button
               type="button"
               onClick={() => onOpenQuickAddWithTab?.('university')}
@@ -94,50 +96,50 @@ export const StatsHero: React.FC<StatsHeroProps> = ({ state, onOpenQuickAddWithT
         </div>
 
         {/* Right Column: Unified Telemetry Strip (Hairline-divided, zero nested box-in-box) */}
-        <div className="lg:border-l lg:border-[var(--line)] lg:pl-8 w-full lg:w-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+        <div className="lg:border-l lg:border-[var(--line)] lg:pl-8 w-full lg:w-auto pt-4 lg:pt-0 border-t lg:border-t-0 border-[var(--line)]">
+          <div className="grid grid-cols-3 gap-3 sm:gap-6">
             {/* Metric 1: Racha */}
             <div className="flex flex-col justify-between">
               <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
                 <Flame className="w-3.5 h-3.5 text-[var(--gym)] shrink-0" />
-                <span>Racha activa</span>
+                <span className="truncate">Racha</span>
               </div>
-              <div className="mt-2">
-                <div className="t-num text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
-                  {state.streak} <span className="text-sm font-normal text-[var(--muted)]">días</span>
+              <div className="mt-1.5">
+                <div className="t-num text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
+                  {state.streak} <span className="text-xs sm:text-sm font-normal text-[var(--muted)]">días</span>
                 </div>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Constancia diaria</p>
+                <p className="text-xs text-[var(--muted)] mt-0.5 truncate">Constancia</p>
               </div>
             </div>
 
             {/* Metric 2: Gym */}
-            <div className="flex flex-col justify-between sm:border-l sm:border-[var(--line)] sm:pl-6">
+            <div className="flex flex-col justify-between border-l border-[var(--line)] pl-3 sm:pl-6">
               <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
                 <Dumbbell className="w-3.5 h-3.5 text-[var(--action)] shrink-0" />
-                <span className="truncate">Gym · {todayName}</span>
+                <span className="truncate">Gym ({todayName})</span>
               </div>
-              <div className="mt-2">
-                <div className="t-num text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
-                  {completedSets}/{totalSets} <span className="text-sm font-normal text-[var(--muted)]">series</span>
+              <div className="mt-1.5">
+                <div className="t-num text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
+                  {completedSets}/{totalSets}
                 </div>
                 <p className="text-xs text-[var(--muted)] mt-0.5 truncate">
-                  {todayRoutine ? todayRoutine.tag : 'Día de descanso'}
+                  {todayRoutine ? todayRoutine.tag : 'Descanso'}
                 </p>
               </div>
             </div>
 
             {/* Metric 3: Entregas */}
-            <div className="flex flex-col justify-between sm:border-l sm:border-[var(--line)] sm:pl-6">
+            <div className="flex flex-col justify-between border-l border-[var(--line)] pl-3 sm:pl-6">
               <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
                 <CheckCircle2 className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" />
-                <span>Entregas ciclo</span>
+                <span className="truncate">Ciclo</span>
               </div>
-              <div className="mt-2">
-                <div className="t-num text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
-                  {doneUni}/{totalUni} <span className="text-sm font-normal text-[var(--muted)]">listas</span>
+              <div className="mt-1.5">
+                <div className="t-num text-xl sm:text-2xl font-semibold text-[var(--ink)] tracking-[-0.02em]">
+                  {doneUni}/{totalUni}
                 </div>
-                <p className="text-xs text-[var(--muted)] mt-0.5 t-num">
-                  {totalUni > 0 ? `${Math.round((doneUni / totalUni) * 100)}% completado` : 'Al día'}
+                <p className="text-xs text-[var(--muted)] mt-0.5 t-num truncate">
+                  {totalUni > 0 ? `${Math.round((doneUni / totalUni) * 100)}% avance` : 'Al día'}
                 </p>
               </div>
             </div>

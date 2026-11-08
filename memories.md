@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.2.0 (Auditoría Impeccable, Rediseño Interfaz Workspace & Eliminación de Slop SVG)`  
+> **Versión actual:** `v2.2.1 (Refactor Impeccable Workspace: HUD compacto, hairlines 1px, erradicación de slop cian y target táctil 44px)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -226,7 +226,7 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.2)** | `03f1c95` → `37cf6c3` + Impeccable Redesign | Auditoría Impeccable, Workspace mockup interactivo real, Cadence hub 1..16, telemetría limpia en StatsHero |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.2.1)** | `03f1c95` → `91cf170` + Workspace Impeccable Refactor | HUD compacto, erradicación de border-l-[3px], tokenización de AuthModal, Bento sin duplicados |
 | `feat/wt1-shell-dashboard` | Fusionada | `a30c298` | Navbar, StatsHero, QuickAdd, OverviewBento, Hábitos y Backup |
 | `feat/wt2-academic-learning` | Fusionada | `d4f8ff0` | Universidad, GPA, Rúbricas, Aprendizaje y Semana libre |
 | `feat/wt3-kanban-calendar` | Fusionada | `4bd4451` | Kanban y Horario semanal con selector de día móvil |

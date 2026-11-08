@@ -109,21 +109,21 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
       case 'universidad':
         return {
           surfaceClass:
-            'bg-[color-mix(in_oklab,var(--action)_13%,var(--surface))] border-[color-mix(in_oklab,var(--action)_34%,var(--line))] border-l-[3px] border-l-[var(--action)]',
+            'bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] border-[color-mix(in_oklab,var(--action)_38%,var(--line))]',
           accentText: 'text-[var(--action)]',
           icon: GraduationCap,
         };
       case 'trabajo':
         return {
           surfaceClass:
-            'bg-[color-mix(in_oklab,var(--ok)_13%,var(--surface))] border-[color-mix(in_oklab,var(--ok)_34%,var(--line))] border-l-[3px] border-l-[var(--ok)]',
+            'bg-[color-mix(in_oklab,var(--ok)_10%,var(--surface))] border-[color-mix(in_oklab,var(--ok)_38%,var(--line))]',
           accentText: 'text-[var(--ok)]',
           icon: Briefcase,
         };
       case 'gym':
         return {
           surfaceClass:
-            'bg-[color-mix(in_oklab,var(--gym)_13%,var(--surface))] border-[color-mix(in_oklab,var(--gym)_34%,var(--line))] border-l-[3px] border-l-[var(--gym)]',
+            'bg-[color-mix(in_oklab,var(--gym)_10%,var(--surface))] border-[color-mix(in_oklab,var(--gym)_38%,var(--line))]',
           accentText: 'text-[var(--gym)]',
           icon: Dumbbell,
         };
@@ -131,7 +131,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
       default:
         return {
           surfaceClass:
-            'bg-[var(--surface-2)] border-[var(--line-strong)] border-l-[3px] border-l-[var(--muted)]',
+            'bg-[var(--surface-2)] border-[var(--line-strong)]',
           accentText: 'text-[var(--muted)]',
           icon: User,
         };
@@ -389,7 +389,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                       }}
                       className={`group absolute rounded-[12px] border px-2.5 py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 hover:shadow-md flex flex-col justify-between overflow-hidden ${
                         hasConflict
-                          ? 'bg-[color-mix(in_oklab,var(--danger)_14%,var(--surface))] border-[var(--danger)] border-l-[3px] border-l-[var(--danger)]'
+                          ? 'bg-[color-mix(in_oklab,var(--danger)_14%,var(--surface))] border-[var(--danger)] ring-1 ring-[var(--danger)]/30'
                           : styles.surfaceClass
                       }`}
                     >
