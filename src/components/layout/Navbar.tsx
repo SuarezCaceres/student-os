@@ -10,6 +10,8 @@ import {
   Sun,
   RotateCcw,
   BookOpen,
+  Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { SegmentedControl } from '../common/SegmentedControl';
 import type { SegmentOption } from '../common/SegmentedControl';
@@ -26,6 +28,9 @@ export interface NavbarProps {
   currentAcademicWeek?: number;
   isFreeWeek?: boolean;
   hasReflectionThisWeek?: boolean;
+  onNavigateLanding?: () => void;
+  userSession?: { name: string; email: string } | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -38,6 +43,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentAcademicWeek = 5,
   isFreeWeek = false,
   hasReflectionThisWeek = false,
+  onNavigateLanding,
+  userSession,
+  onLogout,
 }) => {
   const learningBadge = isFreeWeek
     ? 'Libre'
@@ -149,6 +157,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {onNavigateLanding && (
+              <button
+                type="button"
+                onClick={onNavigateLanding}
+                className="t-btn t-btn-secondary px-2.5 sm:px-3 text-xs"
+                title="Ver Landing Page informativa y Manifiesto"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="hidden sm:inline">Landing</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => onOpenQuickAdd('university')}
@@ -187,6 +207,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <RotateCcw className="w-4 h-4" />
             </button>
+
+            {userSession && (
+              <div className="hidden lg:flex items-center gap-1 pl-1 border-l border-[var(--line)]">
+                <span className="text-xs font-mono text-[var(--muted)] max-w-[90px] truncate" title={userSession.email}>
+                  {userSession.name}
+                </span>
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="t-btn t-btn-ghost t-btn-icon !h-8 !w-8"
+                    title="Cerrar sesión"
+                    aria-label="Cerrar sesión"
+                  >
+                    <LogOut className="w-3.5 h-3.5 text-[var(--muted)] hover:text-red-400" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>

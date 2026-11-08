@@ -24,12 +24,48 @@ import { GymTracker } from './components/gym/GymTracker';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
 import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
+import { LandingPage } from './components/landing/LandingPage';
+import type { UserSession } from './components/auth/AuthModal';
 
 export const App: React.FC = () => {
   const [state, setState, resetState] = useLocalStorage<AppState>('student_os_state_v1', initialData);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
+
+  // User session & Landing vs App View Routing
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
+    try {
+      const session = localStorage.getItem('student_os_user_session');
+      if (session) {
+        const parsed = JSON.parse(session);
+        if (parsed.isLoggedIn) return 'app';
+      }
+    } catch {
+      // Fallback to landing
+    }
+    return 'landing';
+  });
+
+  const [userSession, setUserSession] = useState<UserSession | null>(() => {
+    try {
+      const session = localStorage.getItem('student_os_user_session');
+      if (session) return JSON.parse(session);
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem('student_os_user_session');
+    } catch {
+      // ignore
+    }
+    setUserSession(null);
+    setCurrentView('landing');
+  };
 
   // Handle Theme Toggle
   const isDark = state.theme === 'dark';
@@ -273,6 +309,18 @@ export const App: React.FC = () => {
   const isFreeWeek = currentWeekAssignments.length > 0 && currentWeekAssignments.filter((a) => a.status !== 'entregado').length === 0;
   const hasReflectionThisWeek = Boolean(state.weeklyReflections?.[state.currentAcademicWeek]?.learnings);
 
+  if (currentView === 'landing') {
+    return (
+      <LandingPage
+        onEnterApp={() => setCurrentView('app')}
+        onAuthSuccess={(user) => {
+          setUserSession(user);
+          setCurrentView('app');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] transition-colors duration-200">
       {/* Top Navbar */}
@@ -286,6 +334,9 @@ export const App: React.FC = () => {
         currentAcademicWeek={state.currentAcademicWeek}
         isFreeWeek={isFreeWeek}
         hasReflectionThisWeek={hasReflectionThisWeek}
+        onNavigateLanding={() => setCurrentView('landing')}
+        userSession={userSession}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}

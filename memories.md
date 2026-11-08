@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.0.0 (Rediseño Integral design-taste-frontend: blue-black-cornflower + Transiciones Amigables + Arquitectura Multi-Agente)`  
+> **Versión actual:** `v2.1.0 (Landing Page Informativo, HD Vector Visuals, Storytelling al Scroll & Flujo de Auth)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -206,13 +206,31 @@ student-os/
 - **Captura Rápida Multidisciplinaria (5 Pestañas):**
   - Modal accesible globalmente con selector: Universidad, Gym, Kanban, Agenda y **Aprender** (guardado directo de enlaces de YouTube o notas a la semana deseada con confeti).
 
+### 8. Landing Page Informativo, Visuales HD y Sistema de Auth (`src/components/landing/` & `src/components/auth/`)
+- **Ilustraciones vectoriales de alta definición en SVG:**
+  - `StudentLaptopDuoVisual`: Dos jóvenes universitarios con audífonos over-ear y laptops programando con trazos neón cyan y bus de datos continuo.
+  - `LabFlaskNucleusVisual`: Matraz de laboratorio tecnológico con callouts interactivos `[PROBLEMA]`, `[ANÁLISIS]`, `[SOLUCIÓN]`, partículas ascendentes y cápsula de estado.
+  - `StudentSoloFocusVisual`: Estudiante en su laptop con bombilla/sol conceptual luminoso sobre su cabeza.
+- **Storytelling Progresivo al Scroll:**
+  - `HeroSection`: Promesa central (*"Menos caos manual. Más tiempo para crecer."*), CTAs de acción rápida y fila de 3 píldoras de valor (`Misión`, `Automatización`, `Control Total`).
+  - `ProblemSection`: *"¿Qué está saboteando tu semestre y tu tiempo?"* analizando entregas desfasadas, falta de consistencia en el gym y dispersión mental en 5 apps.
+  - `FeatureShowcaseSection`: *"¿Para qué está hecho StudentOS?"* con Bento Grid interactivo mostrando Semanas 1 a 16, series interactivas de Gym (S1..S4), Kanban ágil y horario cronológico con día actual.
+  - `AudienceSection`: *"¿Para quiénes está hecho?"* (Estudiantes de Software/Ingeniería, Universitarios Atletas y Freelancers).
+  - `CreatorStorySection`: *"¿Por qué decidí hacer este proyecto?"* (Manifiesto personal del creador, filosofía offline-first y privacidad de datos).
+  - `LandingFooter`: Enlaces rápidos, botón volver arriba y licencia MIT.
+- **Sistema de Autenticación & Registro por Correo (`AuthModal.tsx`):**
+  - Formulario ágil para Iniciar Sesión o Crear Cuenta con email y contraseña.
+  - Botón de acceso directo en 1 clic (*Modo Demo*) sin registro obligatorio.
+  - Persistencia de sesión en `localStorage` (`student_os_user_session`) y transición suave hacia el Dashboard.
+  - Navegación bidireccional mediante botón `Landing` en el Navbar del Dashboard y opción de cierre de sesión.
+
 ---
 
 ## 🌿 6. Registro de Git y Ramas
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.0)** | `03f1c95` → `f1fe3b8` + integración | Rediseño `design-taste-frontend`: sistema `blue-black-cornflower`, primitivas de movimiento, 4 worktrees fusionados e integración en `App.tsx` |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.1)** | `03f1c95` → `f1fe3b8` + Landing/Auth | Rediseño `design-taste-frontend`, Landing Page interactivo con scroll storytelling, visuales HD y flujo de auth |
 | `feat/wt1-shell-dashboard` | Fusionada | `a30c298` | Navbar, StatsHero, QuickAdd, OverviewBento, Hábitos y Backup |
 | `feat/wt2-academic-learning` | Fusionada | `d4f8ff0` | Universidad, GPA, Rúbricas, Aprendizaje y Semana libre |
 | `feat/wt3-kanban-calendar` | Fusionada | `4bd4451` | Kanban y Horario semanal con selector de día móvil |
@@ -224,10 +242,7 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.0)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) sin errores.
-- **Linter Estático:** `oxlint` con `0` warnings y `0` errores (ignora `.agents/**`, `dist/**`, `node_modules/**`).
-- **Auditoría en navegador real (Edge headless vía CDP):** 6 vistas en `1440px`, `390px` y `320px`, Modo Claro y Oscuro, `0` errores de consola, `0` desbordamiento horizontal y `0` textos menores a `12px`.
-- **Auditoría anti-slop:** `0` coincidencias de `indigo-*`, `violet-*`, `purple-*`, `Sparkles`, `blur-3xl`, `animate-pulse`, `font-black` o `text-[9-11px]`.
-- **Servidor de Desarrollo Local:** Vite en `http://localhost:5173/` con HMR reactivo.
-- **Worktrees en Windows:** antes de eliminar un worktree, desvincular el junction con `cmd /c rmdir "<wt>\node_modules"` para no borrar el `node_modules` compartido.
+## 🚀 7. Verificación del Sistema (v2.1)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 666ms.
+- **Linter Estático:** `oxlint` con `0` warnings y `0` errores en 42 archivos.
+- **Auditoría visual y assets:** Gráficos vectoriales SVG escalables en 4K, contraste accesible y navegación bidireccional Landing <-> Dashboard.
