@@ -235,7 +235,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             <button
               type="submit"
               disabled={!newSubtaskText.trim()}
-              className="t-btn t-btn-secondary min-h-[44px] px-3.5 shrink-0"
+              className="t-btn t-btn-secondary t-btn-icon shrink-0"
               aria-label="Sumar subtarea"
               title="Sumar subtarea"
             >
@@ -284,13 +284,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 }
                 onUpdateStatus(item.id, nextStatus);
               }}
-              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-[12px] text-xs sm:text-[13px] font-medium bg-[color-mix(in_oklab,var(--action)_14%,transparent)] text-[var(--action)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)] hover:bg-[color-mix(in_oklab,var(--action)_22%,transparent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--action)]"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-[var(--r-btn)] text-xs sm:text-[13px] font-medium bg-[color-mix(in_oklab,var(--action)_14%,transparent)] text-[var(--action)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)] hover:bg-[color-mix(in_oklab,var(--action)_22%,transparent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--action)]"
             >
               <span>{status === 'todo' ? 'Empezar' : 'Terminar'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           ) : (
             <span className="inline-flex items-center gap-1.5 min-h-[44px] px-2.5 text-xs sm:text-[13px] font-medium text-[var(--ok)]">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Listo</span>
+            </span>
+          )}
               <CheckCircle2 className="w-4 h-4" />
               <span>Listo</span>
             </span>
