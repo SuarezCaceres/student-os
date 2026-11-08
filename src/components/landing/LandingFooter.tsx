@@ -53,33 +53,55 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             <h4 className="font-semibold text-[var(--ink)] uppercase tracking-wider mb-3">
               Navegación
             </h4>
-            <ul className="space-y-2">
-              <li>
-                <a href="#inicio" className="hover:text-[var(--ink)] transition-colors">
-                  Inicio
-                </a>
-              </li>
-              <li>
-                <a href="#problema" className="hover:text-[var(--ink)] transition-colors">
-                  Diagnóstico del Problema
-                </a>
-              </li>
-              <li>
-                <a href="#para-que-sirve" className="hover:text-[var(--ink)] transition-colors">
-                  ¿Para qué sirve?
-                </a>
-              </li>
-              <li>
-                <a href="#para-quienes" className="hover:text-[var(--ink)] transition-colors">
-                  ¿Para quiénes está hecho?
-                </a>
-              </li>
-              <li>
-                <a href="#manifiesto" className="hover:text-[var(--ink)] transition-colors">
-                  ¿Por qué se creó?
-                </a>
-              </li>
-            </ul>
+            <nav aria-label="Navegación del pie de página">
+              <ul className="space-y-1">
+                <li>
+                  <a 
+                    href="#inicio" 
+                    className="hover:text-[var(--ink)] transition-colors py-1.5 inline-flex items-center min-h-[36px]"
+                    aria-label="Ir al inicio de la página"
+                  >
+                    Inicio
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#problema" 
+                    className="hover:text-[var(--ink)] transition-colors py-1.5 inline-flex items-center min-h-[36px]"
+                    aria-label="Ir a la sección de diagnóstico del problema"
+                  >
+                    Diagnóstico del Problema
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#para-que-sirve" 
+                    className="hover:text-[var(--ink)] transition-colors py-1.5 inline-flex items-center min-h-[36px]"
+                    aria-label="Ir a la sección ¿Para qué sirve?"
+                  >
+                    ¿Para qué sirve?
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#para-quienes" 
+                    className="hover:text-[var(--ink)] transition-colors py-1.5 inline-flex items-center min-h-[36px]"
+                    aria-label="Ir a la sección ¿Para quiénes está hecho?"
+                  >
+                    ¿Para quiénes está hecho?
+                  </a>
+                </li>
+                <li>
+                  <a 
+                    href="#manifiesto" 
+                    className="hover:text-[var(--ink)] transition-colors py-1.5 inline-flex items-center min-h-[36px]"
+                    aria-label="Ir a la sección del manifiesto del creador"
+                  >
+                    ¿Por qué se creó?
+                  </a>
+                </li>
+              </ul>
+            </nav>
           </div>
 
           {/* Quick Access (Span 4) */}
@@ -91,14 +113,16 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
               <button
                 type="button"
                 onClick={() => onOpenAuth('register')}
-                className="t-btn t-btn-primary w-full text-xs font-medium"
+                className="t-btn t-btn-primary w-full min-h-[44px] text-xs font-medium"
+                aria-label="Crear cuenta en StudentOS con tu correo electrónico"
               >
                 Crear Cuenta con tu Correo
               </button>
               <button
                 type="button"
                 onClick={onEnterAppDemo}
-                className="t-btn t-btn-secondary w-full text-xs font-medium"
+                className="t-btn t-btn-secondary w-full min-h-[44px] text-xs font-medium"
+                aria-label="Probar demo interactiva de StudentOS sin registrarte"
               >
                 Probar Demo sin Registro
               </button>
@@ -110,7 +134,19 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
         {/* Bottom Bar */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono">
           <div className="flex items-center gap-3 text-[var(--muted)]">
-            <span>© {CURRENT_YEAR} StudentOS. Licencia MIT.</span>
+            <span>
+              © {CURRENT_YEAR} StudentOS.{' '}
+              <a
+                href="https://opensource.org/licenses/MIT"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-[var(--ink)] underline underline-offset-2 transition-colors"
+                aria-label="Ver Licencia MIT de código abierto (abre en una pestaña nueva)"
+              >
+                Licencia MIT
+              </a>
+              .
+            </span>
             <span>•</span>
             <span className="text-[var(--action)] font-medium">100% Offline-First</span>
           </div>
@@ -119,7 +155,8 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             <button
               type="button"
               onClick={scrollToTop}
-              className="t-btn t-btn-ghost !h-8 !px-2.5 text-xs inline-flex items-center gap-1.5"
+              className="t-btn t-btn-ghost min-h-[44px] px-3 text-xs inline-flex items-center gap-1.5"
+              aria-label="Volver arriba al inicio de la página"
               title="Volver arriba"
             >
               <span>Subir</span>

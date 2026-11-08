@@ -16,7 +16,8 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
         {/* Brand Logo & Tag */}
         <a 
           href="#inicio" 
-          className="flex items-center gap-2.5 group focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-xl"
+          className="flex items-center gap-2.5 group focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-xl min-h-[44px] py-1"
+          aria-label="StudentOS PRO MAX - Ir al inicio"
         >
           <div className="w-9 h-9 rounded-[10px] overflow-hidden border border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-center shrink-0">
             <img
@@ -39,28 +40,32 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
         </a>
 
         {/* Section Navigation Links (Desktop) */}
-        <nav className="hidden md:flex items-center gap-6 font-sans text-sm text-[var(--muted)]" aria-label="Navegación principal">
+        <nav className="hidden md:flex items-center gap-2 lg:gap-3 font-sans text-sm text-[var(--muted)]" aria-label="Navegación principal">
           <a 
             href="#problema" 
-            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded px-1.5 py-1"
+            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-lg px-2.5 py-2 min-h-[44px] inline-flex items-center"
+            aria-label="Ir a la sección de diagnóstico del problema"
           >
             Diagnóstico
           </a>
           <a 
             href="#para-que-sirve" 
-            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded px-1.5 py-1"
+            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-lg px-2.5 py-2 min-h-[44px] inline-flex items-center"
+            aria-label="Ir a la sección ¿Para qué sirve?"
           >
             ¿Para qué sirve?
           </a>
           <a 
             href="#para-quienes" 
-            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded px-1.5 py-1"
+            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-lg px-2.5 py-2 min-h-[44px] inline-flex items-center"
+            aria-label="Ir a la sección ¿Para quiénes está hecho?"
           >
             ¿Para quiénes?
           </a>
           <a 
             href="#manifiesto" 
-            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded px-1.5 py-1"
+            className="hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-lg px-2.5 py-2 min-h-[44px] inline-flex items-center"
+            aria-label="Ir a la sección ¿Por qué se creó?"
           >
             ¿Por qué se creó?
           </a>
@@ -71,8 +76,9 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           <button
             type="button"
             onClick={onEnterAppDemo}
-            className="hidden sm:inline-flex items-center gap-1.5 t-btn t-btn-secondary !h-9 !px-3 text-xs"
+            className="hidden sm:inline-flex items-center justify-center gap-1.5 t-btn t-btn-secondary min-h-[44px] px-3.5 text-xs font-medium"
             title="Explorar la aplicación completa sin registro"
+            aria-label="Explorar la aplicación completa en modo demo"
           >
             <Sparkles className="h-3.5 w-3.5 text-[var(--action)]" />
             <span>Ver Demo</span>
@@ -81,7 +87,8 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           <button
             type="button"
             onClick={() => onOpenAuth('login')}
-            className="t-btn t-btn-ghost !h-9 !px-3 text-xs"
+            className="t-btn t-btn-ghost min-h-[44px] px-3.5 text-xs font-medium"
+            aria-label="Iniciar sesión con tu cuenta de StudentOS"
           >
             Iniciar Sesión
           </button>
@@ -89,7 +96,8 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
           <button
             type="button"
             onClick={() => onOpenAuth('register')}
-            className="t-btn t-btn-primary !h-9 !px-3.5 text-xs font-medium"
+            className="t-btn t-btn-primary min-h-[44px] px-4 text-xs font-medium"
+            aria-label="Crear tu cuenta gratis en StudentOS"
           >
             <span>Crear Cuenta</span>
             <ArrowRight className="h-3.5 w-3.5" />
