@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
-import { 
-  CheckCircle2, 
-  Clock, 
-  Plus, 
-  Trash2,
+import {
   Calculator,
-  FileEdit,
   ExternalLink,
   FileCheck,
-  Award
+  FileEdit,
+  Plus,
+  Trash2,
 } from 'lucide-react';
-import type { UniversityAssignment, AssignmentStatus, AssignmentType } from '../../types';
+import type {
+  AssignmentStatus,
+  AssignmentType,
+  UniversityAssignment,
+} from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
-import { GradesCalculatorModal } from './GradesCalculatorModal';
+import { SectionHeader } from '../common/SectionHeader';
+import { SegmentedControl } from '../common/SegmentedControl';
 import { AssignmentDetailModal } from './AssignmentDetailModal';
+import { GradesCalculatorModal } from './GradesCalculatorModal';
 
 interface UniversityViewProps {
   assignments: UniversityAssignment[];
@@ -24,6 +27,33 @@ interface UniversityViewProps {
   onUpdateAssignment?: (assignment: UniversityAssignment) => void;
 }
 
+type WeekScope = 'upcoming' | 'current' | 'all';
+
+const TYPE_LABEL: Record<AssignmentType, string> = {
+  tarea: 'Tarea',
+  laboratorio: 'Laboratorio',
+  proyecto: 'Proyecto',
+  examen: 'Examen',
+};
+
+function getInitialTodayUtcMs(): number {
+  const now = new Date();
+  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function parseIsoDateUtcMs(dateStr: string): number | null {
+  if (!dateStr) return null;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return null;
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return null;
+  }
+  return Date.UTC(year, month - 1, day);
+}
+
 export const UniversityView: React.FC<UniversityViewProps> = ({
   assignments,
   currentWeek,
@@ -32,21 +62,20 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
   onAddAssignment,
   onUpdateAssignment,
 }) => {
+  const [todayUtcMs] = useState<number>(getInitialTodayUtcMs);
+  const [weekFilter, setWeekFilter] = useState<WeekScope>('upcoming');
   const [filterCourse, setFilterCourse] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
-  const [weekFilter, setWeekFilter] = useState<'all' | 'current' | 'upcoming'>('all');
-  const [quickTitleByWeek, setQuickTitleByWeek] = useState<{ [week: number]: string }>({});
+  const [quickTitleByWeek, setQuickTitleByWeek] = useState<Record<number, string>>({});
 
-  // Modals state
-  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  const [detailAssignment, setDetailAssignment] = useState<UniversityAssignment | null>(null);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState<boolean>(false);
+  const [detailAssignment, setDetailAssignment] =
+    useState<UniversityAssignment | null>(null);
 
-  // Safe update handler
   const handleSaveAssignment = (updated: UniversityAssignment) => {
     if (onUpdateAssignment) {
       onUpdateAssignment(updated);
     } else {
-      // Graceful fallback without touching App.tsx
       onDeleteAssignment(updated.id);
       onAddAssignment(updated);
     }
@@ -58,10 +87,8 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     });
   };
 
-  // Unique courses for filter
   const courses = Array.from(new Set(assignments.map((a) => a.course)));
 
-  // Filter logic
   const filtered = assignments.filter((a) => {
     if (filterCourse !== 'todos' && a.course !== filterCourse) return false;
     if (filterStatus === 'pendientes' && a.status === 'entregado') return false;
@@ -71,35 +98,42 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     return true;
   });
 
-  // Group by week (from 1 to 16)
   const allWeeks = Array.from({ length: 16 }, (_, i) => i + 1);
-  const weeksWithAssignments = allWeeks.filter((w) => {
+  const visibleWeeks = allWeeks.filter((w) => {
     if (weekFilter === 'current') return w === currentWeek;
-    if (weekFilter === 'upcoming') return w >= currentWeek;
+    if (weekFilter === 'upcoming') {
+      if (w < currentWeek) return false;
+      const hasFilteredItems = filtered.some((a) => a.week === w);
+      return w === currentWeek || hasFilteredItems;
+    }
     return true;
   });
 
-  // Countdown helper
-  const getDaysDiff = (dateStr: string) => {
-    if (!dateStr) return null;
-    const target = new Date(dateStr);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-    const diffTime = target.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const getDaysDiff = (dateStr: string): number | null => {
+    const targetUtcMs = parseIsoDateUtcMs(dateStr);
+    if (targetUtcMs === null) return null;
+    return Math.round((targetUtcMs - todayUtcMs) / 86_400_000);
   };
 
-  const handleQuickAddForWeek = (weekNum: number) => {
+  const handleQuickAddForWeek = (weekNum: number, e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const title = (quickTitleByWeek[weekNum] || '').trim();
     if (!title) return;
+
+    const fallbackCourse =
+      filterCourse !== 'todos'
+        ? filterCourse
+        : courses[0] || 'Ingeniería de Software II';
+
+    const dueUtc = new Date(Date.now() + 7 * 86_400_000);
+    const dueIso = dueUtc.toISOString().split('T')[0];
 
     const newAssignment: UniversityAssignment = {
       id: `uni-${Date.now()}`,
       title,
-      course: filterCourse !== 'todos' ? filterCourse : 'Ingeniería de Software II',
+      course: fallbackCourse,
       week: weekNum,
-      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      dueDate: dueIso,
       status: 'pendiente',
       type: 'tarea',
       weightPercentage: 15,
@@ -110,105 +144,124 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     triggerConfetti();
   };
 
-  const getTypeBadge = (type: AssignmentType) => {
-    switch (type) {
-      case 'proyecto':
-        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">Proyecto</span>;
-      case 'examen':
-        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400">Examen</span>;
-      case 'laboratorio':
-        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">Laboratorio</span>;
-      case 'tarea':
-      default:
-        return <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">Tarea</span>;
+  const renderDueBadge = (assignment: UniversityAssignment, daysDiff: number | null) => {
+    if (assignment.status === 'entregado') {
+      return <span className="t-badge t-badge-ok">Entregada</span>;
     }
+
+    if (daysDiff === null) {
+      return (
+        <span className="t-badge">
+          {assignment.status === 'en_progreso' ? 'En progreso' : 'Pendiente'}
+        </span>
+      );
+    }
+
+    if (daysDiff < 0) {
+      const lateDays = Math.abs(daysDiff);
+      return (
+        <span className="t-badge t-badge-danger t-num">
+          Vencida hace {lateDays} {lateDays === 1 ? 'día' : 'días'}
+        </span>
+      );
+    }
+
+    if (daysDiff === 0) {
+      return <span className="t-badge t-badge-danger">Vence hoy</span>;
+    }
+
+    if (daysDiff === 1) {
+      return <span className="t-badge t-badge-warn">Vence mañana</span>;
+    }
+
+    if (daysDiff <= 3) {
+      return <span className="t-badge t-badge-warn t-num">En {daysDiff} días</span>;
+    }
+
+    if (assignment.status === 'en_progreso') {
+      return (
+        <span className="t-badge t-badge-accent t-num">
+          En progreso · {daysDiff} días
+        </span>
+      );
+    }
+
+    return <span className="t-badge t-num">En {daysDiff} días</span>;
   };
 
-  const getGradePill = (grade: number | undefined) => {
+  const renderGradeBadge = (grade: number | undefined) => {
     if (grade === undefined) return null;
-    let color = 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30';
-    if (grade >= 17) color = 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30';
-    else if (grade >= 14) color = 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30';
-    else if (grade >= 11) color = 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30';
+    const toneClass =
+      grade >= 14
+        ? 't-badge-ok'
+        : grade >= 11
+          ? 't-badge-warn'
+          : 't-badge-danger';
 
-    return (
-      <span className={`inline-flex items-center gap-1 text-[11px] font-black px-2 py-0.5 rounded-md ${color}`}>
-        <Award className="w-3 h-3" />
-        {grade} / 20
-      </span>
-    );
+    return <span className={`t-badge ${toneClass} t-num`}>{grade} / 20</span>;
   };
+
+  const pendingTotal = assignments.filter((a) => a.status !== 'entregado').length;
+  const deliveredTotal = assignments.length - pendingTotal;
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Entregas Universitarias por Semanas
-            </h2>
-            <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 font-extrabold text-xs">
-              Semana {currentWeek} Actual
-            </span>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Monitorea en qué semana debes entregar cada tarea, parcial o proyecto del ciclo académico
-          </p>
-        </div>
+      {/* Section Header */}
+      <SectionHeader
+        title="Entregas de la universidad"
+        badge={
+          <span className="t-badge t-badge-accent t-num">
+            Semana {currentWeek}
+          </span>
+        }
+        subtitle="Tus tareas, laboratorios y exámenes organizados semana a semana."
+        actions={
+          <>
+            <SegmentedControl<WeekScope>
+              ariaLabel="Alcance de semanas académicas"
+              value={weekFilter}
+              onChange={setWeekFilter}
+              options={[
+                {
+                  id: 'upcoming',
+                  label: 'Desde esta semana',
+                  shortLabel: 'Próximas',
+                },
+                {
+                  id: 'current',
+                  label: `Solo semana ${currentWeek}`,
+                  shortLabel: `Sem. ${currentWeek}`,
+                },
+                {
+                  id: 'all',
+                  label: 'Ciclo 1–16',
+                  shortLabel: '1–16',
+                },
+              ]}
+            />
 
-        {/* Action Controls & Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* GPA Calculator Button */}
-          <button
-            onClick={() => setIsCalculatorOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-sm shadow-indigo-600/30 transition-all cursor-pointer min-h-[38px]"
-          >
-            <Calculator className="w-4 h-4" />
-            <span>Calculadora GPA</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setIsCalculatorOpen(true)}
+              className="t-btn t-btn-primary"
+            >
+              <Calculator className="w-4 h-4" />
+              <span>Calcular promedio</span>
+            </button>
+          </>
+        }
+      />
 
-          {/* Week Filter Buttons */}
-          <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            <button
-              onClick={() => setWeekFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${
-                weekFilter === 'all'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Todo el Ciclo
-            </button>
-            <button
-              onClick={() => setWeekFilter('current')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${
-                weekFilter === 'current'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Semana Actual
-            </button>
-            <button
-              onClick={() => setWeekFilter('upcoming')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer min-h-[36px] ${
-                weekFilter === 'upcoming'
-                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              Próximas
-            </button>
-          </div>
-
-          {/* Course Dropdown */}
+      {/* Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <select
+            aria-label="Filtrar por curso"
             value={filterCourse}
             onChange={(e) => setFilterCourse(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 min-h-[38px] cursor-pointer"
+            className="t-input min-h-[44px] w-full sm:w-auto sm:min-w-[230px] py-2 cursor-pointer"
           >
-            <option value="todos">Todos los Cursos</option>
+            <option value="todos">Todos los cursos</option>
             {courses.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -216,246 +269,285 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
             ))}
           </select>
 
-          {/* Status Dropdown */}
           <select
+            aria-label="Filtrar por estado"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 min-h-[38px] cursor-pointer"
+            className="t-input min-h-[44px] w-full sm:w-auto sm:min-w-[185px] py-2 cursor-pointer"
           >
-            <option value="todos">Todos los Estados</option>
-            <option value="pendientes">Pendientes</option>
-            <option value="entregados">Entregados</option>
+            <option value="todos">Todos los estados</option>
+            <option value="pendientes">Solo pendientes</option>
+            <option value="entregados">Solo entregadas</option>
           </select>
+
+          {(filterCourse !== 'todos' || filterStatus !== 'todos') && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilterCourse('todos');
+                setFilterStatus('todos');
+              }}
+              className="t-btn t-btn-ghost"
+            >
+              Limpiar filtros
+            </button>
+          )}
         </div>
+
+        <p className="text-sm text-[var(--muted)] t-num">
+          {pendingTotal} {pendingTotal === 1 ? 'pendiente' : 'pendientes'} ·{' '}
+          {deliveredTotal} {deliveredTotal === 1 ? 'entregada' : 'entregadas'}
+        </p>
       </div>
 
-      {/* Timeline of Weeks */}
-      <div className="space-y-6">
-        {weeksWithAssignments.map((weekNum) => {
+      {/* Weekly Blocks */}
+      <div className="space-y-5">
+        {visibleWeeks.map((weekNum) => {
           const weekAssignments = filtered.filter((a) => a.week === weekNum);
           const isCurrent = weekNum === currentWeek;
-          const isPast = weekNum < currentWeek;
-
-          // Don't render empty weeks unless they are current week or upcoming weeks with filter all
-          if (weekAssignments.length === 0 && !isCurrent && weekFilter !== 'all') {
-            return null;
-          }
 
           return (
-            <div
+            <section
               key={weekNum}
-              className={`rounded-3xl border transition-all duration-200 ${
+              className={`t-card p-5 sm:p-6 ${
                 isCurrent
-                  ? 'bg-indigo-50/40 dark:bg-indigo-950/20 border-indigo-400/50 shadow-md shadow-indigo-500/5'
-                  : isPast
-                  ? 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-200/60 dark:border-slate-800/60 opacity-90'
-                  : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'
-              } p-5 sm:p-6`}
+                  ? 'border-[color-mix(in_oklab,var(--action)_45%,var(--line))]'
+                  : ''
+              }`}
             >
-              {/* Week Title & Quick Add Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200/80 dark:border-slate-800/80">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm ${
-                      isCurrent
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                        : isPast
-                        ? 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                        : 'bg-indigo-100 dark:bg-slate-800 text-indigo-700 dark:text-indigo-400'
-                    }`}
-                  >
-                    S{weekNum}
+              {/* Week Header + Inline Add */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-[var(--line)]">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold text-[var(--ink)]">
+                      Semana <span className="t-num">{weekNum}</span>
+                    </h3>
+
+                    {isCurrent && (
+                      <span className="t-badge t-badge-accent">
+                        Semana actual
+                      </span>
+                    )}
+
+                    {weekNum === 8 && (
+                      <span className="t-badge t-badge-warn t-num">
+                        Semana 8 · Parciales
+                      </span>
+                    )}
+
+                    {weekNum === 16 && (
+                      <span className="t-badge t-badge-warn t-num">
+                        Semana 16 · Finales
+                      </span>
+                    )}
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
-                        Semana {weekNum}
-                      </h3>
-                      {isCurrent && (
-                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                          SEMANA EN CURSO
-                        </span>
-                      )}
-                      {weekNum === 8 && (
-                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400">
-                          PARCIALES
-                        </span>
-                      )}
-                      {weekNum === 16 && (
-                        <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400">
-                          FINALES
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {weekAssignments.length} {weekAssignments.length === 1 ? 'entrega programada' : 'entregas programadas'}
-                    </p>
-                  </div>
+                  <p className="text-sm text-[var(--muted)] t-num">
+                    {weekAssignments.length === 0
+                      ? 'Sin entregas registradas en esta vista'
+                      : `${weekAssignments.length} ${
+                          weekAssignments.length === 1
+                            ? 'entrega programada'
+                            : 'entregas programadas'
+                        }`}
+                  </p>
                 </div>
 
-                {/* Inline Quick Add for this week */}
-                <div className="flex items-center gap-2">
+                <form
+                  onSubmit={(e) => handleQuickAddForWeek(weekNum, e)}
+                  className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto"
+                >
                   <input
                     type="text"
-                    placeholder={`+ Tarea para Sem. ${weekNum}...`}
+                    aria-label={`Nueva entrega para la semana ${weekNum}`}
+                    placeholder={`Nueva entrega en semana ${weekNum}...`}
                     value={quickTitleByWeek[weekNum] || ''}
-                    onChange={(e) => setQuickTitleByWeek((prev) => ({ ...prev, [weekNum]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleQuickAddForWeek(weekNum);
-                      }
-                    }}
-                    className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56"
+                    onChange={(e) =>
+                      setQuickTitleByWeek((prev) => ({
+                        ...prev,
+                        [weekNum]: e.target.value,
+                      }))
+                    }
+                    className="t-input min-h-[44px] py-2 sm:w-64"
                   />
                   <button
-                    onClick={() => handleQuickAddForWeek(weekNum)}
-                    className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all cursor-pointer min-w-[36px] min-h-[36px] flex items-center justify-center shrink-0"
-                    title="Añadir a esta semana"
+                    type="submit"
+                    className="t-btn t-btn-secondary shrink-0"
                   >
                     <Plus className="w-4 h-4" />
+                    <span>Agregar</span>
                   </button>
-                </div>
+                </form>
               </div>
 
-              {/* Assignments Cards in this week */}
+              {/* Assignment Rows */}
               {weekAssignments.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400 dark:text-slate-500 italic">
-                  No hay entregas pendientes registradas para la Semana {weekNum}
+                <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm text-[var(--muted)]">
+                  <span>
+                    No tienes entregas pendientes aquí. Escribe arriba y presiona Enter para añadir una rápida.
+                  </span>
+                  {weekFilter === 'upcoming' && (
+                    <button
+                      type="button"
+                      onClick={() => setWeekFilter('all')}
+                      className="t-btn t-btn-ghost self-start sm:self-auto"
+                    >
+                      Ver ciclo 1–16
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-4">
+                <div className="pt-4">
                   {weekAssignments.map((assignment) => {
                     const daysDiff = getDaysDiff(assignment.dueDate);
                     const isDone = assignment.status === 'entregado';
-                    const rubricDone = assignment.rubricCriteria ? assignment.rubricCriteria.filter((c) => c.done).length : 0;
-                    const rubricTotal = assignment.rubricCriteria ? assignment.rubricCriteria.length : 0;
+                    const rubricDone = assignment.rubricCriteria
+                      ? assignment.rubricCriteria.filter((c) => c.done).length
+                      : 0;
+                    const rubricTotal = assignment.rubricCriteria
+                      ? assignment.rubricCriteria.length
+                      : 0;
+                    const normalizedUrl = assignment.submissionUrl
+                      ? assignment.submissionUrl.startsWith('http://') ||
+                        assignment.submissionUrl.startsWith('https://')
+                        ? assignment.submissionUrl
+                        : `https://${assignment.submissionUrl}`
+                      : null;
 
                     return (
                       <div
                         key={assignment.id}
-                        className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
-                          isDone
-                            ? 'bg-emerald-50/30 dark:bg-emerald-950/10 border-emerald-500/20 opacity-85'
-                            : 'bg-white dark:bg-[#111827] border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md'
-                        }`}
+                        className="t-row flex flex-col md:flex-row md:items-center justify-between gap-3"
                       >
-                        <div>
-                          {/* Course Pill, Type & Grade */}
-                          <div className="flex items-center justify-between gap-1.5 mb-2">
-                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
-                              {assignment.course}
+                        {/* Left: 44x44 check + clickable title & metadata */}
+                        <div className="flex items-start gap-2 min-w-0 flex-1">
+                          <label
+                            className="w-11 h-11 rounded-[10px] flex items-center justify-center shrink-0 cursor-pointer hover:bg-[var(--surface-2)] transition-colors -ml-1.5"
+                            title={
+                              isDone
+                                ? 'Marcar como pendiente'
+                                : 'Marcar como entregada'
+                            }
+                          >
+                            <input
+                              type="checkbox"
+                              className="m-check"
+                              checked={isDone}
+                              aria-label={
+                                isDone
+                                  ? `Marcar ${assignment.title} como pendiente`
+                                  : `Marcar ${assignment.title} como entregada`
+                              }
+                              onChange={() => {
+                                const nextStatus: AssignmentStatus = isDone
+                                  ? 'pendiente'
+                                  : 'entregado';
+                                if (nextStatus === 'entregado') {
+                                  triggerConfetti();
+                                }
+                                onUpdateStatus(assignment.id, nextStatus);
+                              }}
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => setDetailAssignment(assignment)}
+                            className="min-w-0 flex-1 min-h-[44px] flex flex-col justify-center text-left cursor-pointer group focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-[8px] px-1 -mx-1"
+                          >
+                            <span
+                              className={`text-[15px] sm:text-base font-medium leading-snug transition-colors ${
+                                isDone
+                                  ? 'line-through text-[var(--muted)] group-hover:text-[var(--ink)]'
+                                  : 'text-[var(--ink)] group-hover:text-[var(--action)]'
+                              }`}
+                            >
+                              {assignment.title}
                             </span>
-                            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                              {getGradePill(assignment.gradeObtained)}
-                              {getTypeBadge(assignment.type)}
-                              {assignment.weightPercentage && (
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                                  {assignment.weightPercentage}%
-                                </span>
+
+                            <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-[13px] text-[var(--muted)]">
+                              <span className="font-medium text-[var(--ink)]">
+                                {assignment.course}
+                              </span>
+                              <span aria-hidden="true">·</span>
+                              <span>{TYPE_LABEL[assignment.type]}</span>
+
+                              {assignment.weightPercentage !== undefined && (
+                                <>
+                                  <span aria-hidden="true">·</span>
+                                  <span className="t-num">
+                                    {assignment.weightPercentage}%
+                                  </span>
+                                </>
                               )}
-                            </div>
-                          </div>
 
-                          {/* Assignment Title */}
-                          <h4 className={`text-sm font-bold text-slate-900 dark:text-white leading-snug mb-2 ${
-                            isDone ? 'line-through text-slate-500 dark:text-slate-400' : ''
-                          }`}>
-                            {assignment.title}
-                          </h4>
+                              {assignment.dueDate && (
+                                <>
+                                  <span aria-hidden="true">·</span>
+                                  <span className="t-num">
+                                    {assignment.dueDate}
+                                  </span>
+                                </>
+                              )}
 
-                          {/* Rubric and Links Mini Pills */}
-                          <div className="flex items-center gap-2 mb-2 flex-wrap">
-                            {rubricTotal > 0 && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                <FileCheck className="w-3 h-3 text-emerald-500" />
-                                {rubricDone}/{rubricTotal} criterios
+                              {rubricTotal > 0 && (
+                                <>
+                                  <span aria-hidden="true">·</span>
+                                  <span className="inline-flex items-center gap-1 t-num">
+                                    <FileCheck className="w-3.5 h-3.5 text-[var(--ok)]" />
+                                    {rubricDone}/{rubricTotal} criterios
+                                  </span>
+                                </>
+                              )}
+                            </span>
+
+                            {assignment.notes && (
+                              <span className="text-[13px] text-[var(--muted)] mt-1 line-clamp-1">
+                                {assignment.notes}
                               </span>
                             )}
-                            {assignment.submissionUrl && (
-                              <a
-                                href={assignment.submissionUrl.startsWith('http') ? assignment.submissionUrl : `https://${assignment.submissionUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:underline"
-                                title="Abrir link de entrega"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                                Link de entrega
-                              </a>
-                            )}
-                          </div>
-
-                          {/* Notes if any */}
-                          {assignment.notes && (
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3 line-clamp-2">
-                              {assignment.notes}
-                            </p>
-                          )}
+                          </button>
                         </div>
 
-                        {/* Footer: Due date countdown & Actions */}
-                        <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between mt-2">
-                          {/* Due Date Indicator */}
-                          <div className="flex items-center gap-1.5 text-xs">
-                            <Clock className="w-3.5 h-3.5 text-slate-400" />
-                            {isDone ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                                Entregado
-                              </span>
-                            ) : daysDiff !== null ? (
-                              daysDiff < 0 ? (
-                                <span className="text-rose-500 font-bold">Vencido</span>
-                              ) : daysDiff === 0 ? (
-                                <span className="text-rose-600 font-extrabold animate-pulse">¡Vence Hoy!</span>
-                              ) : daysDiff <= 3 ? (
-                                <span className="text-amber-500 font-bold">En {daysDiff} días</span>
-                              ) : (
-                                <span className="text-slate-500 font-medium">{assignment.dueDate}</span>
-                              )
-                            ) : (
-                              <span className="text-slate-400">{assignment.dueDate}</span>
-                            )}
+                        {/* Right: Grade + Due status + >=44x44px actions */}
+                        <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 pl-9 md:pl-0 shrink-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {renderGradeBadge(assignment.gradeObtained)}
+                            {renderDueBadge(assignment, daysDiff)}
                           </div>
 
-                          {/* Action Buttons: Detail, Delivery & Delete */}
-                          <div className="flex items-center gap-1.5">
-                            {/* Detail / Rubric button */}
+                          <div className="flex items-center gap-1">
+                            {normalizedUrl && (
+                              <a
+                                href={normalizedUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="t-btn t-btn-ghost t-btn-icon"
+                                aria-label={`Abrir enlace de entrega de ${assignment.title}`}
+                                title="Abrir enlace de entrega"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                            )}
+
                             <button
+                              type="button"
                               onClick={() => setDetailAssignment(assignment)}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
-                              title="Ver detalle y rúbrica"
+                              className="t-btn t-btn-ghost t-btn-icon"
+                              aria-label={`Ver detalle y rúbrica de ${assignment.title}`}
+                              title="Detalle y rúbrica"
                             >
                               <FileEdit className="w-4 h-4" />
                             </button>
 
-                            {/* Delivery status button */}
                             <button
-                              onClick={() => {
-                                const newStatus: AssignmentStatus = isDone ? 'pendiente' : 'entregado';
-                                if (newStatus === 'entregado') triggerConfetti();
-                                onUpdateStatus(assignment.id, newStatus);
-                              }}
-                              className={`px-2.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer min-h-[36px] ${
-                                isDone
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300'
-                                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/30'
-                              }`}
-                              title={isDone ? 'Marcar como pendiente' : 'Marcar como entregado'}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>{isDone ? 'Entregada' : 'Entregar'}</span>
-                            </button>
-
-                            {/* Delete button */}
-                            <button
+                              type="button"
                               onClick={() => onDeleteAssignment(assignment.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors cursor-pointer min-w-[32px] min-h-[32px] flex items-center justify-center"
-                              title="Eliminar tarea"
+                              className="t-btn t-btn-ghost t-btn-icon hover:text-[var(--danger)]"
+                              aria-label={`Eliminar ${assignment.title}`}
+                              title="Eliminar entrega"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </div>
@@ -464,7 +556,7 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                   })}
                 </div>
               )}
-            </div>
+            </section>
           );
         })}
       </div>

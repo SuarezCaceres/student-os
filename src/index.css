@@ -1,33 +1,490 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Schibsted Grotesk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==========================================================================
+   1. DESIGN-TASTE-FRONTEND TOKENS
+   Kind: software | Palette: blue-black-cornflower (dark) + white-link-blue (light)
+   Typography: Schibsted Grotesk (400/500/600) + JetBrains Mono (400/500)
+   Rule: 92% neutral ground/ink, ONE primary accent (--action), ZERO violet/lavender
+   ========================================================================== */
+
+:root {
+  /* Light palette (white-link-blue) */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --ink: #111318;
+  --muted: #5d6470;
+  --action: #1a4be0;
+  --action-ink: #ffffff;
+  --line: rgba(17, 19, 24, 0.10);
+  --line-strong: rgba(17, 19, 24, 0.20);
+  --card-hi: transparent;
+
+  /* Legacy compatibility aliases */
+  --color-bg-base: var(--bg);
+  --color-card-base: var(--surface);
+  --color-border-subtle: var(--line);
+  --color-text-main: var(--ink);
+  --color-text-dim: var(--muted);
+
+  /* Functional status tokens (used sparingly for real state only, never violet) */
+  --ok: #0f9f6e;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --gym: #e04f16;
+
+  /* Radii (data-radius="soft") */
+  --r-lg: 20px;
+  --r-md: 12px;
+  --r-sm: 8px;
+  --r-btn: 12px;
+
+  /* Rhythm & Heights */
+  --nav-h: 72px;
+  --nav-h-mobile: 56px;
+  --mobile-bar-h: calc(64px + env(safe-area-inset-bottom, 0px));
+
+  /* Motion layer tokens (references/motion.md) */
+  --m-in: 150ms;
+  --m-out: 120ms;
+  --m-press: 90ms;
+  --m-panel: 200ms;
+  --m-close: 120ms;
+  --m-slide: 240ms;
+  --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --m-ease-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --m-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --m-lift: -2px;
+}
+
+.dark {
+  /* Dark palette (blue-black-cornflower) */
+  --bg: #0a0d14;
+  --surface: #131824;
+  --surface-2: #192030;
+  --ink: #e9edf3;
+  --muted: #8891a1;
+  --action: #5ab9fc;
+  --action-ink: #0a0d14;
+  --line: rgba(233, 237, 243, 0.09);
+  --line-strong: rgba(233, 237, 243, 0.18);
+  --card-hi: rgba(255, 255, 255, 0.05);
+
+  --ok: #34d399;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --gym: #ff6b35;
+}
+
 @layer base {
-  :root {
-    --color-bg-base: #f8fafc;
-    --color-card-base: #ffffff;
-    --color-border-subtle: #e2e8f0;
-    --color-text-main: #0f172a;
-    --color-text-dim: #64748b;
+  *, *::before, *::after {
+    box-sizing: border-box;
   }
 
-  .dark {
-    --color-bg-base: #080c14;
-    --color-card-base: #0f1523;
-    --color-border-subtle: #1e293b;
-    --color-text-main: #f8fafc;
-    --color-text-dim: #94a3b8;
-  }
-
-  body {
-    background-color: var(--color-bg-base);
-    color: var(--color-text-main);
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  html, body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
   }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.028em;
+    color: var(--ink);
+  }
 }
 
-/* Custom Scrollbar for sleek university aesthetic */
+/* ==========================================================================
+   2. ONE SYSTEM: CARDS, ROWS, INPUTS, BADGES & BUTTONS
+   ========================================================================== */
+
+@layer components {
+/* Equal left and right content edges */
+.t-wrap {
+  width: min(100% - 32px, 1280px);
+  margin-inline: auto;
+}
+
+@media (min-width: 640px) {
+  .t-wrap {
+    width: min(100% - 48px, 1280px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .t-wrap {
+    width: min(100% - 64px, 1280px);
+  }
+}
+
+/* Card: 1 step off ground, 1px hairline, flat at rest (no nested box-in-box) */
+.t-card {
+  min-width: 0;
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 1px 0 var(--card-hi);
+  transition:
+    transform var(--m-out) var(--m-ease),
+    border-color var(--m-out) var(--m-ease),
+    box-shadow var(--m-out) var(--m-ease),
+    background-color var(--m-out) var(--m-ease);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-motion="off"]) .t-card-lift:hover {
+    transform: translateY(var(--m-lift));
+    border-color: var(--line-strong);
+    box-shadow:
+      inset 0 1px 0 var(--card-hi),
+      0 12px 28px -16px rgba(0, 0, 0, 0.35);
+    transition-duration: 180ms;
+  }
+}
+
+/* Clean hairline rows inside cards (replaces inner grey boxes) */
+.t-row {
+  border-bottom: 1px solid var(--line);
+  padding-block: 14px;
+}
+
+.t-row:first-child {
+  padding-top: 0;
+}
+
+.t-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Tabular numbers for GPA, weights, sets, times and timers */
+.t-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Buttons: 44px minimum height, tactile hover step & press, immediate focus ring */
+.t-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--r-btn);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--m-out) var(--m-ease),
+    color var(--m-out) var(--m-ease),
+    border-color var(--m-out) var(--m-ease),
+    transform var(--m-press) var(--m-ease);
+}
+
+.t-btn:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+  transition-duration: 0s;
+}
+
+.t-btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.t-btn-primary {
+  background-color: var(--action);
+  color: var(--action-ink);
+}
+
+.t-btn-primary:hover {
+  background-color: color-mix(in oklab, var(--action) 86%, var(--bg));
+  transition-duration: var(--m-in);
+}
+
+.t-btn-secondary {
+  background-color: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.t-btn-secondary:hover {
+  background-color: var(--surface-2);
+  border-color: color-mix(in oklab, var(--ink) 30%, transparent);
+  transition-duration: var(--m-in);
+}
+
+.t-btn-ghost {
+  background-color: transparent;
+  color: var(--muted);
+}
+
+.t-btn-ghost:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+  transition-duration: var(--m-in);
+}
+
+.t-btn-icon {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-motion="off"]) .t-btn:hover {
+    transform: translateY(-1px);
+  }
+  html:not([data-motion="off"]) .t-btn:active {
+    transform: translateY(1px) scale(0.985);
+  }
+}
+
+html:not([data-motion="off"]) .t-btn:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+/* Inputs, Selects & Textareas: 48px height, 16px text (prevents mobile auto-zoom) */
+.t-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background-color: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 1rem; /* 16px */
+  line-height: 1.4;
+  transition:
+    border-color var(--m-out) var(--m-ease),
+    background-color var(--m-out) var(--m-ease),
+    box-shadow var(--m-out) var(--m-ease);
+}
+
+.t-input::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.t-input:hover {
+  border-color: color-mix(in oklab, var(--ink) 36%, transparent);
+}
+
+.t-input:focus {
+  outline: none;
+  background-color: var(--surface);
+  border-color: var(--action);
+  box-shadow:
+    0 0 0 1px var(--action),
+    0 0 0 4px color-mix(in oklab, var(--action) 18%, transparent);
+  transition-duration: 0s;
+}
+
+.t-label {
+  display: block;
+  font-size: 0.875rem; /* 14px */
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+/* Badges: minimum 13px, sentence case, never tiny screamed uppercase */
+.t-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 500;
+  line-height: 1.35;
+  background-color: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.t-badge-accent {
+  background-color: color-mix(in oklab, var(--action) 14%, transparent);
+  color: var(--action);
+  border-color: color-mix(in oklab, var(--action) 28%, transparent);
+}
+
+.t-badge-ok {
+  background-color: color-mix(in oklab, var(--ok) 14%, transparent);
+  color: var(--ok);
+  border-color: color-mix(in oklab, var(--ok) 28%, transparent);
+}
+
+.t-badge-warn {
+  background-color: color-mix(in oklab, var(--warn) 14%, transparent);
+  color: var(--warn);
+  border-color: color-mix(in oklab, var(--warn) 28%, transparent);
+}
+
+.t-badge-danger {
+  background-color: color-mix(in oklab, var(--danger) 14%, transparent);
+  color: var(--danger);
+  border-color: color-mix(in oklab, var(--danger) 28%, transparent);
+}
+
+.t-badge-gym {
+  background-color: color-mix(in oklab, var(--gym) 14%, transparent);
+  color: var(--gym);
+  border-color: color-mix(in oklab, var(--gym) 28%, transparent);
+}
+
+/* Animated Checkbox (.m-check from motion.css) */
+.m-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  margin: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1.5px solid var(--line-strong);
+  background-color: var(--surface);
+  display: inline-grid;
+  place-items: center;
+  transition:
+    background-color var(--m-in) var(--m-ease),
+    border-color var(--m-in) var(--m-ease);
+}
+
+.m-check::before {
+  content: "";
+  width: 10px;
+  height: 6px;
+  margin-top: -2px;
+  border: solid var(--action-ink);
+  border-width: 0 0 2px 2px;
+  opacity: 0;
+  transform: rotate(-45deg) scale(0.7);
+  transform-origin: 50% 50%;
+  transition:
+    transform 160ms var(--m-ease),
+    opacity 100ms var(--m-ease);
+}
+
+.m-check:hover:not(:checked) {
+  border-color: var(--action);
+}
+
+.m-check:checked {
+  background-color: var(--action);
+  border-color: var(--action);
+}
+
+.m-check:checked::before {
+  opacity: 1;
+  transform: rotate(-45deg) scale(1);
+}
+
+.m-check:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+}
+
+/* ==========================================================================
+   3. FRIENDLY TRANSITIONS: VIEW SWITCHES, HERO ENTRANCE & MODALS/SHEETS
+   ========================================================================== */
+
+@keyframes viewSettle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.view-enter {
+  animation: viewSettle 220ms var(--m-ease-enter);
+}
+
+@keyframes heroSettle {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-enter {
+  animation: heroSettle 680ms var(--m-ease-enter);
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheetRiseMobile {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dialogSettleDesktop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-backdrop-enter {
+  animation: backdropFadeIn var(--m-panel) var(--m-ease) both;
+}
+
+.modal-panel-enter {
+  animation: sheetRiseMobile var(--m-panel) var(--m-ease-enter) both;
+}
+
+@media (min-width: 640px) {
+  .modal-panel-enter {
+    animation: dialogSettleDesktop var(--m-panel) var(--m-ease-enter) both;
+  }
+}
+
+/* Custom sleek scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -38,34 +495,40 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25);
+  background: color-mix(in oklab, var(--muted) 35%, transparent);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  background: color-mix(in oklab, var(--muted) 55%, transparent);
 }
 
-/* Animations */
-@keyframes pulseFlame {
-  0%, 100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(249, 115, 22, 0.5));
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ==========================================================================
+   4. REDUCED MOTION ACCESSIBILITY (references/motion.md)
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
-  50% {
-    transform: scale(1.1);
-    filter: drop-shadow(0 0 14px rgba(239, 68, 68, 0.75));
+
+  .t-card-lift:hover,
+  .t-btn:hover,
+  .t-btn:active {
+    transform: none !important;
   }
-}
 
-.flame-pulse {
-  animation: pulseFlame 2.2s infinite ease-in-out;
-}
-
-/* Glassmorphism helpers */
-.glass-panel {
-  background: rgba(15, 21, 35, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  .m-check::before {
+    transform: rotate(-45deg) scale(1);
+    transition-property: opacity;
+  }
 }

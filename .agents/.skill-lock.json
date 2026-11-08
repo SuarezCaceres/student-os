@@ -54,6 +54,16 @@
       "skillPath": "github-workflow-standards/SKILL.md",
       "installedAt": "2026-11-06T08:22:00.000Z",
       "updatedAt": "2026-11-06T08:22:00.000Z"
+    },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/Leonxlnx/taste-skill.git",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "skillFolderHash": "90f92ba7a3ce514cf85a2809583712dbd14106ea",
+      "pluginName": "taste-skill",
+      "installedAt": "2026-11-07T20:44:42.605Z",
+      "updatedAt": "2026-11-07T20:44:42.605Z"
     }
   },
   "dismissed": {}

@@ -1,30 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  GraduationCap, 
-  Dumbbell, 
-  KanbanSquare, 
-  CalendarDays, 
-  Check, 
-  Sparkles,
-  BookOpen
-} from 'lucide-react';
-import type { 
-  AppState, 
-  UniversityAssignment, 
-  GymExercise, 
-  KanbanItem, 
-  CalendarBlock, 
-  DayOfWeek, 
-  Category, 
+import React, { useState } from 'react';
+import { Check } from 'lucide-react';
+import type {
+  AppState,
+  UniversityAssignment,
+  GymExercise,
+  KanbanItem,
+  CalendarBlock,
+  DayOfWeek,
+  Category,
   Priority,
   AssignmentType,
   LearningResource,
-  ResourceType
+  ResourceType,
 } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { ModalShell } from '../common/ModalShell';
+import { SegmentedControl } from '../common/SegmentedControl';
+import type { SegmentOption } from '../common/SegmentedControl';
 
-interface QuickAddModalProps {
+export type QuickAddTab = 'university' | 'gym' | 'kanban' | 'calendar' | 'learning';
+
+export interface QuickAddModalProps {
   isOpen: boolean;
   onClose: () => void;
   state: AppState;
@@ -33,7 +29,7 @@ interface QuickAddModalProps {
   onAddKanbanItem: (item: KanbanItem) => void;
   onAddCalendarBlock: (block: CalendarBlock) => void;
   onAddLearningResource?: (resource: LearningResource, week?: number) => void;
-  initialTab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning';
+  initialTab?: QuickAddTab;
 }
 
 const COMMON_COURSES = [
@@ -45,10 +41,29 @@ const COMMON_COURSES = [
   'Cálculo Multivariable',
 ];
 
-const DAYS: DayOfWeek[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const DAYS: DayOfWeek[] = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+];
 
-export const QuickAddModal: React.FC<QuickAddModalProps> = ({
-  isOpen,
+const TAB_OPTIONS: SegmentOption<QuickAddTab>[] = [
+  { id: 'university', label: 'Uni' },
+  { id: 'gym', label: 'Gym' },
+  { id: 'kanban', label: 'Kanban' },
+  { id: 'calendar', label: 'Horario' },
+  { id: 'learning', label: 'Aprender' },
+];
+
+type QuickAddFormContentProps = Omit<QuickAddModalProps, 'isOpen'> & {
+  initialTab: QuickAddTab;
+};
+
+const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   onClose,
   state,
   onAddAssignment,
@@ -56,27 +71,11 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   onAddKanbanItem,
   onAddCalendarBlock,
   onAddLearningResource,
-  initialTab = 'university',
+  initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>(initialTab);
+  const [activeTab, setActiveTab] = useState<QuickAddTab>(initialTab);
 
-  // Sync tab if initialTab changes
-  useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
-  }, [initialTab]);
-
-  // Close on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (isOpen) window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Form State: University Assignment
+  // University Assignment Form
   const [uniTitle, setUniTitle] = useState('');
   const [uniCourse, setUniCourse] = useState(COMMON_COURSES[0]);
   const [uniWeek, setUniWeek] = useState(state.currentAcademicWeek);
@@ -84,36 +83,33 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [uniType, setUniType] = useState<AssignmentType>('tarea');
   const [uniWeight, setUniWeight] = useState<number>(15);
 
-  // Form State: Gym Exercise
+  // Gym Exercise Form
   const [gymDay, setGymDay] = useState<DayOfWeek>('Lunes');
   const [gymExerciseName, setGymExerciseName] = useState('');
   const [gymSets, setGymSets] = useState(4);
-  const [gymReps] = useState('10-12 reps');
+  const [gymReps, setGymReps] = useState('10-12 reps');
   const [gymWeight, setGymWeight] = useState<number | ''>(20);
 
-  // Form State: Kanban
+  // Kanban Task Form
   const [kanbanTitle, setKanbanTitle] = useState('');
   const [kanbanCategory, setKanbanCategory] = useState<Category>('trabajo');
   const [kanbanPriority, setKanbanPriority] = useState<Priority>('alta');
   const [kanbanDueDate, setKanbanDueDate] = useState('');
 
-  // Form State: Calendar
+  // Calendar Block Form
   const [calDay, setCalDay] = useState<DayOfWeek>('Lunes');
   const [calTitle, setCalTitle] = useState('');
   const [calStart, setCalStart] = useState('09:00');
   const [calEnd, setCalEnd] = useState('11:00');
   const [calCategory, setCalCategory] = useState<Category>('universidad');
 
-  // Form State: Learning Resource
+  // Learning Resource Form
   const [resTitle, setResTitle] = useState('');
   const [resType, setResType] = useState<ResourceType>('youtube');
   const [resUrl, setResUrl] = useState('');
   const [resNotes, setResNotes] = useState('');
   const [resWeek, setResWeek] = useState(state.currentAcademicWeek);
 
-  if (!isOpen) return null;
-
-  // Handlers
   const handleSaveUni = (e: React.FormEvent) => {
     e.preventDefault();
     if (!uniTitle.trim()) return;
@@ -139,13 +135,14 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     e.preventDefault();
     if (!gymExerciseName.trim()) return;
 
+    const setsCount = Math.max(1, Number(gymSets) || 3);
     const newExercise: GymExercise = {
       id: `ex-${Date.now()}`,
       name: gymExerciseName.trim(),
-      sets: Number(gymSets) || 3,
+      sets: setsCount,
       reps: gymReps.trim() || '10 reps',
-      weightKg: gymWeight ? Number(gymWeight) : undefined,
-      completedSets: Array(Number(gymSets) || 3).fill(false),
+      weightKg: gymWeight !== '' ? Number(gymWeight) : undefined,
+      completedSets: Array(setsCount).fill(false),
     };
 
     onAddGymExercise(gymDay, newExercise);
@@ -216,567 +213,521 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md transition-opacity">
-      <div 
-        className="w-full max-w-lg bg-white dark:bg-[#111827] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="modal-title"
-      >
-        {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 id="modal-title" className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                Captura Rápida
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Añade información en pocos clics sin formularios complicados
-              </p>
-            </div>
+    <div className="space-y-5">
+      <SegmentedControl
+        options={TAB_OPTIONS}
+        value={activeTab}
+        onChange={setActiveTab}
+        ariaLabel="Categoría para agregar"
+        fullWidth
+        size="sm"
+      />
+
+      {/* Tab 1: Universidad */}
+      {activeTab === 'university' && (
+        <form onSubmit={handleSaveUni} className="space-y-4">
+          <div>
+            <label htmlFor="qa-uni-title" className="t-label">
+              Título de la entrega
+            </label>
+            <input
+              id="qa-uni-title"
+              type="text"
+              required
+              placeholder="Ej. Laboratorio 3: Árboles AVL"
+              value={uniTitle}
+              onChange={(e) => setUniTitle(e.target.value)}
+              autoFocus
+              className="t-input"
+            />
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer min-w-[40px] min-h-[40px] flex items-center justify-center"
-            aria-label="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Category Tabs (Frictionless navigation) */}
-        <div className="grid grid-cols-5 p-2 gap-1 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab('university')}
-            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
-              activeTab === 'university'
-                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4 mb-0.5" />
-            <span className="truncate text-[11px]">Uni</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('gym')}
-            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
-              activeTab === 'gym'
-                ? 'bg-white dark:bg-slate-800 text-orange-600 dark:text-orange-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <Dumbbell className="w-4 h-4 mb-0.5" />
-            <span className="truncate text-[11px]">Gym</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('kanban')}
-            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
-              activeTab === 'kanban'
-                ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <KanbanSquare className="w-4 h-4 mb-0.5" />
-            <span className="truncate text-[11px]">Kanban</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('calendar')}
-            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
-              activeTab === 'calendar'
-                ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <CalendarDays className="w-4 h-4 mb-0.5" />
-            <span className="truncate text-[11px]">Agenda</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('learning')}
-            className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-xs font-semibold transition-all cursor-pointer min-h-[44px] ${
-              activeTab === 'learning'
-                ? 'bg-white dark:bg-slate-800 text-violet-600 dark:text-violet-400 shadow-sm border border-slate-200/80 dark:border-slate-700 font-bold'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            <BookOpen className="w-4 h-4 mb-0.5" />
-            <span className="truncate text-[11px]">Aprender</span>
-          </button>
-        </div>
-
-        {/* Tab 1: Formulario Universidad */}
-        {activeTab === 'university' && (
-          <form onSubmit={handleSaveUni} className="p-5 sm:p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Título de la Tarea o Entrega *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Tarea 2: Árboles binarios y AVL"
-                value={uniTitle}
-                onChange={(e) => setUniTitle(e.target.value)}
-                autoFocus
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            {/* Quick course chips */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Curso / Materia
-              </label>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {COMMON_COURSES.slice(0, 4).map((c) => (
+          <div>
+            <label htmlFor="qa-uni-course" className="t-label">
+              Curso o materia
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2.5">
+              {COMMON_COURSES.slice(0, 4).map((course) => {
+                const isSelected = uniCourse === course;
+                return (
                   <button
                     type="button"
-                    key={c}
-                    onClick={() => setUniCourse(c)}
-                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                      uniCourse === c
-                        ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-300 dark:border-indigo-600 text-indigo-700 dark:text-indigo-300 font-bold'
-                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300'
+                    key={course}
+                    onClick={() => setUniCourse(course)}
+                    className={`min-h-[44px] px-3 rounded-[10px] text-[13px] font-medium border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border-[var(--action)] text-[var(--action)]'
+                        : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
                     }`}
                   >
-                    {c}
+                    {course}
                   </button>
-                ))}
-              </div>
+                );
+              })}
+            </div>
+            <input
+              id="qa-uni-course"
+              type="text"
+              value={uniCourse}
+              onChange={(e) => setUniCourse(e.target.value)}
+              placeholder="O escribe otro curso..."
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="qa-uni-week" className="t-label">
+                Semana académica (1–16)
+              </label>
               <input
-                type="text"
-                value={uniCourse}
-                onChange={(e) => setUniCourse(e.target.value)}
-                placeholder="O escribe otro curso..."
-                className="w-full px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                id="qa-uni-week"
+                type="number"
+                min={1}
+                max={16}
+                value={uniWeek}
+                onChange={(e) => setUniWeek(Number(e.target.value))}
+                className="t-input t-num"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Semana de Entrega (1-16)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={1}
-                    max={16}
-                    value={uniWeek}
-                    onChange={(e) => setUniWeek(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                  />
-                  <span className="text-xs text-slate-500 whitespace-nowrap">Sem. {uniWeek}</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tipo de Entrega
-                </label>
-                <select
-                  value={uniType}
-                  onChange={(e) => setUniType(e.target.value as AssignmentType)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                >
-                  <option value="tarea">📝 Tarea</option>
-                  <option value="proyecto">🚀 Proyecto</option>
-                  <option value="examen">🎯 Examen</option>
-                  <option value="laboratorio">💻 Laboratorio</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Fecha Límite
-                </label>
-                <input
-                  type="date"
-                  value={uniDueDate}
-                  onChange={(e) => setUniDueDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Peso Nota (%)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={uniWeight}
-                  onChange={(e) => setUniWeight(Number(e.target.value))}
-                  placeholder="15%"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              Guardar Tarea Universitaria
-            </button>
-          </form>
-        )}
-
-        {/* Tab 2: Formulario Gym */}
-        {activeTab === 'gym' && (
-          <form onSubmit={handleSaveGym} className="p-5 sm:p-6 space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Día de la Rutina
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {DAYS.map((d) => (
-                  <button
-                    type="button"
-                    key={d}
-                    onClick={() => setGymDay(d)}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                      gymDay === d
-                        ? 'bg-orange-50 dark:bg-orange-950/80 border-orange-300 dark:border-orange-600 text-orange-700 dark:text-orange-300 font-bold'
-                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nombre del Ejercicio *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Press Militar con Mancuernas"
-                value={gymExerciseName}
-                onChange={(e) => setGymExerciseName(e.target.value)}
-                autoFocus
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Series
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={gymSets}
-                  onChange={(e) => setGymSets(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Reps
-                </label>
-                <input
-                  type="text"
-                  value={gymReps}
-                  readOnly
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Peso (kg)
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  step={0.5}
-                  value={gymWeight}
-                  onChange={(e) => setGymWeight(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="24"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm shadow-lg shadow-orange-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              Añadir Ejercicio a {gymDay}
-            </button>
-          </form>
-        )}
-
-        {/* Tab 3: Formulario Kanban */}
-        {activeTab === 'kanban' && (
-          <form onSubmit={handleSaveKanban} className="p-5 sm:p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Título del Trabajo / Tarea *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Revisar pull request del equipo"
-                value={kanbanTitle}
-                onChange={(e) => setKanbanTitle(e.target.value)}
-                autoFocus
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Categoría
-                </label>
-                <select
-                  value={kanbanCategory}
-                  onChange={(e) => setKanbanCategory(e.target.value as Category)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                >
-                  <option value="trabajo">💼 Trabajo</option>
-                  <option value="universidad">🎓 Universidad</option>
-                  <option value="gym">🏋️ Gym</option>
-                  <option value="personal">🌟 Personal</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Prioridad
-                </label>
-                <select
-                  value={kanbanPriority}
-                  onChange={(e) => setKanbanPriority(e.target.value as Priority)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                >
-                  <option value="alta">🔴 Alta</option>
-                  <option value="media">🟡 Media</option>
-                  <option value="baja">🟢 Baja</option>
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Fecha Límite (Opcional)
-              </label>
-              <input
-                type="date"
-                value={kanbanDueDate}
-                onChange={(e) => setKanbanDueDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              Crear Tarea en Kanban
-            </button>
-          </form>
-        )}
-
-        {/* Tab 4: Formulario Calendario */}
-        {activeTab === 'calendar' && (
-          <form onSubmit={handleSaveCalendar} className="p-5 sm:p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Día de la Semana
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {DAYS.map((d) => (
-                  <button
-                    type="button"
-                    key={d}
-                    onClick={() => setCalDay(d)}
-                    className={`text-xs px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                      calDay === d
-                        ? 'bg-cyan-50 dark:bg-cyan-950/80 border-cyan-300 dark:border-cyan-600 text-cyan-700 dark:text-cyan-300 font-bold'
-                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                    }`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Actividad / Bloque *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Clase de Redes y Comunicaciones"
-                value={calTitle}
-                onChange={(e) => setCalTitle(e.target.value)}
-                autoFocus
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Hora Inicio
-                </label>
-                <input
-                  type="time"
-                  value={calStart}
-                  onChange={(e) => setCalStart(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Hora Fin
-                </label>
-                <input
-                  type="time"
-                  value={calEnd}
-                  onChange={(e) => setCalEnd(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Categoría
+              <label htmlFor="qa-uni-type" className="t-label">
+                Tipo de evaluación
               </label>
               <select
-                value={calCategory}
-                onChange={(e) => setCalCategory(e.target.value as Category)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
+                id="qa-uni-type"
+                value={uniType}
+                onChange={(e) => setUniType(e.target.value as AssignmentType)}
+                className="t-input"
               >
-                <option value="universidad">🎓 Universidad</option>
-                <option value="gym">🏋️ Gym</option>
-                <option value="trabajo">💼 Trabajo</option>
-                <option value="personal">🌟 Personal / Ocio</option>
+                <option value="tarea">Tarea</option>
+                <option value="proyecto">Proyecto</option>
+                <option value="examen">Examen</option>
+                <option value="laboratorio">Laboratorio</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="qa-uni-date" className="t-label">
+                Fecha de entrega
+              </label>
+              <input
+                id="qa-uni-date"
+                type="date"
+                value={uniDueDate}
+                onChange={(e) => setUniDueDate(e.target.value)}
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="qa-uni-weight" className="t-label">
+                Peso en la nota (%)
+              </label>
+              <input
+                id="qa-uni-weight"
+                type="number"
+                min={1}
+                max={100}
+                value={uniWeight}
+                onChange={(e) => setUniWeight(Number(e.target.value))}
+                placeholder="15"
+                className="t-input t-num"
+              />
+            </div>
+          </div>
+
+          <button type="submit" className="t-btn t-btn-primary w-full mt-2">
+            <Check className="w-4 h-4" />
+            <span>Guardar entrega</span>
+          </button>
+        </form>
+      )}
+
+      {/* Tab 2: Gym */}
+      {activeTab === 'gym' && (
+        <form onSubmit={handleSaveGym} className="space-y-4">
+          <div>
+            <span className="t-label">Día de entrenamiento</span>
+            <div className="flex flex-wrap gap-2">
+              {DAYS.map((day) => {
+                const isSelected = gymDay === day;
+                return (
+                  <button
+                    type="button"
+                    key={day}
+                    onClick={() => setGymDay(day)}
+                    className={`min-h-[44px] px-3 rounded-[10px] text-[13px] font-medium border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border-[var(--action)] text-[var(--action)]'
+                        : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="qa-gym-name" className="t-label">
+              Nombre del ejercicio
+            </label>
+            <input
+              id="qa-gym-name"
+              type="text"
+              required
+              placeholder="Ej. Press militar con mancuernas"
+              value={gymExerciseName}
+              onChange={(e) => setGymExerciseName(e.target.value)}
+              autoFocus
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+            <div>
+              <label htmlFor="qa-gym-sets" className="t-label">
+                Series
+              </label>
+              <input
+                id="qa-gym-sets"
+                type="number"
+                min={1}
+                max={8}
+                value={gymSets}
+                onChange={(e) => setGymSets(Number(e.target.value))}
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="qa-gym-reps" className="t-label">
+                Repeticiones
+              </label>
+              <input
+                id="qa-gym-reps"
+                type="text"
+                value={gymReps}
+                onChange={(e) => setGymReps(e.target.value)}
+                placeholder="10-12 reps"
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="qa-gym-weight" className="t-label">
+                Peso (kg)
+              </label>
+              <input
+                id="qa-gym-weight"
+                type="number"
+                min={0}
+                step={0.5}
+                value={gymWeight}
+                onChange={(e) => setGymWeight(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="24"
+                className="t-input t-num"
+              />
+            </div>
+          </div>
+
+          <button type="submit" className="t-btn t-btn-primary w-full mt-2">
+            <Check className="w-4 h-4" />
+            <span>Guardar ejercicio</span>
+          </button>
+        </form>
+      )}
+
+      {/* Tab 3: Kanban */}
+      {activeTab === 'kanban' && (
+        <form onSubmit={handleSaveKanban} className="space-y-4">
+          <div>
+            <label htmlFor="qa-kanban-title" className="t-label">
+              Qué necesitas hacer
+            </label>
+            <input
+              id="qa-kanban-title"
+              type="text"
+              required
+              placeholder="Ej. Revisar pull request del proyecto"
+              value={kanbanTitle}
+              onChange={(e) => setKanbanTitle(e.target.value)}
+              autoFocus
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="qa-kanban-category" className="t-label">
+                Área
+              </label>
+              <select
+                id="qa-kanban-category"
+                value={kanbanCategory}
+                onChange={(e) => setKanbanCategory(e.target.value as Category)}
+                className="t-input"
+              >
+                <option value="trabajo">Trabajo</option>
+                <option value="universidad">Universidad</option>
+                <option value="gym">Gym</option>
+                <option value="personal">Personal</option>
               </select>
             </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm shadow-lg shadow-cyan-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+            <div>
+              <label htmlFor="qa-kanban-priority" className="t-label">
+                Prioridad
+              </label>
+              <select
+                id="qa-kanban-priority"
+                value={kanbanPriority}
+                onChange={(e) => setKanbanPriority(e.target.value as Priority)}
+                className="t-input"
+              >
+                <option value="alta">Alta</option>
+                <option value="media">Media</option>
+                <option value="baja">Baja</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="qa-kanban-date" className="t-label">
+              Fecha objetivo (opcional)
+            </label>
+            <input
+              id="qa-kanban-date"
+              type="date"
+              value={kanbanDueDate}
+              onChange={(e) => setKanbanDueDate(e.target.value)}
+              className="t-input t-num"
+            />
+          </div>
+
+          <button type="submit" className="t-btn t-btn-primary w-full mt-2">
+            <Check className="w-4 h-4" />
+            <span>Crear tarea</span>
+          </button>
+        </form>
+      )}
+
+      {/* Tab 4: Horario */}
+      {activeTab === 'calendar' && (
+        <form onSubmit={handleSaveCalendar} className="space-y-4">
+          <div>
+            <span className="t-label">Día de la semana</span>
+            <div className="flex flex-wrap gap-2">
+              {DAYS.map((day) => {
+                const isSelected = calDay === day;
+                return (
+                  <button
+                    type="button"
+                    key={day}
+                    onClick={() => setCalDay(day)}
+                    className={`min-h-[44px] px-3 rounded-[10px] text-[13px] font-medium border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border-[var(--action)] text-[var(--action)]'
+                        : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
+                    }`}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="qa-cal-title" className="t-label">
+              Clase o actividad
+            </label>
+            <input
+              id="qa-cal-title"
+              type="text"
+              required
+              placeholder="Ej. Clase de Redes y Comunicaciones"
+              value={calTitle}
+              onChange={(e) => setCalTitle(e.target.value)}
+              autoFocus
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label htmlFor="qa-cal-start" className="t-label">
+                Hora de inicio
+              </label>
+              <input
+                id="qa-cal-start"
+                type="time"
+                value={calStart}
+                onChange={(e) => setCalStart(e.target.value)}
+                className="t-input t-num"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="qa-cal-end" className="t-label">
+                Hora de fin
+              </label>
+              <input
+                id="qa-cal-end"
+                type="time"
+                value={calEnd}
+                onChange={(e) => setCalEnd(e.target.value)}
+                className="t-input t-num"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="qa-cal-category" className="t-label">
+              Área
+            </label>
+            <select
+              id="qa-cal-category"
+              value={calCategory}
+              onChange={(e) => setCalCategory(e.target.value as Category)}
+              className="t-input"
             >
-              <Check className="w-4 h-4 stroke-[3]" />
-              Agendar en el Calendario
-            </button>
-          </form>
-        )}
+              <option value="universidad">Universidad</option>
+              <option value="gym">Gym</option>
+              <option value="trabajo">Trabajo</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
 
-        {/* Tab 5: Aprendizaje (YouTube & Fuentes de Estudio) */}
-        {activeTab === 'learning' && (
-          <form onSubmit={handleSaveLearning} className="p-5 sm:p-6 space-y-4">
+          <button type="submit" className="t-btn t-btn-primary w-full mt-2">
+            <Check className="w-4 h-4" />
+            <span>Agendar bloque</span>
+          </button>
+        </form>
+      )}
+
+      {/* Tab 5: Aprender */}
+      {activeTab === 'learning' && (
+        <form onSubmit={handleSaveLearning} className="space-y-4">
+          <div>
+            <label htmlFor="qa-res-title" className="t-label">
+              Título del video o apunte
+            </label>
+            <input
+              id="qa-res-title"
+              type="text"
+              required
+              placeholder="Ej. Sharding en MongoDB explicado en 10 min"
+              value={resTitle}
+              onChange={(e) => setResTitle(e.target.value)}
+              autoFocus
+              className="t-input"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Título del recurso o video *
+              <label htmlFor="qa-res-type" className="t-label">
+                Tipo de recurso
               </label>
-              <input
-                type="text"
-                required
-                placeholder="Ej. Curso de Docker & Microservicios o Síntesis de Algoritmos"
-                value={resTitle}
-                onChange={(e) => setResTitle(e.target.value)}
-                autoFocus
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Tipo de Fuente
-                </label>
-                <select
-                  value={resType}
-                  onChange={(e) => setResType(e.target.value as ResourceType)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                >
-                  <option value="youtube">🎥 Video de YouTube</option>
-                  <option value="documentacion">📖 Documentación</option>
-                  <option value="articulo">📝 Artículo / Blog</option>
-                  <option value="libro">📚 Libro / PDF</option>
-                  <option value="texto">💡 Nota de Texto</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Semana Académica
-                </label>
-                <select
-                  value={resWeek}
-                  onChange={(e) => setResWeek(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm"
-                >
-                  {Array.from({ length: 16 }, (_, i) => i + 1).map((w) => (
-                    <option key={w} value={w}>
-                      Semana {w} {w === state.currentAcademicWeek ? '(Actual)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                id="qa-res-type"
+                value={resType}
+                onChange={(e) => setResType(e.target.value as ResourceType)}
+                className="t-input"
+              >
+                <option value="youtube">Video de YouTube</option>
+                <option value="documentacion">Documentación</option>
+                <option value="articulo">Artículo o blog</option>
+                <option value="libro">Libro o PDF</option>
+                <option value="texto">Nota rápida</option>
+              </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Enlace URL (YouTube o Web)
+              <label htmlFor="qa-res-week" className="t-label">
+                Semana académica
               </label>
-              <input
-                type="url"
-                placeholder="https://www.youtube.com/watch?v=... o https://docs..."
-                value={resUrl}
-                onChange={(e) => setResUrl(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
+              <select
+                id="qa-res-week"
+                value={resWeek}
+                onChange={(e) => setResWeek(Number(e.target.value))}
+                className="t-input t-num"
+              >
+                {Array.from({ length: 16 }, (_, i) => i + 1).map((w) => (
+                  <option key={w} value={w}>
+                    Semana {w} {w === state.currentAcademicWeek ? '(Actual)' : ''}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Nota clave o marca de tiempo
-              </label>
-              <input
-                type="text"
-                placeholder="Ej. En el minuto 12:30 explica sharding vs particionado..."
-                value={resNotes}
-                onChange={(e) => setResNotes(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-              />
-            </div>
+          <div>
+            <label htmlFor="qa-res-url" className="t-label">
+              Enlace (opcional)
+            </label>
+            <input
+              id="qa-res-url"
+              type="url"
+              placeholder="https://www.youtube.com/watch?v=..."
+              value={resUrl}
+              onChange={(e) => setResUrl(e.target.value)}
+              className="t-input"
+            />
+          </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-violet-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
-            >
-              <Check className="w-4 h-4 stroke-[3]" />
-              Guardar en Aprendizaje Semanal
-            </button>
-          </form>
-        )}
-      </div>
+          <div>
+            <label htmlFor="qa-res-notes" className="t-label">
+              Idea clave o minuto del video (opcional)
+            </label>
+            <textarea
+              id="qa-res-notes"
+              rows={2}
+              placeholder="Ej. En el minuto 12:30 compara particionado vs replicación"
+              value={resNotes}
+              onChange={(e) => setResNotes(e.target.value)}
+              className="t-input min-h-[76px] resize-y"
+            />
+          </div>
+
+          <button type="submit" className="t-btn t-btn-primary w-full mt-2">
+            <Check className="w-4 h-4" />
+            <span>Guardar recurso</span>
+          </button>
+        </form>
+      )}
     </div>
+  );
+};
+
+export const QuickAddModal: React.FC<QuickAddModalProps> = ({
+  isOpen,
+  onClose,
+  initialTab = 'university',
+  ...formProps
+}) => {
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Agregar rápido"
+      subtitle="Guarda tareas, rutinas o apuntes en segundos"
+      maxWidth="lg"
+    >
+      {isOpen && (
+        <QuickAddFormContent
+          key={initialTab}
+          initialTab={initialTab}
+          onClose={onClose}
+          {...formProps}
+        />
+      )}
+    </ModalShell>
   );
 };

@@ -3,9 +3,9 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v1.3.1 (Módulo de Aprendizaje + Rediseño Avanzado de Navbar & QuickAdd)`  
-> **Rama principal:** `feat/student-os-core-hub`  
-> **Última actualización:** Noviembre 2026 (Commit: `037e9fb`)
+> **Versión actual:** `v2.1.0 (Landing Page Informativo, HD Vector Visuals, Storytelling al Scroll & Flujo de Auth)`  
+> **Rama activa:** `feat/ui-taste-foundation`  
+> **Última actualización:** Noviembre 2026
 
 ---
 
@@ -130,25 +130,22 @@ student-os/
 
 ---
 
-## 🎨 4. Identidad Visual y Sistema de Diseño (UI/UX Pro Max)
+## 🎨 4. Identidad Visual y Sistema de Diseño (`design-taste-frontend` v2.0)
 
 - **Logo Oficial:**
-  - Emblema 3D Badge que fusiona un delta/birrete universitario con un rayo cinético de energía deportiva.
-  - Paleta del logo: Índigo eléctrico (`#6366F1`), cyan luminiscente (`#06B6D4`) y sunset orange (`#FF6B35`) sobre fondo obsidiana.
-- **Paleta de Color Base (Obsidian Token System):**
-  - Fondo Base Dark: `#080c14` (espacio cósmico de alto contraste).
-  - Superficies de Tarjetas: `#0f1523` con micro-bordes `border-white/[0.08]` y efecto `glass-panel` (`backdrop-blur-xl`).
-  - Fondo Base Light: `#f8fafc`.
+  - Emblema 3D Badge que fusiona un delta/birrete universitario con un rayo cinético de energía deportiva (`/logo.png`).
+- **Paleta de Color (`blue-black-cornflower` + `white-link-blue`, 92% neutra, cero violeta/índigo):**
+  - **Modo Oscuro (`blue-black-cornflower`):** Fondo `--bg: #0a0d14`, Superficie `--surface: #131824`, Superficie alterna `--surface-2: #192030`, Texto `--ink: #e9edf3`, Secundario `--muted: #8891a1`, Acento primario `--action: #5ab9fc` (`--action-ink: #0a0d14`), Bordes de `1px` `--line: rgba(233, 237, 243, 0.10)`.
+  - **Modo Claro (`white-link-blue`):** Fondo `--bg: #f7f8fa`, Superficie `--surface: #ffffff`, Superficie alterna `--surface-2: #f1f3f6`, Texto `--ink: #111318`, Secundario `--muted: #5d6470`, Acento primario `--action: #1a4be0` (`--action-ink: #ffffff`).
+  - **Semántica funcional discreta:** Éxito `#10b981`, Aviso `#f59e0b`, Urgente/Colisión `#ef4444`, Energía Gym `#ff5a1f`.
 - **Tipografía:**
-  - `Plus Jakarta Sans` en pesos 500, 700 y 900.
-  - Figuras numéricas tabulares y escala visual jerárquica sin ruido tipográfico.
-- **Interacciones Táctiles:**
-  - Botones principales y áreas de clic optimizados a `min-h-[44px]`.
-- **Saludo Dinámico Contextual:**
-  - Saludo automático según la hora del sistema (*"Buenos días"*, *"Buenas tardes"*, *"Buenas noches, Mateo"*).
-- **Gamificación Visual:**
-  - Racha diaria con animación `flame-pulse`.
-  - Celebraciones con confeti al entregar tareas, completar rutinas de gym y mover tarjetas a "Completado".
+  - `Schibsted Grotesk` (`400`, `500`, `600`) para títulos y lectura clara (mínimo `13px`, *sentence case* natural).
+  - `JetBrains Mono` (`.t-num`, `tabular-nums`) para promedios GPA, pesos en `kg`, series, semanas, horarios y cronómetros.
+- **Primitivas de Movimiento y Ergonomía (`src/components/common/` & `src/index.css`):**
+  - `ModalShell.tsx`: diálogos con `createPortal` en escritorio y *Bottom Sheets* en móvil (`200ms` entrada, bloqueo de scroll y cierre con `Escape`).
+  - `SegmentedControl.tsx`: indicador activo deslizante por `transform` (`240ms cubic-bezier(.65, 0, .35, 1)`) con `ResizeObserver`.
+  - `SectionHeader.tsx`: encabezados consistentes por módulo; `<StatsHero />` exclusivo en `Resumen` y transición `.view-enter` (`220ms`) al cambiar entre las 6 vistas.
+  - Controles táctiles `>=44x44px` y soporte completo para `@media (prefers-reduced-motion: reduce)`.
 
 ---
 
@@ -209,23 +206,43 @@ student-os/
 - **Captura Rápida Multidisciplinaria (5 Pestañas):**
   - Modal accesible globalmente con selector: Universidad, Gym, Kanban, Agenda y **Aprender** (guardado directo de enlaces de YouTube o notas a la semana deseada con confeti).
 
+### 8. Landing Page Informativo, Visuales HD y Sistema de Auth (`src/components/landing/` & `src/components/auth/`)
+- **Ilustraciones vectoriales de alta definición en SVG:**
+  - `StudentLaptopDuoVisual`: Dos jóvenes universitarios con audífonos over-ear y laptops programando con trazos neón cyan y bus de datos continuo.
+  - `LabFlaskNucleusVisual`: Matraz de laboratorio tecnológico con callouts interactivos `[PROBLEMA]`, `[ANÁLISIS]`, `[SOLUCIÓN]`, partículas ascendentes y cápsula de estado.
+  - `StudentSoloFocusVisual`: Estudiante en su laptop con bombilla/sol conceptual luminoso sobre su cabeza.
+- **Storytelling Progresivo al Scroll:**
+  - `HeroSection`: Promesa central (*"Menos caos manual. Más tiempo para crecer."*), CTAs de acción rápida y fila de 3 píldoras de valor (`Misión`, `Automatización`, `Control Total`).
+  - `ProblemSection`: *"¿Qué está saboteando tu semestre y tu tiempo?"* analizando entregas desfasadas, falta de consistencia en el gym y dispersión mental en 5 apps.
+  - `FeatureShowcaseSection`: *"¿Para qué está hecho StudentOS?"* con Bento Grid interactivo mostrando Semanas 1 a 16, series interactivas de Gym (S1..S4), Kanban ágil y horario cronológico con día actual.
+  - `AudienceSection`: *"¿Para quiénes está hecho?"* (Estudiantes de Software/Ingeniería, Universitarios Atletas y Freelancers).
+  - `CreatorStorySection`: *"¿Por qué decidí hacer este proyecto?"* (Manifiesto personal del creador, filosofía offline-first y privacidad de datos).
+  - `LandingFooter`: Enlaces rápidos, botón volver arriba y licencia MIT.
+- **Sistema de Autenticación & Registro por Correo (`AuthModal.tsx`):**
+  - Formulario ágil para Iniciar Sesión o Crear Cuenta con email y contraseña.
+  - Botón de acceso directo en 1 clic (*Modo Demo*) sin registro obligatorio.
+  - Persistencia de sesión en `localStorage` (`student_os_user_session`) y transición suave hacia el Dashboard.
+  - Navegación bidireccional mediante botón `Landing` en el Navbar del Dashboard y opción de cierre de sesión.
+
 ---
 
 ## 🌿 6. Registro de Git y Ramas
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/student-os-core-hub`** | **ACTIVA / UNIFICADA** | `037e9fb` (HEAD) | Rediseño de Navbar sin wrapping, badges en vivo y Aprendizaje en QuickAdd |
-| `feat/student-os-core-hub` | Previa | `96b029e` | Módulo completo de Aprendizaje, Active Recall Feynman y YouTube |
-| `feat/student-os-core-hub` | Previa | `723c2a7` | Elevación visual obsidian, logo badge holográfico y dark mode |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.1)** | `03f1c95` → `f1fe3b8` + Landing/Auth | Rediseño `design-taste-frontend`, Landing Page interactivo con scroll storytelling, visuales HD y flujo de auth |
+| `feat/wt1-shell-dashboard` | Fusionada | `a30c298` | Navbar, StatsHero, QuickAdd, OverviewBento, Hábitos y Backup |
+| `feat/wt2-academic-learning` | Fusionada | `d4f8ff0` | Universidad, GPA, Rúbricas, Aprendizaje y Semana libre |
+| `feat/wt3-kanban-calendar` | Fusionada | `4bd4451` | Kanban y Horario semanal con selector de día móvil |
+| `feat/wt4-gym-fitness` | Fusionada | `9477508` | Gym Tracker, cronómetro mobile-safe y modal 1RM |
+| `feat/student-os-core-hub` | Base previa | `037e9fb` | Rediseño de Navbar sin wrapping, badges en vivo y Aprendizaje en QuickAdd |
 | `feat/agent-1-university-kanban` | Fusionada | `b81580a` | Trabajo del Agente 1 (Universidad + Kanban) |
 | `feat/agent-2-gym-calendar-dashboard` | Fusionada | `f93f1a7` | Trabajo del Agente 2 (Gym + Calendario + Dashboard) |
 | `main` | Base | `06e040f` | Versión inicial del repositorio |
 
 ---
 
-## 🚀 7. Verificación del Sistema
-- **Compilación de Producción:** `npm run build` ejecutado con éxito sin errores en 496ms.
-- **Linter Estático:** `oxlint` validado con 0 errores.
-- **Servidor de Desarrollo Local:** Vite ejecutándose en segundo plano en `http://localhost:5173/` con HMR reactivo.
-- **GitHub Remoto:** Repositorio sincronizado al 100% con `git push origin feat/student-os-core-hub`.
+## 🚀 7. Verificación del Sistema (v2.1)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 666ms.
+- **Linter Estático:** `oxlint` con `0` warnings y `0` errores en 42 archivos.
+- **Auditoría visual y assets:** Gráficos vectoriales SVG escalables en 4K, contraste accesible y navegación bidireccional Landing <-> Dashboard.

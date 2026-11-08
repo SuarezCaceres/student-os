@@ -1,30 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BookOpen, 
-  FileText, 
-  ExternalLink, 
-  Plus, 
-  Trash2, 
-  Save, 
-  Sparkles, 
-  Dumbbell, 
-  Flame, 
-  Zap, 
-  Palmtree, 
+import React, { useId, useState } from 'react';
+import {
   BatteryMedium,
-  Tag
+  BookOpen,
+  Dumbbell,
+  ExternalLink,
+  FileText,
+  Flame,
+  Palmtree,
+  Plus,
+  Save,
+  Trash2,
+  X,
+  Zap,
 } from 'lucide-react';
-import { YoutubeIcon } from '../common/YoutubeIcon';
-import type { 
-  WeeklyReflection, 
-  LearningResource, 
-  ResourceType, 
-  ReflectionMood, 
-  UniversityAssignment, 
-  GymRoutine 
+import type {
+  GymRoutine,
+  LearningResource,
+  ReflectionMood,
+  ResourceType,
+  UniversityAssignment,
+  WeeklyReflection,
 } from '../../types';
 import type { NavTab } from '../layout/Navbar';
 import { triggerConfetti } from '../../utils/confetti';
+import { SectionHeader } from '../common/SectionHeader';
+import { YoutubeIcon } from '../common/YoutubeIcon';
 import { FreeWeekCelebrationCard } from './FreeWeekCelebrationCard';
 
 interface LearningViewProps {
@@ -36,6 +36,33 @@ interface LearningViewProps {
   onNavigateTab?: (tab: NavTab) => void;
 }
 
+interface WeekDraftPatch {
+  learnings?: string;
+  keyConcepts?: string[];
+  resources?: LearningResource[];
+  gymReflection?: string;
+  mood?: ReflectionMood;
+}
+
+const MOOD_OPTIONS: Array<{
+  id: ReflectionMood;
+  label: string;
+  Icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: 'increible', label: 'Con toda la energía', Icon: Flame },
+  { id: 'productivo', label: 'Enfocado', Icon: Zap },
+  { id: 'despejado', label: 'En calma', Icon: Palmtree },
+  { id: 'cansado', label: 'Cansado', Icon: BatteryMedium },
+];
+
+const RESOURCE_TYPE_LABEL: Record<ResourceType, string> = {
+  youtube: 'YouTube',
+  documentacion: 'Documentación',
+  articulo: 'Artículo',
+  libro: 'Libro / PDF',
+  texto: 'Apunte',
+};
+
 export const LearningView: React.FC<LearningViewProps> = ({
   currentAcademicWeek,
   assignments,
@@ -44,79 +71,106 @@ export const LearningView: React.FC<LearningViewProps> = ({
   onSaveReflection,
   onNavigateTab,
 }) => {
+  const uid = useId();
   const [selectedWeek, setSelectedWeek] = useState<number>(currentAcademicWeek);
+  const [draftsByWeek, setDraftsByWeek] = useState<Record<number, WeekDraftPatch>>(
+    {}
+  );
 
-  const [learnings, setLearnings] = useState('');
-  const [keyConcepts, setKeyConcepts] = useState<string[]>([]);
-  const [newConceptInput, setNewConceptInput] = useState('');
-  const [resources, setResources] = useState<LearningResource[]>([]);
-  const [gymReflection, setGymReflection] = useState('');
-  const [mood, setMood] = useState<ReflectionMood>('productivo');
-
-  // Resource form state
-  const [newResTitle, setNewResTitle] = useState('');
-  const [newResUrl, setNewResUrl] = useState('');
+  // Local inputs for adding concepts & resources
+  const [newConceptInput, setNewConceptInput] = useState<string>('');
+  const [showAddResource, setShowAddResource] = useState<boolean>(false);
+  const [newResTitle, setNewResTitle] = useState<string>('');
+  const [newResUrl, setNewResUrl] = useState<string>('');
   const [newResType, setNewResType] = useState<ResourceType>('youtube');
-  const [newResNotes, setNewResNotes] = useState('');
-  const [showAddResource, setShowAddResource] = useState(false);
+  const [newResNotes, setNewResNotes] = useState<string>('');
 
-  // Sync state when selectedWeek changes
-  useEffect(() => {
-    const current = weeklyReflections[selectedWeek];
-    if (current) {
-      setLearnings(current.learnings || '');
-      setKeyConcepts(current.keyConcepts || []);
-      setResources(current.resources || []);
-      setGymReflection(current.gymReflection || '');
-      setMood(current.mood || 'productivo');
-    } else {
-      setLearnings('');
-      setKeyConcepts([]);
-      setResources([]);
-      setGymReflection('');
-      setMood('productivo');
-    }
-  }, [selectedWeek, weeklyReflections]);
+  const saved = weeklyReflections[selectedWeek];
+  const patch = draftsByWeek[selectedWeek];
 
-  // Check if selected week is free
+  const learnings = patch?.learnings ?? saved?.learnings ?? '';
+  const keyConcepts = patch?.keyConcepts ?? saved?.keyConcepts ?? [];
+  const resources = patch?.resources ?? saved?.resources ?? [];
+  const gymReflection = patch?.gymReflection ?? saved?.gymReflection ?? '';
+  const mood: ReflectionMood = patch?.mood ?? saved?.mood ?? 'productivo';
+
+  const updatePatch = (next: WeekDraftPatch) => {
+    setDraftsByWeek((prev) => ({
+      ...prev,
+      [selectedWeek]: {
+        ...prev[selectedWeek],
+        ...next,
+      },
+    }));
+  };
+
+  // Free week calculation
   const weekAssignments = assignments.filter((a) => a.week === selectedWeek);
-  const pendingWeekAssignments = weekAssignments.filter((a) => a.status !== 'entregado');
-  const isFreeWeek = weekAssignments.length === 0 || pendingWeekAssignments.length === 0;
+  const pendingWeekAssignments = weekAssignments.filter(
+    (a) => a.status !== 'entregado'
+  );
+  const deliveredCount = weekAssignments.length - pendingWeekAssignments.length;
+  const isFreeWeek =
+    weekAssignments.length === 0 || pendingWeekAssignments.length === 0;
 
-  // Key concepts handlers
+  // Gym summary
+  const totalGymSetsPlanned = gymRoutines.reduce(
+    (acc, r) => acc + r.exercises.reduce((exAcc, ex) => exAcc + ex.sets, 0),
+    0
+  );
+  const totalGymSetsDone = gymRoutines.reduce(
+    (acc, r) =>
+      acc +
+      r.exercises.reduce(
+        (exAcc, ex) => exAcc + ex.completedSets.filter(Boolean).length,
+        0
+      ),
+    0
+  );
+
   const handleAddConcept = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newConceptInput.trim()) return;
-    if (!keyConcepts.includes(newConceptInput.trim())) {
-      setKeyConcepts((prev) => [...prev, newConceptInput.trim()]);
+    const cleaned = newConceptInput.trim().replace(/^#+/, '').trim();
+    if (!cleaned) return;
+
+    const alreadyExists = keyConcepts.some(
+      (c) => c.replace(/^#+/, '').toLowerCase() === cleaned.toLowerCase()
+    );
+    if (!alreadyExists) {
+      updatePatch({ keyConcepts: [...keyConcepts, cleaned] });
     }
     setNewConceptInput('');
   };
 
   const handleDeleteConcept = (conceptToDelete: string) => {
-    setKeyConcepts((prev) => prev.filter((c) => c !== conceptToDelete));
+    updatePatch({
+      keyConcepts: keyConcepts.filter((c) => c !== conceptToDelete),
+    });
   };
 
-  // Resources handlers
   const handleAddResource = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newResTitle.trim()) return;
+    const cleanTitle = newResTitle.trim();
+    if (!cleanTitle) return;
 
-    // Auto-detect YouTube URL
-    let detectedType = newResType;
-    if (newResUrl && (newResUrl.includes('youtube.com') || newResUrl.includes('youtu.be'))) {
+    const cleanUrl = newResUrl.trim();
+    let detectedType: ResourceType = newResType;
+    if (
+      cleanUrl &&
+      (cleanUrl.includes('youtube.com') || cleanUrl.includes('youtu.be'))
+    ) {
       detectedType = 'youtube';
     }
 
     const newRes: LearningResource = {
       id: `res-${Date.now()}`,
-      title: newResTitle.trim(),
-      url: newResUrl.trim() || undefined,
+      title: cleanTitle,
+      url: cleanUrl || undefined,
       type: detectedType,
       notes: newResNotes.trim() || undefined,
     };
 
-    setResources((prev) => [...prev, newRes]);
+    updatePatch({ resources: [...resources, newRes] });
     setNewResTitle('');
     setNewResUrl('');
     setNewResNotes('');
@@ -124,7 +178,9 @@ export const LearningView: React.FC<LearningViewProps> = ({
   };
 
   const handleDeleteResource = (resId: string) => {
-    setResources((prev) => prev.filter((r) => r.id !== resId));
+    updatePatch({
+      resources: resources.filter((r) => r.id !== resId),
+    });
   };
 
   const handleSave = () => {
@@ -139,77 +195,85 @@ export const LearningView: React.FC<LearningViewProps> = ({
     };
 
     onSaveReflection(reflection);
+    setDraftsByWeek((prev) => {
+      const next = { ...prev };
+      delete next[selectedWeek];
+      return next;
+    });
     triggerConfetti();
   };
 
-  // Gym summary calculations
-  const totalGymSetsPlanned = gymRoutines.reduce((acc, r) => {
-    return acc + r.exercises.reduce((exAcc, ex) => exAcc + ex.sets, 0);
-  }, 0);
-
-  const totalGymSetsDone = gymRoutines.reduce((acc, r) => {
-    return acc + r.exercises.reduce((exAcc, ex) => exAcc + ex.completedSets.filter(Boolean).length, 0);
-  }, 0);
-
   return (
     <div className="space-y-6">
-      {/* Header & Week Selector */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-indigo-500" />
-              Bitácora de Aprendizaje & Balance Semanal
-            </h2>
-          </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Consolida lo que realmente aprendiste, guarda tus fuentes (videos, textos) y evalúa tu semana
-          </p>
-        </div>
+      {/* Header */}
+      <SectionHeader
+        title="Lo que aprendiste esta semana"
+        badge={
+          <span className="t-badge t-badge-accent t-num">
+            Semana {selectedWeek}
+          </span>
+        }
+        subtitle="Explica con tus palabras lo más importante, guarda tus videos de estudio y cierra la semana."
+        actions={
+          <button
+            type="button"
+            onClick={handleSave}
+            className="t-btn t-btn-primary"
+          >
+            <Save className="w-4 h-4" />
+            <span className="t-num">Guardar semana {selectedWeek}</span>
+          </button>
+        }
+      />
 
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/30 transition-all cursor-pointer min-h-[44px]"
-        >
-          <Save className="w-4 h-4" />
-          <span>Guardar Bitácora Sem. {selectedWeek}</span>
-        </button>
-      </div>
-
-      {/* Week Selector Chips (1 to 16) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+      {/* Horizontal Week Selector 1..16 */}
+      <div
+        role="tablist"
+        aria-label="Seleccionar semana de estudio"
+        className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5"
+      >
         {Array.from({ length: 16 }, (_, i) => i + 1).map((w) => {
           const isSelected = selectedWeek === w;
           const isCurrent = currentAcademicWeek === w;
-          const hasNotes = Boolean(weeklyReflections[w]?.learnings);
+          const wSaved = weeklyReflections[w];
+          const wPatch = draftsByWeek[w];
+          const hasNotes = Boolean(
+            wPatch?.learnings?.trim() ||
+              wSaved?.learnings?.trim() ||
+              (wPatch?.resources?.length ?? wSaved?.resources?.length ?? 0) > 0
+          );
 
           return (
             <button
               key={w}
               type="button"
+              role="tab"
+              aria-selected={isSelected}
               onClick={() => setSelectedWeek(w)}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[38px] flex items-center gap-1.5 ${
+              className={`min-h-[44px] px-3.5 rounded-[10px] t-num text-[14px] font-medium inline-flex items-center gap-2 whitespace-nowrap cursor-pointer select-none border transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                 isSelected
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 scale-[1.02]'
+                  ? 'bg-[var(--action)] text-[var(--action-ink)] border-[var(--action)]'
                   : isCurrent
-                  ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-300 dark:border-indigo-800'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800'
+                    ? 'bg-[var(--surface)] text-[var(--ink)] border-[var(--action)] hover:bg-[var(--surface-2)]'
+                    : 'bg-[var(--surface)] text-[var(--muted)] border-[var(--line)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
               }`}
             >
               <span>Semana {w}</span>
-              {isCurrent && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" title="Semana Actual" />
-              )}
-              {hasNotes && !isSelected && (
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" title="Bitácora registrada" />
+              {hasNotes && (
+                <span
+                  aria-hidden="true"
+                  title="Con apuntes guardados"
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    isSelected ? 'bg-[var(--action-ink)]' : 'bg-[var(--action)]'
+                  }`}
+                />
               )}
             </button>
           );
         })}
       </div>
 
-      {/* Free Week Celebration Banner (if applicable) */}
+      {/* Free Week Celebration Card */}
       {isFreeWeek && (
         <FreeWeekCelebrationCard
           week={selectedWeek}
@@ -218,358 +282,385 @@ export const LearningView: React.FC<LearningViewProps> = ({
         />
       )}
 
-      {/* Main Grid: Learning & Sources */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Col 1 & 2: Active Recall & Key Concepts */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Card: Active Recall Feynman */}
-          <div className="rounded-3xl bg-white dark:bg-[#0f1523] border border-slate-200 dark:border-white/[0.08] p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-500 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                    ¿Qué has aprendido en la Semana {selectedWeek}?
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Explica con tus propias palabras qué entendiste de verdad (sin mirar apuntes)
-                  </p>
-                </div>
-              </div>
+      {/* Main 2-Column Clean Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Left Column: Active Recall, Mood & Concept Tags */}
+        <section className="t-card p-6 space-y-6">
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--ink)]">
+                Resumen con tus palabras
+              </h3>
+              <p className="text-sm text-[var(--muted)] mt-1">
+                ¿Qué entendiste de verdad en la semana{' '}
+                <span className="t-num">{selectedWeek}</span> sin mirar tus
+                apuntes?
+              </p>
             </div>
 
             <textarea
-              rows={5}
+              id={`${uid}-learnings`}
+              aria-label={`Resumen de aprendizaje de la semana ${selectedWeek}`}
+              rows={6}
               value={learnings}
-              onChange={(e) => setLearnings(e.target.value)}
-              placeholder="Ej: Esta semana comprendí cómo funciona la partición de bases de datos distribuidas y la diferencia entre concurrencia y paralelismo. En React practiqué hooks desacoplados..."
-              className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-sm leading-relaxed text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none font-medium"
+              onChange={(e) => updatePatch({ learnings: e.target.value })}
+              placeholder="Ej. Esta semana por fin entendí cómo se reparten los datos con sharding en MongoDB y cuándo conviene frente a replicación..."
+              className="t-input min-h-[160px] resize-y"
             />
-
-            {/* Key Concepts Remembered (Active Recall Pills) */}
-            <div className="space-y-2 pt-1">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Conceptos clave que recuerdas de memoria:
-              </label>
-
-              <div className="flex flex-wrap items-center gap-2">
-                {keyConcepts.map((concept) => (
-                  <span
-                    key={concept}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/60 text-xs font-semibold"
-                  >
-                    <Tag className="w-3 h-3 text-indigo-500" />
-                    <span>{concept}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteConcept(concept)}
-                      className="text-slate-400 hover:text-rose-500 ml-0.5"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-
-              {/* Add concept input */}
-              <form onSubmit={handleAddConcept} className="flex gap-2 pt-2">
-                <input
-                  type="text"
-                  placeholder="+ Agregar concepto memorizado (ej. Sharding con Hash Key)..."
-                  value={newConceptInput}
-                  onChange={(e) => setNewConceptInput(e.target.value)}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all cursor-pointer min-h-[36px]"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
           </div>
 
-          {/* Card: Fuentes de Estudio & Links de YouTube */}
-          <div className="rounded-3xl bg-white dark:bg-[#0f1523] border border-slate-200 dark:border-white/[0.08] p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-500 flex items-center justify-center">
-                  <YoutubeIcon className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                    Fuentes de Estudio & YouTube
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    ¿De dónde sacaste la información? Guarda videos, docs o notas para repasar
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAddResource(!showAddResource)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all cursor-pointer min-h-[36px]"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Agregar Fuente</span>
-              </button>
-            </div>
-
-            {/* Add Resource Form */}
-            {showAddResource && (
-              <form onSubmit={handleAddResource} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      Título del recurso:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. MongoDB Sharding en 10 minutos..."
-                      value={newResTitle}
-                      onChange={(e) => setNewResTitle(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                      Tipo:
-                    </label>
-                    <select
-                      value={newResType}
-                      onChange={(e) => setNewResType(e.target.value as ResourceType)}
-                      className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer"
-                    >
-                      <option value="youtube">Video de YouTube</option>
-                      <option value="documentacion">Documentación Oficial</option>
-                      <option value="articulo">Artículo / Blog</option>
-                      <option value="libro">Libro / PDF</option>
-                      <option value="texto">Nota de Texto</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                    Enlace URL (YouTube o Web):
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=... o https://docs..."
-                    value={newResUrl}
-                    onChange={(e) => setNewResUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400 mb-1">
-                    Apunte o conclusión clave:
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. El minuto 4:20 explica la diferencia con réplicas..."
-                    value={newResNotes}
-                    onChange={(e) => setNewResNotes(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddResource(false)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer min-h-[36px]"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-sm cursor-pointer min-h-[36px]"
-                  >
-                    Guardar Fuente
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* List of Resources */}
-            <div className="space-y-2.5">
-              {resources.length === 0 ? (
-                <div className="py-6 text-center text-xs text-slate-400 italic">
-                  Aún no has registrado fuentes o videos para esta semana.
-                </div>
-              ) : (
-                resources.map((res) => {
-                  const isYouTube = res.type === 'youtube' || (res.url && (res.url.includes('youtube') || res.url.includes('youtu.be')));
-
-                  return (
-                    <div
-                      key={res.id}
-                      className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
-                          isYouTube 
-                            ? 'bg-rose-500/15 text-rose-500' 
-                            : 'bg-indigo-500/15 text-indigo-500'
-                        }`}>
-                          {isYouTube ? <YoutubeIcon className="w-5 h-5" /> : <FileText className="w-4 h-4" />}
-                        </div>
-
-                        <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                            {res.title}
-                          </h4>
-                          {res.notes && (
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">
-                              {res.notes}
-                            </p>
-                          )}
-                          {res.url && (
-                            <a
-                              href={res.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline mt-1"
-                            >
-                              Abrir fuente
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteResource(res.id)}
-                        className="p-2 text-slate-400 hover:text-rose-500 rounded-xl transition-colors shrink-0"
-                        title="Eliminar recurso"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Col 3: Balance Gym & Mood */}
-        <div className="space-y-6">
-          
-          {/* Card: Balance del Gym */}
-          <div className="rounded-3xl bg-white dark:bg-[#0f1523] border border-slate-200 dark:border-white/[0.08] p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <div className="w-8 h-8 rounded-xl bg-orange-500/15 text-orange-500 flex items-center justify-center">
-                <Dumbbell className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  Avance en el Gimnasio
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Desempeño físico y recuperación
-                </p>
-              </div>
-            </div>
-
-            {/* Gym Metric Stats */}
-            <div className="p-3.5 rounded-2xl bg-orange-50/40 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/40 flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-bold text-orange-600 dark:text-orange-400 uppercase tracking-wider">
-                  Cumplimiento de Series
-                </span>
-                <div className="text-xl font-black text-slate-900 dark:text-white">
-                  {totalGymSetsDone} / {totalGymSetsPlanned} series
-                </div>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-orange-500/20 text-orange-500 flex items-center justify-center">
-                <Flame className="w-5 h-5 fill-orange-500" />
-              </div>
-            </div>
-
+          {/* Weekly Mood Selector */}
+          <div className="border-t border-[var(--line)] pt-5 space-y-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                ¿Cómo te fue entrenando esta semana?
-              </label>
-              <textarea
-                rows={3}
-                value={gymReflection}
-                onChange={(e) => setGymReflection(e.target.value)}
-                placeholder="Ej. Me sentí fuerte en pecho y subí 2.5kg en sentadillas. Dormí bien y descansé adecuadamente entre series..."
-                className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-              />
-            </div>
-          </div>
-
-          {/* Card: Estado Mental & Energía */}
-          <div className="rounded-3xl bg-white dark:bg-[#0f1523] border border-slate-200 dark:border-white/[0.08] p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-500 flex items-center justify-center">
-                <Zap className="w-4 h-4" />
-              </div>
-              <div>
-                <h3 className="font-extrabold text-base text-slate-900 dark:text-white">
-                  Energía de la Semana
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  ¿Cómo calificarías esta semana en general?
-                </p>
-              </div>
+              <span className="t-label mb-0">
+                ¿Cómo te sentiste esta semana?
+              </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { id: 'increible' as ReflectionMood, label: 'Imparable', icon: Flame, color: 'text-orange-500 border-orange-500 bg-orange-500/10' },
-                { id: 'productivo' as ReflectionMood, label: 'Productivo', icon: Zap, color: 'text-indigo-500 border-indigo-500 bg-indigo-500/10' },
-                { id: 'despejado' as ReflectionMood, label: 'En Calma / Libre', icon: Palmtree, color: 'text-emerald-500 border-emerald-500 bg-emerald-500/10' },
-                { id: 'cansado' as ReflectionMood, label: 'Exigido', icon: BatteryMedium, color: 'text-amber-500 border-amber-500 bg-amber-500/10' },
-              ].map((m) => {
-                const Icon = m.icon;
-                const isSelected = mood === m.id;
-
+            <div className="grid grid-cols-2 gap-2.5">
+              {MOOD_OPTIONS.map(({ id, label, Icon }) => {
+                const isSelected = mood === id;
                 return (
                   <button
-                    key={m.id}
+                    key={id}
                     type="button"
-                    onClick={() => setMood(m.id)}
-                    className={`p-3 rounded-2xl border text-xs font-bold flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[64px] ${
+                    aria-pressed={isSelected}
+                    onClick={() => updatePatch({ mood: id })}
+                    className={`min-h-[44px] px-3.5 py-2.5 rounded-[12px] border text-sm font-medium flex items-center gap-2.5 cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                       isSelected
-                        ? `${m.color} ring-2 ring-indigo-500/30 shadow-sm`
-                        : 'bg-slate-50 dark:bg-slate-900/60 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300'
+                        ? 'bg-[color-mix(in_oklab,var(--action)_12%,var(--surface))] border-[var(--action)] text-[var(--ink)]'
+                        : 'bg-[var(--surface-2)] border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--line-strong)]'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{m.label}</span>
+                    <Icon
+                      className={`w-4 h-4 shrink-0 ${
+                        isSelected
+                          ? 'text-[var(--action)]'
+                          : 'text-[var(--muted)]'
+                      }`}
+                    />
+                    <span className="truncate">{label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Quick Academic Summary for this week */}
-          <div className="rounded-3xl bg-white dark:bg-[#0f1523] border border-slate-200 dark:border-white/[0.08] p-5 shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                Entregas Semana {selectedWeek}:
-              </span>
-              <span className="text-xs font-black text-slate-900 dark:text-white">
-                {weekAssignments.length - pendingWeekAssignments.length} / {weekAssignments.length} entregadas
-              </span>
+          {/* Key Concepts (#concepto) */}
+          <div className="border-t border-[var(--line)] pt-5 space-y-3">
+            <label htmlFor={`${uid}-concept`} className="t-label mb-0">
+              Conceptos clave que recuerdas
+            </label>
+
+            {keyConcepts.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                {keyConcepts.map((concept) => {
+                  const displayConcept = concept.replace(/^#+/, '').trim();
+                  return (
+                    <span
+                      key={concept}
+                      className="t-badge max-w-full pl-3.5 pr-0 py-0 min-h-[44px] text-[var(--ink)] bg-[var(--surface-2)] border-[var(--line-strong)]"
+                    >
+                      <span className="min-w-0 whitespace-normal break-words py-2 leading-snug">#{displayConcept}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteConcept(concept)}
+                        className="w-11 h-11 min-w-[44px] min-h-[44px] shrink-0 rounded-full inline-flex items-center justify-center text-[var(--muted)] hover:text-[var(--danger)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
+                        aria-label={`Quitar concepto ${displayConcept}`}
+                        title="Quitar concepto"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+
+            <form
+              onSubmit={handleAddConcept}
+              className="flex flex-col sm:flex-row gap-2.5"
+            >
+              <input
+                id={`${uid}-concept`}
+                type="text"
+                placeholder="Ej. Sharding con Hash Key"
+                value={newConceptInput}
+                onChange={(e) => setNewConceptInput(e.target.value)}
+                className="t-input flex-1"
+              />
+              <button
+                type="submit"
+                className="t-btn t-btn-secondary shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Agregar concepto</span>
+              </button>
+            </form>
+          </div>
+        </section>
+
+        {/* Right Column: YouTube, Study Sources & Physical Balance */}
+        <section className="t-card p-6 space-y-6">
+          {/* Sources Header & List */}
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <YoutubeIcon className="w-5 h-5 text-[#FF0000] shrink-0" />
+                  <h3 className="text-lg font-semibold text-[var(--ink)]">
+                    Videos de YouTube y lecturas
+                  </h3>
+                </div>
+                <p className="text-sm text-[var(--muted)] mt-1">
+                  Guarda tus videos, guías o apuntes para repasar rápido antes de
+                  los exámenes.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAddResource((v) => !v)}
+                className="t-btn t-btn-secondary shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{showAddResource ? 'Cerrar' : 'Guardar fuente'}</span>
+              </button>
             </div>
+
+            {/* Expandable Clean Form (no nested card box) */}
+            {showAddResource && (
+              <form
+                onSubmit={handleAddResource}
+                className="border-y border-[var(--line)] py-4 space-y-3.5"
+              >
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label htmlFor={`${uid}-res-title`} className="t-label">
+                      Título del video o lectura
+                    </label>
+                    <input
+                      id={`${uid}-res-title`}
+                      type="text"
+                      placeholder="Ej. Sharding en MongoDB explicado en 10 min"
+                      value={newResTitle}
+                      onChange={(e) => setNewResTitle(e.target.value)}
+                      className="t-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor={`${uid}-res-type`} className="t-label">
+                      Formato
+                    </label>
+                    <select
+                      id={`${uid}-res-type`}
+                      value={newResType}
+                      onChange={(e) =>
+                        setNewResType(e.target.value as ResourceType)
+                      }
+                      className="t-input cursor-pointer"
+                    >
+                      <option value="youtube">YouTube</option>
+                      <option value="documentacion">Documentación</option>
+                      <option value="articulo">Artículo / Blog</option>
+                      <option value="libro">Libro / PDF</option>
+                      <option value="texto">Apunte propio</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor={`${uid}-res-url`} className="t-label">
+                    Enlace (opcional)
+                  </label>
+                  <input
+                    id={`${uid}-res-url`}
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=... o https://..."
+                    value={newResUrl}
+                    onChange={(e) => setNewResUrl(e.target.value)}
+                    className="t-input"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor={`${uid}-res-notes`} className="t-label">
+                    Minuto clave o idea principal
+                  </label>
+                  <input
+                    id={`${uid}-res-notes`}
+                    type="text"
+                    placeholder="Ej. En el minuto 04:20 compara réplicas vs shards"
+                    value={newResNotes}
+                    onChange={(e) => setNewResNotes(e.target.value)}
+                    className="t-input"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddResource(false)}
+                    className="t-btn t-btn-ghost"
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="t-btn t-btn-primary">
+                    Agregar a la semana
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Resources .t-row list */}
+            {resources.length === 0 ? (
+              <p className="text-sm text-[var(--muted)] py-2">
+                Todavía no guardaste videos ni lecturas en la semana{' '}
+                <span className="t-num">{selectedWeek}</span>.
+              </p>
+            ) : (
+              <div>
+                {resources.map((res) => {
+                  const isYouTube =
+                    res.type === 'youtube' ||
+                    Boolean(
+                      res.url &&
+                        (res.url.includes('youtube.com') ||
+                          res.url.includes('youtu.be'))
+                    );
+                  const normalizedResUrl = res.url
+                    ? res.url.startsWith('http://') ||
+                      res.url.startsWith('https://')
+                      ? res.url
+                      : `https://${res.url}`
+                    : null;
+
+                  return (
+                    <div
+                      key={res.id}
+                      className="t-row flex items-start justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3 min-w-0 flex-1">
+                        <span className="mt-1 shrink-0">
+                          {isYouTube ? (
+                            <YoutubeIcon className="w-5 h-5 text-[#FF0000]" />
+                          ) : res.type === 'documentacion' ||
+                            res.type === 'libro' ? (
+                            <BookOpen className="w-4 h-4 text-[var(--action)]" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-[var(--muted)]" />
+                          )}
+                        </span>
+
+                        <div className="min-w-0 flex-1">
+                          {normalizedResUrl ? (
+                            <a
+                              href={normalizedResUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="min-h-[44px] flex flex-col justify-center group focus-visible:outline-2 focus-visible:outline-[var(--action)] rounded-[8px] px-1 -mx-1"
+                            >
+                              <span className="text-[15px] font-medium text-[var(--ink)] group-hover:text-[var(--action)] leading-snug transition-colors">
+                                {res.title}
+                              </span>
+                              <span className="flex flex-wrap items-center gap-2 mt-0.5 text-[13px] text-[var(--muted)]">
+                                <span>{RESOURCE_TYPE_LABEL[res.type]}</span>
+                                {res.notes && (
+                                  <>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{res.notes}</span>
+                                  </>
+                                )}
+                              </span>
+                            </a>
+                          ) : (
+                            <div className="min-h-[44px] flex flex-col justify-center">
+                              <p className="text-[15px] font-medium text-[var(--ink)] leading-snug">
+                                {res.title}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2 mt-0.5 text-[13px] text-[var(--muted)]">
+                                <span>{RESOURCE_TYPE_LABEL[res.type]}</span>
+                                {res.notes && (
+                                  <>
+                                    <span aria-hidden="true">·</span>
+                                    <span>{res.notes}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {normalizedResUrl && (
+                          <a
+                            href={normalizedResUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="t-btn t-btn-ghost t-btn-icon"
+                            aria-label={`Abrir ${res.title}`}
+                            title={
+                              isYouTube ? 'Ver en YouTube' : 'Abrir recurso'
+                            }
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteResource(res.id)}
+                          className="t-btn t-btn-ghost t-btn-icon hover:text-[var(--danger)]"
+                          aria-label={`Eliminar fuente ${res.title}`}
+                          title="Eliminar fuente"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
-        </div>
+          {/* Bottom Block: Physical Progress & Week Summary */}
+          <div className="border-t border-[var(--line)] pt-5 space-y-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Dumbbell className="w-4 h-4 text-[var(--gym)] shrink-0" />
+                <h4 className="text-base font-semibold text-[var(--ink)]">
+                  Progreso físico y balance semanal
+                </h4>
+              </div>
 
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="t-badge t-badge-gym t-num">
+                  {totalGymSetsDone} / {totalGymSetsPlanned} series
+                </span>
+                <span className="t-badge t-num">
+                  {deliveredCount} / {weekAssignments.length} entregas
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor={`${uid}-gym`} className="t-label">
+                Notas de entrenamiento, descanso y energía
+              </label>
+              <textarea
+                id={`${uid}-gym`}
+                rows={3}
+                value={gymReflection}
+                onChange={(e) => updatePatch({ gymReflection: e.target.value })}
+                placeholder="Ej. Subí carga en press banca, dormí mejor y llegué con buena energía al viernes..."
+                className="t-input min-h-[104px] resize-y"
+              />
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -1,31 +1,75 @@
-# 🗺️ Plan de Implementación Modular y Worktrees para Agentes
+# Plan Maestro UI/UX (`design-taste-frontend`) & Arquitectura Multi-Agente por Worktrees
 
-> Este archivo sirve como directriz principal para cualquier agente o desarrollador que trabaje en las fases del proyecto.
-> Antes de programar, lee [memories.md](memories.md) para conocer el contexto general del proyecto y sus principios de diseño (UI/UX Pro Max).
+> **Estándar visual activo:** `design-taste-frontend` (`tasteskill 2.5.1`)  
+> **Kind:** `software` | **Paleta:** `blue-black-cornflower` (Dark `#0a0d14` / `#5ab9fc`) + `white-link-blue` (Light `#f7f8fa` / `#1a4be0`)  
+> **Tipografía:** `Schibsted Grotesk` (`400 / 500 / 600`) + `JetBrains Mono` (`tabular-nums`)  
+> **Estándar Git obligatorio:** `github-workflow-standards` + lectura previa de [memories.md](memories.md)
 
 ---
 
-## 🌿 Estructura de Ramas y Worktrees por Fase
+## Estructura de Fases y Git Worktrees para Agentes en Simultáneo
 
-| Fase | Módulo / Sección | Rama Git | Directorio de Trabajo (Worktree) | Alcance Exclusivo de Archivos |
+| Fase | Rol / Agente | Rama Git | Directorio de Trabajo (Worktree) | Estado |
 | :--- | :--- | :--- | :--- | :--- |
-| **0** | **Tipos Base** | `feat/contracts-core-types` | `C:\Users\mateo\Documents\proyects\student-os` | `src/types/index.ts` |
-| **1** | **Universidad** | `feat/university-grades-rubrics` | `C:\Users\mateo\Documents\proyects\student-os-worktrees\university` | `src/components/university/` |
-| **2** | **Gym Tracker** | `feat/gym-timer-prs-progression` | `C:\Users\mateo\Documents\proyects\student-os-worktrees\gym` | `src/components/gym/` |
-| **3** | **Kanban** | `feat/kanban-dnd-checklists-search` | `C:\Users\mateo\Documents\proyects\student-os-worktrees\kanban` | `src/components/kanban/` |
-| **4** | **Calendario** | `feat/calendar-timeline-ics-export` | `C:\Users\mateo\Documents\proyects\student-os-worktrees\calendar` | `src/components/calendar/`, `src/utils/icsExport.ts` |
-| **5** | **Dashboard** | `feat/dashboard-habits-backup-analytics` | `C:\Users\mateo\Documents\proyects\student-os-worktrees\dashboard` | `src/components/dashboard/`, `src/components/layout/` |
+| **Fase 0** | **Arquitecto Base (`03f1c95`)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
+| **Fase 1 — WT1** | **Agente 1: Shell, Nav, QuickAdd & Dashboard (`a30c298`)** | `feat/wt1-shell-dashboard` | Fusionado y limpiado (`182bcb9`) | **Completada** |
+| **Fase 1 — WT2** | **Agente 2: Universidad & Aprendizaje (`d4f8ff0`)** | `feat/wt2-academic-learning` | Fusionado y limpiado (`d6e5604`) | **Completada** |
+| **Fase 1 — WT3** | **Agente 3: Kanban & Horario Semanal (`4bd4451`)** | `feat/wt3-kanban-calendar` | Fusionado y limpiado (`5d87f71`) | **Completada** |
+| **Fase 1 — WT4** | **Agente 4: Gym Tracker, Timer & 1RM (`9477508`)** | `feat/wt4-gym-fitness` | Fusionado y limpiado (`f1fe3b8`) | **Completada** |
+| **Fase 2** | **Integrador Central (`App.tsx`)** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
+| **Fase 3** | **Auditoría Responsive, QA & Documentación** | `feat/ui-taste-foundation` | `C:\Users\mateo\Documents\proyects\student-os` | **Completada** |
 
 ---
 
-## 📌 Reglas de Oro para los Agentes (Zero-Conflict)
+## Reglas Inquebrantables para los 4 Agentes en Simultáneo (Zero-Conflict)
 
-1. **Trabaja únicamente en tu directorio de worktree asignado.**
-2. **Modifica exclusivamente los archivos de tu carpeta de componentes.** No toques `App.tsx` directamente durante el desarrollo de la fase; cada componente debe exponer sus nuevas props y modales de forma limpia.
-3. **Sigue las directrices de `memories.md`:**
-   - Paleta Obsidian (`#0b0f19` / `#111827`) y acentos correspondientes.
-   - 100% iconos vectoriales de Lucide React (sin emojis interactivos).
-   - Botones táctiles de mínimo 44x44px.
-   - Animaciones con Canvas-Confetti en hitos y acciones clave.
-4. **Verifica siempre antes de finalizar:**
-   - Ejecuta `npm run build` y comprueba que TypeScript compile con cero errores.
+1. **Aislamiento absoluto de archivos:** Trabaja únicamente dentro de tu carpeta de worktree asignada y modifica solo las carpetas de tu alcance exclusivo. **PROHIBIDO modificar `src/App.tsx`, `src/index.css`, `index.html`, `src/types/index.ts` o `src/components/common/**` durante la Fase 1.**
+2. **Usa el sistema de Fase 0 ya instalado:**
+   - Clases globales en `src/index.css`: `.t-card`, `.t-card-lift`, `.t-row`, `.t-btn`, `.t-btn-primary`, `.t-btn-secondary`, `.t-btn-ghost`, `.t-btn-icon`, `.t-input`, `.t-label`, `.t-badge` (`.t-badge-accent`, `.t-badge-ok`, `.t-badge-warn`, `.t-badge-danger`, `.t-badge-gym`), `.t-num`, `.m-check`, `.view-enter`, `.hero-enter`.
+   - Componentes compartidos en `src/components/common/`: `ModalShell`, `SegmentedControl`, `SectionHeader`, `YoutubeIcon`.
+3. **Reglas `design-taste-frontend` + UX Juvenil:**
+   - **Cero violeta / índigo / púrpura (`indigo-*`, `violet-*`, `purple-*`):** El 92% de la interfaz usa variables neutras (`var(--bg)`, `var(--surface)`, `var(--surface-2)`, `var(--ink)`, `var(--muted)`, `var(--line)`) y un único acento primario `var(--action)` (`#5ab9fc` en oscuro / `#1a4be0` en claro).
+   - **Cero adornos "AI-Slop":** Prohibido usar `<Sparkles />`, esferas `blur-3xl`, gradientes neón en botones o puntos `animate-pulse` decorativos.
+   - **Máximo 2 niveles de profundidad:** Nunca anides `card > caja > sub-caja`. Dentro de una `.t-card`, separa elementos de lista usando `.t-row` (`border-bottom: 1px solid var(--line)`).
+   - **Tipografía clara (mínimo `13px`):** Prohibido usar `text-[9px]`, `text-[10px]`, `text-[11px]`, `font-black` o `uppercase tracking-wider`. Usa *sentence case* natural, pesos `400 / 500 / 600` y `.t-num` para cifras, notas, horas y pesos.
+   - **Ergonomía táctil y lenguaje cercano:** Todo botón/control interactivo mide mínimo `44x44px`; habla claro y directo para jóvenes universitarios (sin tecnicismos innecesarios ni doble signo `+ +`).
+4. **Props opcionales para compatibilidad con `App.tsx`:** Si agregas nuevos callbacks para persistencia limpia (ej. `onRestoreState?`, `onUpdateExercise?`), decláralos como opcionales (`?`) para que `npm run build` pase con `0` errores antes de la Fase 2.
+5. **Verificación obligatoria antes del commit:**
+   ```powershell
+   npm run build
+   npm run lint
+   ```
+
+---
+
+## Secuencia de Integración (Fase 2 y Fase 3)
+
+Una vez que los **4 Agentes** hayan confirmado sus commits en `WT1`, `WT2`, `WT3` y `WT4`:
+
+```powershell
+Set-Location "C:\Users\mateo\Documents\proyects\student-os"
+
+# 1. Fusionar las 4 ramas sin conflictos
+git merge --no-ff feat/wt1-shell-dashboard -m "merge(wt1): integrate redesigned shell, navbar, quick-add and overview dashboard"
+git merge --no-ff feat/wt2-academic-learning -m "merge(wt2): integrate redesigned university modules and active recall learning view"
+git merge --no-ff feat/wt3-kanban-calendar -m "merge(wt3): integrate redesigned kanban board and weekly calendar"
+git merge --no-ff feat/wt4-gym-fitness -m "merge(wt4): integrate redesigned gym tracker, floating rest timer and 1rm modal"
+
+# 2. Actualizar src/App.tsx:
+#    - Mostrar <StatsHero /> solo en activeTab === 'overview'
+#    - Envolver la vista activa en <div key={activeTab} className="view-enter">
+#    - Conectar callbacks reactivos (onUpdateAssignment, onUpdateItem, onUpdateExercise, onHabitsChange, onRestoreState)
+
+# 3. Verificar compilación, linter y limpiar worktrees de forma segura en Windows
+npm run build
+npm run lint
+
+# IMPORTANTE EN WINDOWS: Desvincular primero el junction de node_modules antes de eliminar el worktree
+foreach ($wt in @("student-os-wt1-shell","student-os-wt2-academic","student-os-wt3-planning","student-os-wt4-gym")) {
+  if (Test-Path "C:\Users\mateo\Documents\proyects\$wt\node_modules") {
+    cmd /c rmdir "C:\Users\mateo\Documents\proyects\$wt\node_modules"
+  }
+  git worktree remove "C:\Users\mateo\Documents\proyects\$wt"
+}
+git worktree prune
+```
