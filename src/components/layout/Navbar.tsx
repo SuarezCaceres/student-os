@@ -10,7 +10,6 @@ import {
   Sun,
   RotateCcw,
   BookOpen,
-  Sparkles,
   LogOut,
 } from 'lucide-react';
 import { SegmentedControl } from '../common/SegmentedControl';
@@ -119,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full h-full object-cover"
                 />
               </div>
-              <span className="text-[17px] sm:text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">
+              <span className="text-lg font-semibold tracking-[-0.025em] text-[var(--ink)]">
                 StudentOS
               </span>
             </button>
@@ -161,11 +160,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onNavigateLanding}
-                className="t-btn t-btn-secondary px-2.5 sm:px-3 text-xs"
-                title="Ver Landing Page informativa y Manifiesto"
+                className="t-btn t-btn-ghost px-2.5 sm:px-3 text-xs"
+                title="Ver portal de presentación de StudentOS"
               >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                <span className="hidden sm:inline">Landing</span>
+                <span>Portal</span>
               </button>
             )}
 
@@ -217,11 +215,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <button
                     type="button"
                     onClick={onLogout}
-                    className="t-btn t-btn-ghost t-btn-icon !h-8 !w-8"
+                    className="t-btn t-btn-ghost t-btn-icon"
                     title="Cerrar sesión"
                     aria-label="Cerrar sesión"
                   >
-                    <LogOut className="w-3.5 h-3.5 text-[var(--muted)] hover:text-red-400" />
+                    <LogOut className="w-4 h-4 text-[var(--muted)] hover:text-red-400" />
                   </button>
                 )}
               </div>
@@ -270,7 +268,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     />
                   )}
                 </span>
-                <span className="text-[12px] sm:text-[13px] font-medium leading-none truncate max-w-full">
+                <span className="text-xs sm:text-[13px] font-medium leading-none truncate max-w-full">
                   {tab.label}
                 </span>
               </button>

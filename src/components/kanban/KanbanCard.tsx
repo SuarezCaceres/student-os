@@ -104,7 +104,6 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             onDeleteItem(item.id);
           }}
           className="t-btn t-btn-ghost t-btn-icon -mr-1.5 -mt-1.5 text-[var(--muted)] hover:text-[var(--danger)] sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 shrink-0"
-          style={{ minWidth: '38px', minHeight: '38px' }}
           aria-label={`Eliminar tarea: ${item.title}`}
           title="Eliminar tarea"
         >
@@ -216,12 +215,11 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               <button
                 type="button"
                 onClick={() => handleDeleteSubtask(sub.id)}
-                className="t-btn t-btn-ghost text-[var(--muted)] hover:text-[var(--danger)] shrink-0"
-                style={{ minWidth: '38px', minHeight: '38px', padding: 0, borderRadius: '10px' }}
+                className="t-btn t-btn-ghost t-btn-icon text-[var(--muted)] hover:text-[var(--danger)] shrink-0"
                 aria-label={`Eliminar subtarea: ${sub.text}`}
                 title="Eliminar subtarea"
               >
-                <Trash2 className="w-3.5 h-3.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           ))}
@@ -232,14 +230,12 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               placeholder="Escribe una subtarea..."
               value={newSubtaskText}
               onChange={(e) => setNewSubtaskText(e.target.value)}
-              className="t-input"
-              style={{ minHeight: '42px', padding: '8px 12px' }}
+              className="t-input min-h-[44px] py-2 text-sm"
             />
             <button
               type="submit"
               disabled={!newSubtaskText.trim()}
-              className="t-btn t-btn-secondary shrink-0"
-              style={{ minHeight: '42px', minWidth: '42px', padding: '0 12px' }}
+              className="t-btn t-btn-secondary t-btn-icon shrink-0"
               aria-label="Sumar subtarea"
               title="Sumar subtarea"
             >
@@ -270,8 +266,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 const prevStatus: KanbanStatus = status === 'done' ? 'in_progress' : 'todo';
                 onUpdateStatus(item.id, prevStatus);
               }}
-              className="t-btn t-btn-ghost"
-              style={{ minHeight: '38px', minWidth: '38px', padding: '0 10px', borderRadius: '10px' }}
+              className="t-btn t-btn-ghost t-btn-icon"
               aria-label={status === 'done' ? 'Mover a En progreso' : 'Mover a Por hacer'}
               title={status === 'done' ? 'Mover a En progreso' : 'Mover a Por hacer'}
             >
@@ -289,13 +284,13 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 }
                 onUpdateStatus(item.id, nextStatus);
               }}
-              className="inline-flex items-center justify-center gap-1.5 min-h-[38px] px-3 rounded-[10px] text-[13px] font-medium bg-[color-mix(in_oklab,var(--action)_14%,transparent)] text-[var(--action)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)] hover:bg-[color-mix(in_oklab,var(--action)_22%,transparent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--action)]"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-[var(--r-btn)] text-xs sm:text-[13px] font-medium bg-[color-mix(in_oklab,var(--action)_14%,transparent)] text-[var(--action)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)] hover:bg-[color-mix(in_oklab,var(--action)_22%,transparent)] transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-[var(--action)]"
             >
               <span>{status === 'todo' ? 'Empezar' : 'Terminar'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           ) : (
-            <span className="inline-flex items-center gap-1.5 min-h-[38px] px-2.5 text-[13px] font-medium text-[var(--ok)]">
+            <span className="inline-flex items-center gap-1.5 min-h-[44px] px-2.5 text-xs sm:text-[13px] font-medium text-[var(--ok)]">
               <CheckCircle2 className="w-4 h-4" />
               <span>Listo</span>
             </span>

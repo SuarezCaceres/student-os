@@ -36,7 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 selection:bg-cyan-500 selection:text-black">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] selection:bg-[var(--action)] selection:text-white transition-colors">
       {/* Top Sticky Navbar */}
       <LandingNavbar
         onOpenAuth={handleOpenAuth}
@@ -45,7 +45,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Main Content with Scroll Storytelling */}
       <main>
-        {/* 1. Hero Section: Split Visual with Coders at Laptops & Flask */}
+        {/* 1. Hero Section: Split Visual with Interactive Workspace & Cadence Hub */}
         <HeroSection
           onOpenAuth={handleOpenAuth}
           onEnterAppDemo={handleEnterDemo}

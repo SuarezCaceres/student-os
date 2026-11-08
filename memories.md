@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.1.0 (Landing Page Informativo, HD Vector Visuals, Storytelling al Scroll & Flujo de Auth)`  
+> **Versión actual:** `v2.3.0 (Auditoría Impeccable 20/20, Focus Trap WAI-ARIA, Motion A11y, Memoización React y Multi-Agente Worktrees)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -206,23 +206,19 @@ student-os/
 - **Captura Rápida Multidisciplinaria (5 Pestañas):**
   - Modal accesible globalmente con selector: Universidad, Gym, Kanban, Agenda y **Aprender** (guardado directo de enlaces de YouTube o notas a la semana deseada con confeti).
 
-### 8. Landing Page Informativo, Visuales HD y Sistema de Auth (`src/components/landing/` & `src/components/auth/`)
-- **Ilustraciones vectoriales de alta definición en SVG:**
-  - `StudentLaptopDuoVisual`: Dos jóvenes universitarios con audífonos over-ear y laptops programando con trazos neón cyan y bus de datos continuo.
-  - `LabFlaskNucleusVisual`: Matraz de laboratorio tecnológico con callouts interactivos `[PROBLEMA]`, `[ANÁLISIS]`, `[SOLUCIÓN]`, partículas ascendentes y cápsula de estado.
-  - `StudentSoloFocusVisual`: Estudiante en su laptop con bombilla/sol conceptual luminoso sobre su cabeza.
-- **Storytelling Progresivo al Scroll:**
-  - `HeroSection`: Promesa central (*"Menos caos manual. Más tiempo para crecer."*), CTAs de acción rápida y fila de 3 píldoras de valor (`Misión`, `Automatización`, `Control Total`).
-  - `ProblemSection`: *"¿Qué está saboteando tu semestre y tu tiempo?"* analizando entregas desfasadas, falta de consistencia en el gym y dispersión mental en 5 apps.
-  - `FeatureShowcaseSection`: *"¿Para qué está hecho StudentOS?"* con Bento Grid interactivo mostrando Semanas 1 a 16, series interactivas de Gym (S1..S4), Kanban ágil y horario cronológico con día actual.
-  - `AudienceSection`: *"¿Para quiénes está hecho?"* (Estudiantes de Software/Ingeniería, Universitarios Atletas y Freelancers).
-  - `CreatorStorySection`: *"¿Por qué decidí hacer este proyecto?"* (Manifiesto personal del creador, filosofía offline-first y privacidad de datos).
-  - `LandingFooter`: Enlaces rápidos, botón volver arriba y licencia MIT.
-- **Sistema de Autenticación & Registro por Correo (`AuthModal.tsx`):**
-  - Formulario ágil para Iniciar Sesión o Crear Cuenta con email y contraseña.
-  - Botón de acceso directo en 1 clic (*Modo Demo*) sin registro obligatorio.
-  - Persistencia de sesión en `localStorage` (`student_os_user_session`) y transición suave hacia el Dashboard.
-  - Navegación bidireccional mediante botón `Landing` en el Navbar del Dashboard y opción de cierre de sesión.
+### 8. Landing Page & Mockups de Producto Real Impeccable (`src/components/landing/`)
+- **Eliminación Total de Ilustraciones Cartoon / Slop SVG:**
+  - Sustitución de `StudentLaptopDuoVisual`, `LabFlaskNucleusVisual` y `StudentSoloFocusVisual` por componentes de producto real.
+- **Componentes de Producto Real (`src/components/landing/visuals/`):**
+  - `WorkspaceInteractiveMockup`: Ventana interactiva viva de `workspace/student-os.dev` con pestañas reales (`Hoy`, `Universidad`, `Gym`), marcado interactivo de entregas con confeti, botones táctiles de series (S1..S4) y campo rápido de notas con `Enter`.
+  - `AcademicCadenceHubVisual`: Visualizador semestral interactivo de las semanas 1 a 16 con alerta de parciales (S8) y finales (S16), cálculo en vivo de GPA ponderado (0..20) y cálculo de 1RM de Epley.
+  - `DiagnosticComparisonVisual`: Comparativa técnica de arquitectura de flujo (5 aplicaciones tradicionales fragmentadas vs el centro reactivo y offline de StudentOS).
+- **Cumplimiento Estricto del Craft Floor de `impeccable`:**
+  - Erradicación de gradientes de texto artificiales (`bg-clip-text text-transparent`).
+  - Erradicación de kickers/eyebrows prohibidos encima de encabezados principales en Hero y StatsHero.
+  - Erradicación de patrones box-in-box en `StatsHero` a favor de telemetría dividida por hairlines continuos de 1px.
+  - Erradicación de numeraciones redundantes (`01 / 02 / 03`) en píldoras de valor y tarjetas.
+  - Rampa tipográfica 100% alineada con `DESIGN.md` (eliminación de clases arbitrarias `text-[11px]` y `text-[10px]`).
 
 ---
 
@@ -230,7 +226,9 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.1)** | `03f1c95` → `f1fe3b8` + Landing/Auth | Rediseño `design-taste-frontend`, Landing Page interactivo con scroll storytelling, visuales HD y flujo de auth |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.3.0)** | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
+| `feat/audit-a11y-core-opt` | Fusionada | `9268ae7` | Trabajo del Agente 1 (Focus Trap, prefers-reduced-motion, SectionHeader h1, useCallback/useMemo) |
+| `feat/audit-landing-auth-polish` | Fusionada | `95efa37`, `1c561fb` | Trabajo del Agente 2 (AuthModal labels htmlFor, selección contrast, táctil 44px) |
 | `feat/wt1-shell-dashboard` | Fusionada | `a30c298` | Navbar, StatsHero, QuickAdd, OverviewBento, Hábitos y Backup |
 | `feat/wt2-academic-learning` | Fusionada | `d4f8ff0` | Universidad, GPA, Rúbricas, Aprendizaje y Semana libre |
 | `feat/wt3-kanban-calendar` | Fusionada | `4bd4451` | Kanban y Horario semanal con selector de día móvil |
@@ -242,7 +240,8 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.1)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 666ms.
+## 🚀 7. Verificación del Sistema (v2.3.0)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 289ms.
 - **Linter Estático:** `oxlint` con `0` warnings y `0` errores en 42 archivos.
-- **Auditoría visual y assets:** Gráficos vectoriales SVG escalables en 4K, contraste accesible y navegación bidireccional Landing <-> Dashboard.
+- **Detector Mecánico Impeccable:** `impeccable detect` con `0` findings (`[]`) en todo `src/`.
+- **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.

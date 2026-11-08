@@ -1,4 +1,6 @@
-# Logs
+# Agent skills and runtime
+.agents/
+.impeccable/
 logs
 *.log
 npm-debug.log*

@@ -5,6 +5,7 @@ export interface SectionHeaderProps {
   subtitle?: string;
   badge?: React.ReactNode;
   actions?: React.ReactNode;
+  as?: 'h1' | 'h2' | 'h3';
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -12,14 +13,17 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   subtitle,
   badge,
   actions,
+  as = 'h1',
 }) => {
+  const HeadingTag = as;
+
   return (
     <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-2">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2.5">
-          <h2 className="text-2xl sm:text-[28px] font-medium tracking-[-0.03em] text-[var(--ink)] leading-tight">
+          <HeadingTag className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-[var(--ink)] leading-tight">
             {title}
-          </h2>
+          </HeadingTag>
           {badge}
         </div>
         {subtitle && (

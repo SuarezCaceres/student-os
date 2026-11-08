@@ -13,7 +13,6 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
-import { SectionHeader } from '../common/SectionHeader';
 import type {
   AppState,
   DayOfWeek,
@@ -101,21 +100,27 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
 
   return (
     <div className="space-y-6">
-      <SectionHeader
-        title="Tu día de hoy"
-        subtitle="Lo importante de hoy en clases, entrenamiento, hábitos y proyectos."
-        actions={
-          <button
-            type="button"
-            onClick={() => setIsBackupOpen(true)}
-            className="t-btn t-btn-secondary"
-            title="Descargar o restaurar copia de seguridad en JSON"
-          >
-            <Database className="w-4 h-4 text-[var(--action)] shrink-0" />
-            <span>Respaldo JSON</span>
-          </button>
-        }
-      />
+      {/* Workspace Operational Toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]">
+            Prioridades de hoy
+          </h2>
+          <p className="text-xs sm:text-sm text-[var(--muted)] mt-0.5">
+            Clases, rutinas de fuerza, hábitos y tareas en curso sincronizados en local.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsBackupOpen(true)}
+          className="t-btn t-btn-secondary self-start sm:self-auto shrink-0"
+          title="Descargar o restaurar copia de seguridad en JSON"
+        >
+          <Database className="w-4 h-4 text-[var(--action)] shrink-0" />
+          <span>Respaldo JSON</span>
+        </button>
+      </div>
 
       {/* Bento Grid (Strict Two-Level Hierarchy: .t-card + .t-row) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -270,11 +275,11 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
 
           <button
             type="button"
-            onClick={() => onNavigateTab('gym')}
+            onClick={() => onOpenQuickAdd('gym')}
             className="t-btn t-btn-secondary w-full mt-5"
           >
-            <span>Abrir rutina completa</span>
-            <ArrowRight className="w-4 h-4" />
+            <Plus className="w-4 h-4" />
+            <span>Agregar ejercicio</span>
           </button>
         </div>
 

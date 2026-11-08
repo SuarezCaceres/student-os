@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { initialData } from './data/initialData';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { 
@@ -77,87 +77,87 @@ export const App: React.FC = () => {
     }
   }, [isDark]);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     setState((prev) => ({
       ...prev,
       theme: prev.theme === 'dark' ? 'light' : 'dark',
     }));
-  };
+  }, [setState]);
 
   // Quick Add Trigger Helper
-  const handleOpenQuickAdd = (tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
+  const handleOpenQuickAdd = useCallback((tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
     setQuickAddInitialTab(tab);
     setIsQuickAddOpen(true);
-  };
+  }, []);
 
   // Kanban Handlers
-  const handleUpdateKanbanStatus = (id: string, newStatus: KanbanStatus) => {
+  const handleUpdateKanbanStatus = useCallback((id: string, newStatus: KanbanStatus) => {
     setState((prev) => ({
       ...prev,
       kanbanItems: prev.kanbanItems.map((item) =>
         item.id === id ? { ...item, status: newStatus } : item
       ),
     }));
-  };
+  }, [setState]);
 
-  const handleDeleteKanbanItem = (id: string) => {
+  const handleDeleteKanbanItem = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
       kanbanItems: prev.kanbanItems.filter((item) => item.id !== id),
     }));
-  };
+  }, [setState]);
 
-  const handleAddKanbanItem = (newItem: KanbanItem) => {
+  const handleAddKanbanItem = useCallback((newItem: KanbanItem) => {
     setState((prev) => ({
       ...prev,
       kanbanItems: [newItem, ...prev.kanbanItems],
     }));
-  };
+  }, [setState]);
 
-  const handleUpdateKanbanItem = (updatedItem: KanbanItem) => {
+  const handleUpdateKanbanItem = useCallback((updatedItem: KanbanItem) => {
     setState((prev) => ({
       ...prev,
       kanbanItems: prev.kanbanItems.map((item) =>
         item.id === updatedItem.id ? updatedItem : item
       ),
     }));
-  };
+  }, [setState]);
 
   // University Handlers
-  const handleUpdateUniStatus = (id: string, newStatus: AssignmentStatus) => {
+  const handleUpdateUniStatus = useCallback((id: string, newStatus: AssignmentStatus) => {
     setState((prev) => ({
       ...prev,
       universityAssignments: prev.universityAssignments.map((a) =>
         a.id === id ? { ...a, status: newStatus } : a
       ),
     }));
-  };
+  }, [setState]);
 
-  const handleDeleteAssignment = (id: string) => {
+  const handleDeleteAssignment = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
       universityAssignments: prev.universityAssignments.filter((a) => a.id !== id),
     }));
-  };
+  }, [setState]);
 
-  const handleAddAssignment = (newAssignment: UniversityAssignment) => {
+  const handleAddAssignment = useCallback((newAssignment: UniversityAssignment) => {
     setState((prev) => ({
       ...prev,
       universityAssignments: [newAssignment, ...prev.universityAssignments],
     }));
-  };
+  }, [setState]);
 
-  const handleUpdateAssignment = (updatedAssignment: UniversityAssignment) => {
+  const handleUpdateAssignment = useCallback((updatedAssignment: UniversityAssignment) => {
     setState((prev) => ({
       ...prev,
       universityAssignments: prev.universityAssignments.map((a) =>
         a.id === updatedAssignment.id ? updatedAssignment : a
       ),
     }));
-  };
+  }, [setState]);
 
   // Gym Handlers
-  const handleToggleGymSet = (routineId: string, exerciseId: string, setIndex: number) => {
+  const handleToggleGymSet = useCallback((routineId: string, exerciseId: string, setIndex: number) => {
     setState((prev) => ({
       ...prev,
       gymRoutines: prev.gymRoutines.map((routine) => {
@@ -176,9 +176,9 @@ export const App: React.FC = () => {
         };
       }),
     }));
-  };
+  }, [setState]);
 
-  const handleAddGymExercise = (day: DayOfWeek, exercise: GymExercise) => {
+  const handleAddGymExercise = useCallback((day: DayOfWeek, exercise: GymExercise) => {
     setState((prev) => {
       const routineIndex = prev.gymRoutines.findIndex((r) => r.dayOfWeek === day);
       if (routineIndex === -1) {
@@ -206,9 +206,9 @@ export const App: React.FC = () => {
         gymRoutines: updatedRoutines,
       };
     });
-  };
+  }, [setState]);
 
-  const handleDeleteGymExercise = (routineId: string, exerciseId: string) => {
+  const handleDeleteGymExercise = useCallback((routineId: string, exerciseId: string) => {
     setState((prev) => ({
       ...prev,
       gymRoutines: prev.gymRoutines.map((r) => {
@@ -219,16 +219,16 @@ export const App: React.FC = () => {
         };
       }),
     }));
-  };
+  }, [setState]);
 
-  const handleFinishWorkout = () => {
+  const handleFinishWorkout = useCallback(() => {
     setState((prev) => ({
       ...prev,
       streak: prev.streak + 1,
     }));
-  };
+  }, [setState]);
 
-  const handleUpdateGymExercise = (day: DayOfWeek, updatedExercise: GymExercise) => {
+  const handleUpdateGymExercise = useCallback((day: DayOfWeek, updatedExercise: GymExercise) => {
     setState((prev) => ({
       ...prev,
       gymRoutines: prev.gymRoutines.map((routine) => {
@@ -241,37 +241,37 @@ export const App: React.FC = () => {
         };
       }),
     }));
-  };
+  }, [setState]);
 
   // Habits & Backup Handlers
-  const handleHabitsChange = (dailyHabits: DailyHabits) => {
+  const handleHabitsChange = useCallback((dailyHabits: DailyHabits) => {
     setState((prev) => ({
       ...prev,
       dailyHabits,
     }));
-  };
+  }, [setState]);
 
-  const handleRestoreState = (restored: AppState) => {
+  const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
-  };
+  }, [setState]);
 
   // Calendar Handlers
-  const handleAddCalendarBlock = (newBlock: CalendarBlock) => {
+  const handleAddCalendarBlock = useCallback((newBlock: CalendarBlock) => {
     setState((prev) => ({
       ...prev,
       calendarBlocks: [...prev.calendarBlocks, newBlock],
     }));
-  };
+  }, [setState]);
 
-  const handleDeleteCalendarBlock = (id: string) => {
+  const handleDeleteCalendarBlock = useCallback((id: string) => {
     setState((prev) => ({
       ...prev,
       calendarBlocks: prev.calendarBlocks.filter((b) => b.id !== id),
     }));
-  };
+  }, [setState]);
 
   // Learning / Reflection Handlers
-  const handleSaveReflection = (reflection: WeeklyReflection) => {
+  const handleSaveReflection = useCallback((reflection: WeeklyReflection) => {
     setState((prev) => ({
       ...prev,
       weeklyReflections: {
@@ -279,9 +279,9 @@ export const App: React.FC = () => {
         [reflection.week]: reflection,
       },
     }));
-  };
+  }, [setState]);
 
-  const handleAddLearningResource = (resource: LearningResource, week: number = state.currentAcademicWeek) => {
+  const handleAddLearningResource = useCallback((resource: LearningResource, week: number = state.currentAcademicWeek) => {
     setState((prev) => {
       const existingRef = prev.weeklyReflections?.[week] || {
         week,
@@ -302,12 +302,23 @@ export const App: React.FC = () => {
         },
       };
     });
-  };
+  }, [setState, state.currentAcademicWeek]);
 
   // Academic week & Free week status for live badges
-  const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === state.currentAcademicWeek);
-  const isFreeWeek = currentWeekAssignments.length > 0 && currentWeekAssignments.filter((a) => a.status !== 'entregado').length === 0;
-  const hasReflectionThisWeek = Boolean(state.weeklyReflections?.[state.currentAcademicWeek]?.learnings);
+  const currentWeekAssignments = useMemo(
+    () => state.universityAssignments.filter((a) => a.week === state.currentAcademicWeek),
+    [state.universityAssignments, state.currentAcademicWeek]
+  );
+
+  const isFreeWeek = useMemo(
+    () => currentWeekAssignments.length > 0 && currentWeekAssignments.every((a) => a.status === 'entregado'),
+    [currentWeekAssignments]
+  );
+
+  const hasReflectionThisWeek = useMemo(
+    () => Boolean(state.weeklyReflections?.[state.currentAcademicWeek]?.learnings),
+    [state.weeklyReflections, state.currentAcademicWeek]
+  );
 
   if (currentView === 'landing') {
     return (
