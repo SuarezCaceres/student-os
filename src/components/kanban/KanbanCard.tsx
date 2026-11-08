@@ -295,10 +295,6 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               <span>Listo</span>
             </span>
           )}
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Listo</span>
-            </span>
-          )}
         </div>
       </div>
     </article>
