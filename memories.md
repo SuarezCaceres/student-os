@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.5.1 (Tarjetas Visuales Multimedia por Ejercicio con Atleta Entrenando, Catálogo de Posters Biomecánicos & Popup Directo de Video)`  
+> **Versión actual:** `v2.5.2 (Soporte Integral para Reels de Instagram en Plataforma y Categorías de Aprendizaje, Icono SVG Vectorial & Auto-detección)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -213,14 +213,15 @@ student-os/
   - Permite clasificar en un solo lugar:
     1. **Estado Cognitivo / Energía (`mood`):** 4 opciones ergonómicas (*Con energía*, *Enfocado*, *En calma*, *Cansado*).
     2. **Conceptos Clave (`#tags`):** Input rápido que agrega chips de conceptos al pulsar `Enter`.
-    3. **Bóveda de Fuentes & Videos (YouTube + TikTok + Categorías IA):**
-       - Soporte nativo para **TikTok** (`TiktokIcon.tsx`) y **YouTube** (`YoutubeIcon.tsx`).
-       - Detección automática de URLs de TikTok y YouTube.
-       - **6 Categorías Temáticas de Especialidad:**
+    3. **Bóveda de Fuentes & Videos (YouTube + TikTok + Instagram Reels + Categorías IA):**
+       - Soporte nativo para **Instagram Reels** (`InstagramIcon.tsx`), **TikTok** (`TiktokIcon.tsx`) y **YouTube** (`YoutubeIcon.tsx`).
+       - Detección automática de URLs de Instagram (`instagram.com/reel/`, etc.), TikTok y YouTube.
+       - **7 Categorías Temáticas de Especialidad:**
          - 🤖 `IA en Claude` (Claude Code, Artifacts, prompts)
          - 💎 `IA en Gemini` (Gemini 2.0/3.0, Antigravity CLI, Google AI Studio)
          - ⚡ `Skills & Agentes` (Agent Skills, MCP, automatización)
          - 🎬 `Generación de Videos` (Sora, Runway Gen-3, Kling, Luma)
+         - 📱 `Reels de Instagram` (Micro-tutoriales y tips en formato vertical)
          - 🎓 `Cursos` (Asignaturas universitarias, certificaciones)
          - 🎙️ `Conferencias & Talks` (Tech talks, papers, keynotes)
          - 📚 `General / Software` (Base para retrocompatibilidad)
@@ -229,8 +230,8 @@ student-os/
 - **Timeline Semestral Compacto (Semanas 1 a 16):**
   - Track horizontal con hitos destacados: **S8 (Parciales)**, **S16 (Finales)**, **Hoy (Semana actual)** y puntos en semanas con notas.
 - **Sincronización Global:**
-  - `QuickAddModal.tsx` adaptado con selector de TikTok y Categoría temática en la pestaña *Aprender*.
-  - `OverviewBento.tsx` con soporte de iconos de TikTok y badges de categoría.
+  - `QuickAddModal.tsx` adaptado con selector de Instagram Reel, TikTok y Categorías temáticas en la pestaña *Aprender*.
+  - `OverviewBento.tsx` con soporte de iconos de Instagram, TikTok y badges de categoría.
 
 ### 7. Sistema de Navegación & Captura Rápida (`src/components/layout/Navbar.tsx` & `src/components/quick-add/`)
 - **Navbar Obsidian Glassmorphism:**
