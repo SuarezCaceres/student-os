@@ -108,7 +108,7 @@ export interface DailyHabits {
   targetPomodoros: number;
 }
 
-export type ResourceType = 'youtube' | 'tiktok' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+export type ResourceType = 'youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';
 
 export type ResourceCategory =
   | 'ia_claude'
@@ -117,6 +117,7 @@ export type ResourceCategory =
   | 'video_gen'
   | 'cursos'
   | 'conferencias'
+  | 'reels_instagram'
   | 'general';
 
 export interface LearningResource {

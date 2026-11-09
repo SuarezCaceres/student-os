@@ -647,6 +647,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
               >
                 <option value="youtube">YouTube</option>
                 <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram Reel</option>
                 <option value="documentacion">Documentación</option>
                 <option value="articulo">Artículo o blog</option>
                 <option value="libro">Libro o PDF</option>
@@ -669,6 +670,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
                 <option value="ia_gemini">💎 IA en Gemini</option>
                 <option value="skills">⚡ Skills & Agentes</option>
                 <option value="video_gen">🎬 Generación de Videos</option>
+                <option value="reels_instagram">📱 Reels de Instagram</option>
                 <option value="cursos">🎓 Cursos</option>
                 <option value="conferencias">🎙️ Conferencias</option>
               </select>
@@ -700,7 +702,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             <input
               id="qa-res-url"
               type="url"
-              placeholder="https://www.youtube.com/... o https://www.tiktok.com/..."
+              placeholder="https://www.instagram.com/reel/... o https://www.tiktok.com/@..."
               value={resUrl}
               onChange={(e) => {
                 const url = e.target.value;
@@ -708,6 +710,9 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
                 const lower = url.toLowerCase();
                 if (lower.includes('tiktok.com') || lower.includes('vt.tiktok.com')) {
                   setResType('tiktok');
+                } else if (lower.includes('instagram.com/reel') || lower.includes('instagram.com/p/') || lower.includes('instagram.com/reels') || lower.includes('instagr.am')) {
+                  setResType('instagram');
+                  setResCategory('reels_instagram');
                 } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
                   setResType('youtube');
                 }
@@ -719,6 +724,8 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
                   setResCategory('skills');
                 } else if (lower.includes('sora') || lower.includes('runway') || lower.includes('video')) {
                   setResCategory('video_gen');
+                } else if (lower.includes('reel') || lower.includes('instagram')) {
+                  setResCategory('reels_instagram');
                 }
               }}
               className="t-input"

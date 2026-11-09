@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
 import { TiktokIcon } from '../common/TiktokIcon';
+import { InstagramIcon } from '../common/InstagramIcon';
 import type {
   AppState,
   DayOfWeek,
@@ -537,6 +538,8 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                               <YoutubeIcon className="w-4 h-4 text-[var(--danger)] shrink-0 mt-1" />
                             ) : res.type === 'tiktok' ? (
                               <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                            ) : res.type === 'instagram' ? (
+                              <InstagramIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
                             ) : (
                               <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
                             )}
@@ -557,6 +560,8 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                         <div key={res.id} className="t-row flex items-start gap-2.5">
                           {res.type === 'tiktok' ? (
                             <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                          ) : res.type === 'instagram' ? (
+                            <InstagramIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
                           ) : (
                             <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
                           )}

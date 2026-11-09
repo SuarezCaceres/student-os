@@ -40,6 +40,14 @@ export const initialData: AppState = {
           type: 'documentacion',
           category: 'ia_gemini',
           notes: 'Arquitectura de subagentes y llamadas a herramientas.'
+        },
+        {
+          id: 'res-4',
+          title: '3 Tips de Arquitectura Hexagonal en 60s',
+          url: 'https://www.instagram.com/reel/DC_HexagonalArch',
+          type: 'instagram',
+          category: 'reels_instagram',
+          notes: 'Resumen visual de desacople de puertos y adaptadores.'
         }
       ],
       gymReflection: 'Subí a 75 kg en press de banca plano manteniendo 8 repeticiones sólidas con buena retracción escapular. El descanso de 90 segundos ayudó bastante.',

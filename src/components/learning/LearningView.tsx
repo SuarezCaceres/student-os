@@ -33,6 +33,7 @@ import { triggerConfetti } from '../../utils/confetti';
 import { SectionHeader } from '../common/SectionHeader';
 import { YoutubeIcon } from '../common/YoutubeIcon';
 import { TiktokIcon } from '../common/TiktokIcon';
+import { InstagramIcon } from '../common/InstagramIcon';
 import { ModalShell } from '../common/ModalShell';
 import { FreeWeekCelebrationCard } from './FreeWeekCelebrationCard';
 
@@ -107,6 +108,7 @@ export const RESOURCE_CATEGORIES: Array<{
   { id: 'ia_gemini', label: 'IA en Gemini', shortLabel: 'Gemini', emoji: '💎' },
   { id: 'skills', label: 'Skills & Agentes', shortLabel: 'Skills', emoji: '⚡' },
   { id: 'video_gen', label: 'Generación de Videos', shortLabel: 'Video Gen', emoji: '🎬' },
+  { id: 'reels_instagram', label: 'Reels de Instagram', shortLabel: 'Reels', emoji: '📱' },
   { id: 'cursos', label: 'Cursos', shortLabel: 'Cursos', emoji: '🎓' },
   { id: 'conferencias', label: 'Conferencias & Talks', shortLabel: 'Talks', emoji: '🎙️' },
   { id: 'general', label: 'General / Software', shortLabel: 'General', emoji: '📚' },
@@ -115,6 +117,7 @@ export const RESOURCE_CATEGORIES: Array<{
 const RESOURCE_TYPE_LABEL: Record<ResourceType, string> = {
   youtube: 'YouTube',
   tiktok: 'TikTok',
+  instagram: 'Instagram Reel',
   documentacion: 'Documentación',
   articulo: 'Artículo',
   libro: 'Libro / PDF',
@@ -268,6 +271,9 @@ export const LearningView: React.FC<LearningViewProps> = ({
     // Auto-detección de plataforma
     if (lower.includes('tiktok.com') || lower.includes('vt.tiktok.com')) {
       setNewResType('tiktok');
+    } else if (lower.includes('instagram.com/reel') || lower.includes('instagram.com/p/') || lower.includes('instagram.com/reels') || lower.includes('instagr.am')) {
+      setNewResType('instagram');
+      setNewResCategory('reels_instagram');
     } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
       setNewResType('youtube');
     }
@@ -281,6 +287,8 @@ export const LearningView: React.FC<LearningViewProps> = ({
       setNewResCategory('skills');
     } else if (lower.includes('sora') || lower.includes('runway') || lower.includes('kling') || lower.includes('luma') || lower.includes('video')) {
       setNewResCategory('video_gen');
+    } else if (lower.includes('reel') || lower.includes('instagram')) {
+      setNewResCategory('reels_instagram');
     } else if (lower.includes('coursera') || lower.includes('udemy') || lower.includes('curso')) {
       setNewResCategory('cursos');
     }
@@ -300,6 +308,8 @@ export const LearningView: React.FC<LearningViewProps> = ({
         setNewResCategory('skills');
       } else if (lower.includes('sora') || lower.includes('runway') || lower.includes('kling') || lower.includes('video ai')) {
         setNewResCategory('video_gen');
+      } else if (lower.includes('reel') || lower.includes('instagram')) {
+        setNewResCategory('reels_instagram');
       } else if (lower.includes('curso') || lower.includes('certificacion')) {
         setNewResCategory('cursos');
       } else if (lower.includes('talk') || lower.includes('conferencia') || lower.includes('keynote')) {
@@ -393,6 +403,7 @@ export const LearningView: React.FC<LearningViewProps> = ({
               <div className="flex items-center gap-1.5">
                 <YoutubeIcon className="w-4 h-4 text-[#FF0000]" />
                 <TiktokIcon className="w-3.5 h-3.5 text-[var(--ink)]" />
+                <InstagramIcon className="w-3.5 h-3.5 text-[var(--ink)]" />
                 <span>Fuentes</span>
                 <span className="t-num font-mono px-1.5 py-0.2 rounded bg-[var(--surface-2)] text-[var(--muted)] ml-0.5">
                   {resources.length}
@@ -835,10 +846,11 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
                   <h4 className="text-sm font-semibold text-[var(--ink)] flex items-center gap-2">
                     <YoutubeIcon className="w-4 h-4 text-[#FF0000]" />
                     <TiktokIcon className="w-3.5 h-3.5 text-[var(--ink)]" />
-                    <span>Videos y Lecturas Técnicas ({resources.length})</span>
+                    <InstagramIcon className="w-3.5 h-3.5 text-[var(--ink)]" />
+                    <span>Videos, Reels y Lecturas Técnicas ({resources.length})</span>
                   </h4>
                   <p className="text-xs text-[var(--muted)] mt-0.5">
-                    Micro-tutoriales de TikTok, videos de YouTube y documentación con categorías de IA.
+                    Micro-tutoriales de TikTok e Instagram Reels, videos de YouTube y documentación con categorías de IA.
                   </p>
                 </div>
 
@@ -892,6 +904,7 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
                       >
                         <option value="youtube">YouTube</option>
                         <option value="tiktok">TikTok</option>
+                        <option value="instagram">Instagram Reel</option>
                         <option value="documentacion">Documentación Oficial</option>
                         <option value="articulo">Artículo / Blog Técnico</option>
                         <option value="libro">Libro / PDF</option>
@@ -921,12 +934,12 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
 
                   <div>
                     <label htmlFor={`${uid}-pop-url`} className="block text-xs font-mono font-medium text-[var(--muted)] mb-1">
-                      Enlace URL (YouTube o TikTok)
+                      Enlace URL (YouTube, TikTok o Instagram)
                     </label>
                     <input
                       id={`${uid}-pop-url`}
                       type="url"
-                      placeholder="https://www.tiktok.com/@... o https://www.youtube.com/..."
+                      placeholder="https://www.instagram.com/reel/... o https://www.tiktok.com/@..."
                       value={newResUrl}
                       onChange={(e) => handleUrlChange(e.target.value)}
                       className="t-input min-h-[42px] text-sm bg-[var(--surface)]"
@@ -1022,6 +1035,12 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
                         res.url &&
                           (res.url.includes('tiktok.com') || res.url.includes('vt.tiktok.com'))
                       );
+                    const isInstagram =
+                      res.type === 'instagram' ||
+                      Boolean(
+                        res.url &&
+                          (res.url.includes('instagram.com') || res.url.includes('instagr.am'))
+                      );
                     const categoryMeta = RESOURCE_CATEGORIES.find(
                       (c) => c.id === (res.category || 'general')
                     );
@@ -1042,6 +1061,8 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
                               <YoutubeIcon className="w-4 h-4 text-[#FF0000]" />
                             ) : isTikTok ? (
                               <TiktokIcon className="w-4 h-4 text-[var(--ink)]" />
+                            ) : isInstagram ? (
+                              <InstagramIcon className="w-4 h-4 text-[var(--ink)]" />
                             ) : res.type === 'documentacion' || res.type === 'libro' ? (
                               <BookOpen className="w-4 h-4 text-[var(--action)]" />
                             ) : (
@@ -1092,7 +1113,7 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
                               rel="noopener noreferrer"
                               className="t-btn t-btn-ghost t-btn-icon !min-w-[36px] !min-h-[36px] text-[var(--muted)] hover:text-[var(--action)]"
                               aria-label={`Abrir ${res.title}`}
-                              title={isYouTube ? 'Ver en YouTube' : isTikTok ? 'Ver en TikTok' : 'Abrir enlace'}
+                              title={isYouTube ? 'Ver en YouTube' : isTikTok ? 'Ver en TikTok' : isInstagram ? 'Ver en Instagram' : 'Abrir enlace'}
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
