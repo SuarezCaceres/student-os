@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Target } from 'lucide-react';
 import { WorkspaceInteractiveMockup } from './visuals/WorkspaceInteractiveMockup';
 import { AcademicCadenceHubVisual } from './visuals/AcademicCadenceHubVisual';
+import { InteractivePixelStudents } from './visuals/InteractivePixelStudents';
 
 interface HeroSectionProps {
   onOpenAuth: (mode: 'login' | 'register') => void;
@@ -72,23 +73,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
           </div>
 
-          {/* Right Column: 2 Students Studying with Laptops (Pixel Art, Transparent BG) */}
+          {/* Right Column: Interactive Pixel Art Students (Typing particles & click reactions) */}
           <div className="lg:col-span-5 flex justify-center lg:justify-end mt-4 lg:mt-0">
-            <div className="relative group max-w-[340px] sm:max-w-[380px] lg:max-w-[420px] w-full">
-              {/* Subtle ambient glow behind pixel art */}
-              <div 
-                className="absolute -inset-4 rounded-3xl bg-[color-mix(in_oklab,var(--action)_10%,transparent)] blur-2xl pointer-events-none opacity-60 group-hover:opacity-90 transition-opacity duration-300" 
-                aria-hidden="true"
-              />
-              <img
-                src="/students-pixel-art.png"
-                alt="Dos jóvenes estudiantes universitarios estudiando y programando con laptops en estilo pixel art"
-                className="relative z-10 w-full h-auto object-contain [image-rendering:pixelated] drop-shadow-[0_16px_32px_rgba(0,0,0,0.5)] select-none pointer-events-none transform transition-transform duration-300 group-hover:scale-[1.02]"
-                width="888"
-                height="789"
-                loading="eager"
-              />
-            </div>
+            <InteractivePixelStudents />
           </div>
         </div>
 
