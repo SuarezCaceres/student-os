@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type { GymExercise } from '../../types';
 import { ModalShell } from '../common/ModalShell';
+import { getExerciseMedia } from '../../data/exerciseMediaCatalog';
 
 export interface ExerciseVideoModalProps {
   exercise: GymExercise | null;
@@ -37,31 +38,8 @@ export const ExerciseVideoModal: React.FC<ExerciseVideoModalProps> = ({
 
   if (!isOpen || !exercise) return null;
 
-  const technique = exercise.technique || {
-    videoUrl: '/videos/bench-press-technique.webm',
-    posterUrl: '/bench-press-poster.jpg',
-    muscleGroups: ['Pectoral Mayor', 'Tríceps Braquial', 'Deltoides Anterior'],
-    setupCues: [
-      'Ojos directamente debajo de la barra olímpica.',
-      'Pies firmemente plantados en el suelo generando leg drive.',
-      'Retracción y depresión escapular (omóplatos juntos contra el banco).',
-      'Agarre prono simétrico a 1.5 veces el ancho de hombros.',
-    ],
-    executionCues: [
-      'Desbloquea la barra y estabilízala sobre el pecho superior.',
-      'Fase excéntrica: Bajada de 2 a 3 segundos en trayectoria ligeramente diagonal hacia el esternón.',
-      'Pausa de 0.5 seg rozando el pecho sin rebotar en la caja torácica.',
-      'Fase concéntrica: Empuje explosivo manteniendo codos a 45-60 grados respecto al torso.',
-    ],
-    breathingCues:
-      'Inhala profundo y aprieta el abdomen (Maniobra de Valsalva) antes de descender. Mantén el aire durante el punto bajo y exhala con fuerza al superar la mitad de la subida.',
-    commonMistakes: [
-      'Rebotar la barra con violencia en las costillas.',
-      'Despegar los glúteos del banco durante el empuje máximo.',
-      'Abrir los codos a 90° (genera fricción y pinzamiento en el manguito rotador).',
-      'Perder la rigidez de las muñecas dejándolas dobladas hacia atrás.',
-    ],
-  };
+  const media = getExerciseMedia(exercise);
+  const technique = exercise.technique || media.technique;
 
   const handleTogglePlay = () => {
     if (!videoRef.current) return;

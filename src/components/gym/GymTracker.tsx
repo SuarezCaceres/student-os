@@ -18,6 +18,7 @@ import { RestTimerFloating } from './RestTimerFloating';
 import { ExerciseProgressModal } from './ExerciseProgressModal';
 import { ExerciseVideoModal } from './ExerciseVideoModal';
 import { QuickWeightModal } from './QuickWeightModal';
+import { ExerciseCard } from './ExerciseCard';
 
 export interface GymTrackerProps {
   routines: GymRoutine[];
@@ -384,162 +385,21 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               </button>
             </div>
           ) : (
-            <div>
-              {currentRoutine.exercises.map((exercise) => {
-                const allSetsCompleted =
-                  exercise.sets > 0 &&
-                  exercise.completedSets.slice(0, exercise.sets).filter(Boolean).length ===
-                    exercise.sets;
-
-                return (
-                  <div
-                    key={exercise.id}
-                    className="t-row flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                  >
-                    {/* Exercise Info */}
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-[16px] sm:text-[18px] font-medium text-[var(--ink)] leading-snug">
-                          {exercise.name}
-                        </h4>
-
-                        {allSetsCompleted && (
-                          <span className="t-badge t-badge-ok">
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Completado</span>
-                          </span>
-                        )}
-
-                        {exercise.personalRecordKg !== undefined && (
-                          <span className="t-badge t-badge-gym t-num">
-                            <Trophy className="w-3.5 h-3.5" />
-                            <span>PR {exercise.personalRecordKg} kg</span>
-                          </span>
-                        )}
-
-                        {exercise.history && exercise.history.length > 1 && (() => {
-                          const previousEntry = exercise.history[exercise.history.length - 2];
-                          const deltaKg = exercise.weightKg !== undefined && previousEntry
-                            ? Number((exercise.weightKg - previousEntry.weightKg).toFixed(1))
-                            : 0;
-                          if (deltaKg <= 0) return null;
-                          return (
-                            <span className="t-badge t-badge-ok t-num">
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                              <span>+{deltaKg} kg vs previa</span>
-                            </span>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[14px] text-[var(--muted)]">
-                        <span className="t-num font-medium text-[var(--ink)]">
-                          {exercise.weightKg !== undefined
-                            ? `${exercise.weightKg} kg · ${exercise.reps}`
-                            : `${exercise.sets} ${exercise.sets === 1 ? 'serie' : 'series'} · ${exercise.reps}`}
-                        </span>
-                        {exercise.weightKg !== undefined && (
-                          <span className="t-num text-[13px] text-[var(--muted)]">
-                            · {exercise.sets} {exercise.sets === 1 ? 'serie' : 'series'}
-                          </span>
-                        )}
-                        {exercise.notes && (
-                          <span className="text-[13px] text-[var(--muted)]">
-                            · {exercise.notes}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Interactive Set Bubbles (S1..S4) + Progress/1RM + Delete */}
-                    <div className="flex flex-wrap items-center justify-between sm:justify-start lg:justify-end gap-2.5 shrink-0">
-                      <div
-                        className="flex items-center gap-2 flex-wrap"
-                        role="group"
-                        aria-label={`Series de ${exercise.name}`}
-                      >
-                        {Array.from({ length: exercise.sets }).map((_, setIdx) => {
-                          const isDone = Boolean(exercise.completedSets[setIdx]);
-
-                          return (
-                            <button
-                              key={setIdx}
-                              type="button"
-                              aria-pressed={isDone}
-                              aria-label={`Serie ${setIdx + 1} de ${exercise.name}: ${
-                                isDone ? 'completada' : 'pendiente'
-                              }`}
-                              onClick={() =>
-                                handleToggleSetWithTimer(
-                                  currentRoutine.id,
-                                  exercise.id,
-                                  setIdx,
-                                  isDone
-                                )
-                              }
-                              className={`min-w-[48px] min-h-[48px] rounded-[12px] t-num text-[14px] font-medium inline-flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none border transition-all active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
-                                isDone
-                                  ? 'bg-[var(--ok)] text-[#0a0d14] border-[var(--ok)]'
-                                  : 'bg-[var(--surface-2)] text-[var(--ink)] border-[var(--line-strong)] hover:border-[var(--action)]'
-                              }`}
-                            >
-                              <span>S{setIdx + 1}</span>
-                              {isDone && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
-                        {/* 1. Quick Load Weight Button */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExerciseIdForWeightModal(exercise.id)}
-                          className="t-btn t-btn-primary !min-h-[44px] !px-3 !text-[13px]"
-                          title="Subir peso levantado para este ejercicio (sobrecarga progresiva)"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Cargar peso</span>
-                        </button>
-
-                        {/* 2. Video / Technique Guide Button */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExerciseIdForVideoModal(exercise.id)}
-                          className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px] !border-[color-mix(in_oklab,var(--action)_35%,transparent)] hover:!border-[var(--action)]"
-                          title="Ver video explicativo y técnica de biomecánica"
-                        >
-                          <Video className="w-3.5 h-3.5 text-[var(--action)]" />
-                          <span className="hidden sm:inline">Ver técnica / video</span>
-                          <span className="sm:hidden">Video</span>
-                        </button>
-
-                        {/* 3. Progress / 1RM Modal */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExerciseIdForModal(exercise.id)}
-                          className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px]"
-                          title="Ver récord personal, calculadora 1RM e historial"
-                        >
-                          <TrendingUp className="w-3.5 h-3.5 text-[var(--action)]" />
-                          <span>1RM</span>
-                        </button>
-
-                        {/* 4. Delete */}
-                        <button
-                          type="button"
-                          onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
-                          className="t-btn t-btn-ghost t-btn-icon hover:!text-[var(--danger)]"
-                          aria-label={`Eliminar ${exercise.name}`}
-                          title="Eliminar ejercicio"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-3.5">
+              {currentRoutine.exercises.map((exercise) => (
+                <ExerciseCard
+                  key={exercise.id}
+                  exercise={exercise}
+                  routineId={currentRoutine.id}
+                  onToggleSet={(routineId, exerciseId, setIdx, currentlyDone) =>
+                    handleToggleSetWithTimer(routineId, exerciseId, setIdx, currentlyDone)
+                  }
+                  onOpenVideo={(ex) => setSelectedExerciseIdForVideoModal(ex.id)}
+                  onOpenWeightLog={(ex) => setSelectedExerciseIdForWeightModal(ex.id)}
+                  onOpenProgressModal={(id) => setSelectedExerciseIdForModal(id)}
+                  onDelete={(routineId, exerciseId) => onDeleteExercise(routineId, exerciseId)}
+                />
+              ))}
             </div>
           )}
         </div>

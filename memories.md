@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.5.0 (Bloc de Notas Semanal Minimalista + Pop-up Modal de Consolidación, Soporte TikTok, YouTube & 6 Categorías Temáticas de IA y Especialidad)`  
+> **Versión actual:** `v2.5.1 (Tarjetas Visuales Multimedia por Ejercicio con Atleta Entrenando, Catálogo de Posters Biomecánicos & Popup Directo de Video)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -90,6 +90,7 @@ student-os/
 │   │   │   ├── DailyHabitsCard.tsx      # Widget de hábitos (Agua +250ml, Sueño 7-8h, Pomodoros)
 │   │   │   └── OverviewBento.tsx        # Tablero Bento con vista unificada de prioridades de hoy y widget de Aprendizaje
 │   │   ├── gym/
+│   │   │   ├── ExerciseCard.tsx         # Tarjeta visual multimedia de ejercicio con thumbnail de atleta y popup de video
 │   │   │   ├── ExerciseProgressModal.tsx # Historial de cargas, récord personal (PR) y calculadora 1RM (Epley)
 │   │   │   ├── ExerciseVideoModal.tsx    # Reproductor de video animado de técnica y biomecánica (60fps loop, pautas)
 │   │   │   ├── GymTracker.tsx           # Tracker de rutinas, series interactivas, botones de técnica y cargas
@@ -168,6 +169,10 @@ student-os/
 - **Filtros por Prioridad y Categoría:** Separación clara entre Universidad, Trabajo, Gym y Personal.
 
 ### 3. Gym & Fitness Tracker (`src/components/gym/`)
+- **Tarjetas Visuales Multimedia por Ejercicio (`ExerciseCard.tsx`):**
+  - Cada ejercicio se presenta como una tarjeta visual enriquecida con thumbnail ilustrado de un atleta en ropa de gym realizando el movimiento.
+  - Al presionar directamente sobre la imagen o tarjeta, se despliega el popup modal del video animado con pautas biomecánicas.
+  - Catálogo inteligente de posters (`exerciseMediaCatalog.ts`) cubriendo Empuje, Pierna, Tracción y Recuperación/Cardio.
 - **Rutinas Diarias (Lunes a Domingo):** Preselección automática del día de hoy (Push, Pull, Legs, etc.).
 - **Burbujas de Series:** Marcado táctil de `S1`, `S2`, `S3`, `S4`.
 - **Sobrecarga Progresiva & Registro Rápido de Peso (`QuickWeightModal.tsx`):**
@@ -176,8 +181,8 @@ student-os/
   - Detección automática de Récord Personal (PR) y cálculo visual del incremento (`+2.5 kg vs previa`).
   - Persistencia reactiva en `history` y `localStorage`.
 - **Video Animado de Biomecánica y Guía Técnica (`ExerciseVideoModal.tsx`):**
-  - Botón dedicado `Ver técnica / video` con reproductor looping de alta definición (WebM, póster `/bench-press-poster.jpg` y video `/videos/bench-press-technique.webm`).
-  - Animación de un joven atleta en ropa deportiva ejecutando el ejercicio en un gimnasio moderno.
+  - Popup interactivo activado al pulsar el thumbnail del ejercicio o el botón de técnica.
+  - Video animado looping en WebM de alta definición y póster temático HD.
   - Controles accesibles: Play/Pausa, reinicio, selector de velocidad (0.75x, 1x, 1.25x), silenciar y pantalla completa.
   - Pestañas técnicas: Posición inicial (retracción escapular, leg drive), trayectoria óptima, respiración con Maniobra de Valsalva y errores comunes a evitar.
 - **Rest Timer Flotante:** Temporizador de descanso entre series con presets (45s, 60s, 90s, 120s) y aviso al terminar.
@@ -266,7 +271,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.4.1)** | `TBD` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.5.1)** | `TBD` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
+| `feat/ui-taste-foundation` | v2.4.1 | `20e2c85` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
 | `feat/ui-taste-foundation` | v2.3.1 | `2d709e3`, `373e555`, `5fef05f` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
 | `feat/ui-taste-foundation` | v2.3.0 | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
 | `feat/audit-a11y-core-opt` | Fusionada | `9268ae7` | Trabajo del Agente 1 (Focus Trap, prefers-reduced-motion, SectionHeader h1, useCallback/useMemo) |
@@ -282,8 +288,8 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.4.1)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 378ms.
+## 🚀 7. Verificación del Sistema (v2.5.1)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 309ms.
 - **Detector Mecánico Impeccable:** `npx impeccable detect src/ --json` con `0` findings (`[]`) en todo `src/`.
 - **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.
-- **Video & Multimedia:** Video WebM nativo a 30fps generado y almacenado localmente en `public/videos/bench-press-technique.webm` (1.15 MB) y póster `public/bench-press-poster.jpg`.
+- **Visuales & Multimedia de Ejercicios:** 4 posters temáticos generados en `public/` (`bench-press-poster.jpg`, `squat-poster.jpg`, `pullup-poster.jpg`, `cardio-poster.jpg`) con video explicativo a 30fps.
