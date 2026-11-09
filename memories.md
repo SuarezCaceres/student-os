@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.3.0 (Auditoría Impeccable 20/20, Focus Trap WAI-ARIA, Motion A11y, Memoización React y Multi-Agente Worktrees)`  
+> **Versión actual:** `v2.3.1 (Ilustración Pixel Art Interactiva en Hero, Tipeo en Vivo con Partículas, Sonido Retro 8-bit Web Audio & Diálogos)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -206,7 +206,17 @@ student-os/
 - **Captura Rápida Multidisciplinaria (5 Pestañas):**
   - Modal accesible globalmente con selector: Universidad, Gym, Kanban, Agenda y **Aprender** (guardado directo de enlaces de YouTube o notas a la semana deseada con confeti).
 
-### 8. Landing Page & Mockups de Producto Real Impeccable (`src/components/landing/`)
+### 8. Landing Page, Pixel Art Interactivo & Mockups de Producto Real Impeccable (`src/components/landing/`)
+- **Ilustración Pixel Art Interactiva Hero (`InteractivePixelStudents.tsx`):**
+  - Arte pixel de 2 estudiantes universitarios con laptops generado y renderizado con pixelación nativa `[image-rendering:pixelated]`.
+  - **Partículas de Tipeo Flotantes:** Emisión periódica de fragmentos de código y métricas que suben con animación `@keyframes floatUp` simulando escritura en tiempo real (`{ code }`, `npm run dev`, `1RM +5kg`, `GPA 19.0`, `✓ 200 OK`, `Semana 8`, `Push Day`, etc.).
+  - **Hotspots Clickeables e Interactividad Directa:**
+    - Estudiante izquierdo (Programación / Sistemas): Diálogos contextuales de compilación rápida, tests locales y modo offline.
+    - Estudiante derecho (Ingeniería / Gym): Diálogos de récords personales (PR), GPA ponderado y series completadas.
+  - **Efectos Audiovisuales al Hacer Clic:**
+    - Generador de audio retro 8-bit sintetizado en tiempo real vía Web Audio API (`AudioContext` con onda triangular de 560Hz / 680Hz y rampa exponencial, 0 dependencias externas).
+    - Globo de diálogo pixelado direccional con iconos semánticos y temporizador de auto-ocultamiento.
+    - Estallido de micro-confeti focalizado en las coordenadas del estudiante presionado (`canvas-confetti`).
 - **Eliminación Total de Ilustraciones Cartoon / Slop SVG:**
   - Sustitución de `StudentLaptopDuoVisual`, `LabFlaskNucleusVisual` y `StudentSoloFocusVisual` por componentes de producto real.
 - **Componentes de Producto Real (`src/components/landing/visuals/`):**
@@ -226,7 +236,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.3.0)** | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.3.1)** | `2d709e3`, `373e555` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
+| `feat/ui-taste-foundation` | v2.3.0 | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
 | `feat/audit-a11y-core-opt` | Fusionada | `9268ae7` | Trabajo del Agente 1 (Focus Trap, prefers-reduced-motion, SectionHeader h1, useCallback/useMemo) |
 | `feat/audit-landing-auth-polish` | Fusionada | `95efa37`, `1c561fb` | Trabajo del Agente 2 (AuthModal labels htmlFor, selección contrast, táctil 44px) |
 | `feat/wt1-shell-dashboard` | Fusionada | `a30c298` | Navbar, StatsHero, QuickAdd, OverviewBento, Hábitos y Backup |
@@ -240,8 +251,7 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.3.0)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 289ms.
-- **Linter Estático:** `oxlint` con `0` warnings y `0` errores en 42 archivos.
+## 🚀 7. Verificación del Sistema (v2.3.1)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 287ms.
 - **Detector Mecánico Impeccable:** `impeccable detect` con `0` findings (`[]`) en todo `src/`.
 - **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.
