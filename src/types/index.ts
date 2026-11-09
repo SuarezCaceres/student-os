@@ -53,6 +53,7 @@ export interface GymExercise {
   restSeconds?: number;
   history?: ExerciseHistoryEntry[];
   technique?: ExerciseTechniqueGuide;
+  thumbnailUrl?: string;
 }
 
 export interface GymRoutine {
@@ -107,13 +108,23 @@ export interface DailyHabits {
   targetPomodoros: number;
 }
 
-export type ResourceType = 'youtube' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+export type ResourceType = 'youtube' | 'tiktok' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+
+export type ResourceCategory =
+  | 'ia_claude'
+  | 'ia_gemini'
+  | 'skills'
+  | 'video_gen'
+  | 'cursos'
+  | 'conferencias'
+  | 'general';
 
 export interface LearningResource {
   id: string;
   title: string;
   url?: string;
   type: ResourceType;
+  category?: ResourceCategory;
   notes?: string;
 }
 

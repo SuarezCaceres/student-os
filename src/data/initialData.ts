@@ -22,14 +22,24 @@ export const initialData: AppState = {
           title: 'MongoDB Sharding Explained in 10 Minutes',
           url: 'https://www.youtube.com/watch?v=QAqKPkWbU_0',
           type: 'youtube',
+          category: 'cursos',
           notes: 'Excelente explicación visual del router mongos y shard keys.'
         },
         {
           id: 'res-2',
-          title: 'AWS Well-Architected Reliability Pillar',
-          url: 'https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/',
+          title: 'Claude Code CLI & Artifacts Workflow',
+          url: 'https://www.tiktok.com/@mateo/video/7300000001',
+          type: 'tiktok',
+          category: 'ia_claude',
+          notes: 'Tips de atajos en terminal y prompts rápidos para debugging.'
+        },
+        {
+          id: 'res-3',
+          title: 'Antigravity 2.0 & Gemini 2.0 Flash SDK',
+          url: 'https://docs.gemini.google.com/antigravity',
           type: 'documentacion',
-          notes: 'Lectura obligatoria para el quiz de cloud.'
+          category: 'ia_gemini',
+          notes: 'Arquitectura de subagentes y llamadas a herramientas.'
         }
       ],
       gymReflection: 'Subí a 75 kg en press de banca plano manteniendo 8 repeticiones sólidas con buena retracción escapular. El descanso de 90 segundos ayudó bastante.',

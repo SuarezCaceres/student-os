@@ -12,6 +12,7 @@ import type {
   AssignmentType,
   LearningResource,
   ResourceType,
+  ResourceCategory,
 } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import { ModalShell } from '../common/ModalShell';
@@ -106,6 +107,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   // Learning Resource Form
   const [resTitle, setResTitle] = useState('');
   const [resType, setResType] = useState<ResourceType>('youtube');
+  const [resCategory, setResCategory] = useState<ResourceCategory>('general');
   const [resUrl, setResUrl] = useState('');
   const [resNotes, setResNotes] = useState('');
   const [resWeek, setResWeek] = useState(state.currentAcademicWeek);
@@ -198,6 +200,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
       id: `res-${Date.now()}`,
       title: resTitle.trim(),
       type: resType,
+      category: resCategory,
       url: resUrl.trim() || undefined,
       notes: resNotes.trim() || undefined,
     };
@@ -209,6 +212,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
     setResTitle('');
     setResUrl('');
     setResNotes('');
+    setResCategory('general');
     onClose();
   };
 
@@ -630,10 +634,10 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
               <label htmlFor="qa-res-type" className="t-label">
-                Tipo de recurso
+                Plataforma / Formato
               </label>
               <select
                 id="qa-res-type"
@@ -641,11 +645,32 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
                 onChange={(e) => setResType(e.target.value as ResourceType)}
                 className="t-input"
               >
-                <option value="youtube">Video de YouTube</option>
+                <option value="youtube">YouTube</option>
+                <option value="tiktok">TikTok</option>
                 <option value="documentacion">Documentación</option>
                 <option value="articulo">Artículo o blog</option>
                 <option value="libro">Libro o PDF</option>
                 <option value="texto">Nota rápida</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="qa-res-category" className="t-label">
+                Categoría Temática
+              </label>
+              <select
+                id="qa-res-category"
+                value={resCategory}
+                onChange={(e) => setResCategory(e.target.value as ResourceCategory)}
+                className="t-input font-sans"
+              >
+                <option value="general">📚 General / Software</option>
+                <option value="ia_claude">🤖 IA en Claude</option>
+                <option value="ia_gemini">💎 IA en Gemini</option>
+                <option value="skills">⚡ Skills & Agentes</option>
+                <option value="video_gen">🎬 Generación de Videos</option>
+                <option value="cursos">🎓 Cursos</option>
+                <option value="conferencias">🎙️ Conferencias</option>
               </select>
             </div>
 
@@ -675,9 +700,27 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             <input
               id="qa-res-url"
               type="url"
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="https://www.youtube.com/... o https://www.tiktok.com/..."
               value={resUrl}
-              onChange={(e) => setResUrl(e.target.value)}
+              onChange={(e) => {
+                const url = e.target.value;
+                setResUrl(url);
+                const lower = url.toLowerCase();
+                if (lower.includes('tiktok.com') || lower.includes('vt.tiktok.com')) {
+                  setResType('tiktok');
+                } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+                  setResType('youtube');
+                }
+                if (lower.includes('claude') || lower.includes('anthropic')) {
+                  setResCategory('ia_claude');
+                } else if (lower.includes('gemini') || lower.includes('antigravity')) {
+                  setResCategory('ia_gemini');
+                } else if (lower.includes('skill') || lower.includes('mcp')) {
+                  setResCategory('skills');
+                } else if (lower.includes('sora') || lower.includes('runway') || lower.includes('video')) {
+                  setResCategory('video_gen');
+                }
+              }}
               className="t-input"
             />
           </div>

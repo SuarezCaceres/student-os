@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
+import { TiktokIcon } from '../common/TiktokIcon';
 import type {
   AppState,
   DayOfWeek,
@@ -528,12 +529,14 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                           key={res.id}
                           href={res.url}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="t-row group flex items-center justify-between gap-3 min-h-[44px]"
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
                             {res.type === 'youtube' ? (
                               <YoutubeIcon className="w-4 h-4 text-[var(--danger)] shrink-0 mt-1" />
+                            ) : res.type === 'tiktok' ? (
+                              <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
                             ) : (
                               <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
                             )}
@@ -552,7 +555,11 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                         </a>
                       ) : (
                         <div key={res.id} className="t-row flex items-start gap-2.5">
-                          <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                          {res.type === 'tiktok' ? (
+                            <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                          )}
                           <div className="min-w-0">
                             <div className="text-[14px] font-medium text-[var(--ink)] truncate">
                               {res.title}
