@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.5.2 (Soporte Integral para Reels de Instagram en Plataforma y Categorías de Aprendizaje, Icono SVG Vectorial & Auto-detección)`  
+> **Versión actual:** `v2.5.3 (Generación de Videos Animados de Movimiento Biomecánico por Ejercicio: Press de Banca, Sentadillas, Dominadas y Cardio en WebM 30fps)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -182,7 +182,11 @@ student-os/
   - Persistencia reactiva en `history` y `localStorage`.
 - **Video Animado de Biomecánica y Guía Técnica (`ExerciseVideoModal.tsx`):**
   - Popup interactivo activado al pulsar el thumbnail del ejercicio o el botón de técnica.
-  - Video animado looping en WebM de alta definición y póster temático HD.
+  - **Biblioteca de Videos con Movimiento Real a 30fps en WebM (1280x720):**
+    - `bench-press-technique.webm`: Movimiento de flexión y empuje con codos a 45°, retracción y trayectoria diagonal de barra al esternón.
+    - `squat-technique.webm`: Movimiento de sentadilla rompiendo la paralela (profundidad de 95°), torso neutro y empuje explosivo con barra.
+    - `pullup-technique.webm`: Tracción vertical completa del cuerpo hacia la barra con activación dorsal y descenso controlado.
+    - `cardio-mobility-technique.webm`: Marcha rítmica en caminadora inclinada al 12% a 132 BPM (Zona 2) y estiramiento activo.
   - Controles accesibles: Play/Pausa, reinicio, selector de velocidad (0.75x, 1x, 1.25x), silenciar y pantalla completa.
   - Pestañas técnicas: Posición inicial (retracción escapular, leg drive), trayectoria óptima, respiración con Maniobra de Valsalva y errores comunes a evitar.
 - **Rest Timer Flotante:** Temporizador de descanso entre series con presets (45s, 60s, 90s, 120s) y aviso al terminar.
@@ -272,7 +276,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.5.1)** | `TBD` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.5.3)** | `TBD` | Biblioteca completa de videos animados de movimiento por ejercicio (Press de banca, Sentadillas, Dominadas, Cardio a 30fps) |
+| `feat/ui-taste-foundation` | v2.5.1 | `10aff7a` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
 | `feat/ui-taste-foundation` | v2.4.1 | `20e2c85` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
 | `feat/ui-taste-foundation` | v2.3.1 | `2d709e3`, `373e555`, `5fef05f` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
 | `feat/ui-taste-foundation` | v2.3.0 | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
@@ -289,8 +294,12 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.5.1)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 309ms.
+## 🚀 7. Verificación del Sistema (v2.5.3)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 400ms.
 - **Detector Mecánico Impeccable:** `npx impeccable detect src/ --json` con `0` findings (`[]`) en todo `src/`.
 - **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.
-- **Visuales & Multimedia de Ejercicios:** 4 posters temáticos generados en `public/` (`bench-press-poster.jpg`, `squat-poster.jpg`, `pullup-poster.jpg`, `cardio-poster.jpg`) con video explicativo a 30fps.
+- **Videos WebM Nativos a 30fps:** 4 videos cinemáticos generados en `public/videos/`:
+  - `bench-press-technique.webm` (1.12 MB)
+  - `squat-technique.webm` (1.16 MB)
+  - `pullup-technique.webm` (1.15 MB)
+  - `cardio-mobility-technique.webm` (1.10 MB)

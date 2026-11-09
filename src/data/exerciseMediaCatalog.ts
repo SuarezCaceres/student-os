@@ -35,7 +35,7 @@ const DEFAULT_BENCH_TECHNIQUE: ExerciseTechniqueGuide = {
 };
 
 const SQUAT_TECHNIQUE: ExerciseTechniqueGuide = {
-  videoUrl: '/videos/bench-press-technique.webm',
+  videoUrl: '/videos/squat-technique.webm',
   posterUrl: '/squat-poster.jpg',
   muscleGroups: ['Cuádriceps', 'Glúteo Mayor', 'Core / Erectores'],
   setupCues: [
@@ -58,7 +58,7 @@ const SQUAT_TECHNIQUE: ExerciseTechniqueGuide = {
 };
 
 const PULLUP_TECHNIQUE: ExerciseTechniqueGuide = {
-  videoUrl: '/videos/bench-press-technique.webm',
+  videoUrl: '/videos/pullup-technique.webm',
   posterUrl: '/pullup-poster.jpg',
   muscleGroups: ['Dorsal Ancho', 'Bíceps Braquial', 'Trapecio Medio/Inferior'],
   setupCues: [
@@ -81,7 +81,7 @@ const PULLUP_TECHNIQUE: ExerciseTechniqueGuide = {
 };
 
 const CARDIO_MOBILITY_TECHNIQUE: ExerciseTechniqueGuide = {
-  videoUrl: '/videos/bench-press-technique.webm',
+  videoUrl: '/videos/cardio-mobility-technique.webm',
   posterUrl: '/cardio-poster.jpg',
   muscleGroups: ['Sistema Cardiovascular', 'Movilidad Articular', 'Fascia'],
   setupCues: [
@@ -129,7 +129,7 @@ export function getExerciseMedia(exercise: GymExercise): ExerciseMediaInfo {
   ) {
     return {
       posterUrl: '/squat-poster.jpg',
-      videoUrl: exercise.technique?.videoUrl || '/videos/bench-press-technique.webm',
+      videoUrl: exercise.technique?.videoUrl || '/videos/squat-technique.webm',
       muscleFocus: 'Pierna & Core',
       categoryTag: 'Sentadilla / Pierna',
       technique: exercise.technique || SQUAT_TECHNIQUE,
@@ -148,7 +148,7 @@ export function getExerciseMedia(exercise: GymExercise): ExerciseMediaInfo {
   ) {
     return {
       posterUrl: '/pullup-poster.jpg',
-      videoUrl: exercise.technique?.videoUrl || '/videos/bench-press-technique.webm',
+      videoUrl: exercise.technique?.videoUrl || '/videos/pullup-technique.webm',
       muscleFocus: 'Espalda & Bíceps',
       categoryTag: 'Tracción / Jalón',
       technique: exercise.technique || PULLUP_TECHNIQUE,
@@ -168,7 +168,7 @@ export function getExerciseMedia(exercise: GymExercise): ExerciseMediaInfo {
   ) {
     return {
       posterUrl: '/cardio-poster.jpg',
-      videoUrl: exercise.technique?.videoUrl || '/videos/bench-press-technique.webm',
+      videoUrl: exercise.technique?.videoUrl || '/videos/cardio-mobility-technique.webm',
       muscleFocus: 'Cardio & Movilidad',
       categoryTag: 'Recuperación',
       technique: exercise.technique || CARDIO_MOBILITY_TECHNIQUE,
