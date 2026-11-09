@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.3.1 (Ilustración Pixel Art Interactiva en Hero, Tipeo en Vivo con Partículas, Sonido Retro 8-bit Web Audio & Diálogos)`  
+> **Versión actual:** `v2.4.0 (Rediseño de LearningView: Timeline Semestral S1..S16 con Hitos, Prompts Feynman, Atajo Ctrl+S y Eliminación de Slop Cruzado)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -185,17 +185,30 @@ student-os/
 - **Bento Card de Aprendizaje & Active Recall:** Tarjeta destacada de 3 columnas que muestra la síntesis Feynman de la semana en curso, estado de Semana Libre y accesos rápidos a fuentes de YouTube.
 
 ### 6. Aprendizaje & Active Recall Semanal (`src/components/learning/`)
-- **Técnica Feynman / Active Recall:** Pregunta central para el estudiante: *¿Qué has aprendido hoy en la semana realmente? ¿De qué te acuerdas?*, facilitando la consolidación de conceptos mediante explicación en palabras propias.
-- **Píldoras de Conceptos Clave:** Sistema de etiquetas interactivas (`#Concepto`) para indexar conocimientos clave semana a semana.
-- **Gestor de Fuentes de Estudio & YouTube:**
-  - Detección automática de enlaces a YouTube (asigna badge rojo característico y botón de apertura externa).
+- **Técnica Feynman & Prompts Guiados:**
+  - Área de síntesis con auto-expansión e inyectores rápidos de prompts reflexivos (*💡 Explicación simple*, *🛠️ Desafío técnico superado*, *⚡ Analogía del mundo real*, *🎯 Pregunta típica de examen*).
+  - Contador tabular de palabras en tiempo real (`.t-num`).
+  - Botón de copia al portapapeles del resumen semanal formateado.
+- **Timeline Semestral Compacto (Semanas 1 a 16):**
+  - Reemplazo del scroll horizontal por un track de 16 semanas ergonómico con hitos de evaluación:
+    - **S8 (Parciales):** Etiqueta de aviso y acceso directo.
+    - **S16 (Finales):** Etiqueta de cierre semestral.
+    - **Semana Actual:** Indicador visual activo (*Hoy*).
+    - **Puntos de estado:** Indicador de semanas con apuntes guardados.
+- **Guardado Ergonómico con Atajo `Ctrl + S` / `Cmd + S`:**
+  - Botón dinámico con estado (*"Guardar semana X"* vs *"¡Guardado!"* vs *"Semana X al día"*).
+  - Captura global de `Ctrl + S` / `Cmd + S` con prevención del diálogo nativo del navegador y macro-celebración de confeti.
+- **Conceptos Clave con Inserción Directa con `Enter`:**
+  - Sistema de tags (`#Concepto`) que se agregan directamente al pulsar `Enter`, con controles táctiles de eliminación `>=44x44px`.
+- **Bóveda Exclusiva de Fuentes de Estudio & YouTube:**
+  - Eliminación del widget redundante de series de gimnasio para mantener un foco 100% académico y cognitivo.
+  - Detección automática de enlaces a YouTube (asigna badge rojo característico y botón de apertura externa segura `rel="noopener noreferrer"`).
   - Admite documentación oficial, artículos, libros técnicos y apuntes en texto libre.
-  - Guarda minutos o marcas de tiempo y notas asociadas por cada video.
+  - Guarda marcas de tiempo (minutos clave) y notas asociadas.
 - **Detección Automática de "Semana Libre":**
   - Si en la semana académica seleccionada hay 0 entregas pendientes (`status !== 'entregado'`), se activa automáticamente el banner **¡Semana Despejada! 🌴✨**.
   - Ofrece atajos directos para aprovechar el tiempo libre: entrenar en el Gym o avanzar proyectos personales en el Kanban.
-- **Bitácora de Balance Físico & Gym:** Espacio para reflexionar sobre los avances de entrenamiento, cargas y sensaciones corporales semanales.
-- **Selector de Estado / Mood Semanal:** Clasificación del rendimiento general (*Increíble*, *Productivo*, *Cansado*, *Despejado*).
+- **Selector de Estado / Mood Semanal:** Clasificación del rendimiento y nivel de energía (*Increíble*, *Productivo*, *Cansado*, *Despejado*).
 
 ### 7. Sistema de Navegación & Captura Rápida (`src/components/layout/Navbar.tsx` & `src/components/quick-add/`)
 - **Navbar Obsidian Glassmorphism:**
