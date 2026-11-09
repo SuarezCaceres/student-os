@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.4.1 (Sobrecarga Progresiva de Cargas, Modal Rápido de Peso, Video Animado de Biomecánica y Guía Técnica en Gimnasio)`  
+> **Versión actual:** `v2.5.0 (Bloc de Notas Semanal Minimalista + Pop-up Modal de Consolidación, Soporte TikTok, YouTube & 6 Categorías Temáticas de IA y Especialidad)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -198,30 +198,34 @@ student-os/
 - **Bento Card de Aprendizaje & Active Recall:** Tarjeta destacada de 3 columnas que muestra la síntesis Feynman de la semana en curso, estado de Semana Libre y accesos rápidos a fuentes de YouTube.
 
 ### 6. Aprendizaje & Active Recall Semanal (`src/components/learning/`)
-- **Técnica Feynman & Prompts Guiados:**
-  - Área de síntesis con auto-expansión e inyectores rápidos de prompts reflexivos (*💡 Explicación simple*, *🛠️ Desafío técnico superado*, *⚡ Analogía del mundo real*, *🎯 Pregunta típica de examen*).
-  - Contador tabular de palabras en tiempo real (`.t-num`).
-  - Botón de copia al portapapeles del resumen semanal formateado.
+- **Arquitectura Bloc de Notas Semanal (Distraction-Free Notepad):**
+  - Lienzo central amplio dedicado a redactar apuntes y reflexiones técnicas libres de formularios invasivos.
+  - Prompts guiados Feynman en la cabecera (*💡 Explicación simple*, *🛠️ Desafío superado*, *⚡ Analogía del mundo real*, *🎯 Pregunta típica de examen*) con inserción fluida y auto-expansión.
+  - Contador tabular de palabras en tiempo real (`.t-num`) y botón rápido de copiado.
+  - Barra inferior sutil con chips interactivos de metadatos (estado de ánimo, conteo de conceptos `#tags` y fuentes guardadas).
+- **Pop-Up Modal de Consolidación y Guardado (`ModalShell`):**
+  - Se activa con el botón *"Guardar semana X"* o mediante el atajo de teclado nativo **`Ctrl + S` / `Cmd + S`**.
+  - Permite clasificar en un solo lugar:
+    1. **Estado Cognitivo / Energía (`mood`):** 4 opciones ergonómicas (*Con energía*, *Enfocado*, *En calma*, *Cansado*).
+    2. **Conceptos Clave (`#tags`):** Input rápido que agrega chips de conceptos al pulsar `Enter`.
+    3. **Bóveda de Fuentes & Videos (YouTube + TikTok + Categorías IA):**
+       - Soporte nativo para **TikTok** (`TiktokIcon.tsx`) y **YouTube** (`YoutubeIcon.tsx`).
+       - Detección automática de URLs de TikTok y YouTube.
+       - **6 Categorías Temáticas de Especialidad:**
+         - 🤖 `IA en Claude` (Claude Code, Artifacts, prompts)
+         - 💎 `IA en Gemini` (Gemini 2.0/3.0, Antigravity CLI, Google AI Studio)
+         - ⚡ `Skills & Agentes` (Agent Skills, MCP, automatización)
+         - 🎬 `Generación de Videos` (Sora, Runway Gen-3, Kling, Luma)
+         - 🎓 `Cursos` (Asignaturas universitarias, certificaciones)
+         - 🎙️ `Conferencias & Talks` (Tech talks, papers, keynotes)
+         - 📚 `General / Software` (Base para retrocompatibilidad)
+       - Barra de filtros interactivos por categoría con conteo en tiempo real.
+       - Auto-sugerencia inteligente de categorías según el título o enlace pegado.
 - **Timeline Semestral Compacto (Semanas 1 a 16):**
-  - Reemplazo del scroll horizontal por un track de 16 semanas ergonómico con hitos de evaluación:
-    - **S8 (Parciales):** Etiqueta de aviso y acceso directo.
-    - **S16 (Finales):** Etiqueta de cierre semestral.
-    - **Semana Actual:** Indicador visual activo (*Hoy*).
-    - **Puntos de estado:** Indicador de semanas con apuntes guardados.
-- **Guardado Ergonómico con Atajo `Ctrl + S` / `Cmd + S`:**
-  - Botón dinámico con estado (*"Guardar semana X"* vs *"¡Guardado!"* vs *"Semana X al día"*).
-  - Captura global de `Ctrl + S` / `Cmd + S` con prevención del diálogo nativo del navegador y macro-celebración de confeti.
-- **Conceptos Clave con Inserción Directa con `Enter`:**
-  - Sistema de tags (`#Concepto`) que se agregan directamente al pulsar `Enter`, con controles táctiles de eliminación `>=44x44px`.
-- **Bóveda Exclusiva de Fuentes de Estudio & YouTube:**
-  - Eliminación del widget redundante de series de gimnasio para mantener un foco 100% académico y cognitivo.
-  - Detección automática de enlaces a YouTube (asigna badge rojo característico y botón de apertura externa segura `rel="noopener noreferrer"`).
-  - Admite documentación oficial, artículos, libros técnicos y apuntes en texto libre.
-  - Guarda marcas de tiempo (minutos clave) y notas asociadas.
-- **Detección Automática de "Semana Libre":**
-  - Si en la semana académica seleccionada hay 0 entregas pendientes (`status !== 'entregado'`), se activa automáticamente el banner **¡Semana Despejada! 🌴✨**.
-  - Ofrece atajos directos para aprovechar el tiempo libre: entrenar en el Gym o avanzar proyectos personales en el Kanban.
-- **Selector de Estado / Mood Semanal:** Clasificación del rendimiento y nivel de energía (*Increíble*, *Productivo*, *Cansado*, *Despejado*).
+  - Track horizontal con hitos destacados: **S8 (Parciales)**, **S16 (Finales)**, **Hoy (Semana actual)** y puntos en semanas con notas.
+- **Sincronización Global:**
+  - `QuickAddModal.tsx` adaptado con selector de TikTok y Categoría temática en la pestaña *Aprender*.
+  - `OverviewBento.tsx` con soporte de iconos de TikTok y badges de categoría.
 
 ### 7. Sistema de Navegación & Captura Rápida (`src/components/layout/Navbar.tsx` & `src/components/quick-add/`)
 - **Navbar Obsidian Glassmorphism:**
