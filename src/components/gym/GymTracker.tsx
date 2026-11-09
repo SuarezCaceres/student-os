@@ -7,13 +7,17 @@ import {
   Trophy,
   Timer,
   TrendingUp,
+  Video,
+  ArrowUpRight,
 } from 'lucide-react';
-import type { GymRoutine, GymExercise, DayOfWeek } from '../../types';
+import type { GymRoutine, GymExercise, DayOfWeek, ExerciseHistoryEntry } from '../../types';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
 import { SectionHeader } from '../common/SectionHeader';
 import { ModalShell } from '../common/ModalShell';
 import { RestTimerFloating } from './RestTimerFloating';
 import { ExerciseProgressModal } from './ExerciseProgressModal';
+import { ExerciseVideoModal } from './ExerciseVideoModal';
+import { QuickWeightModal } from './QuickWeightModal';
 
 export interface GymTrackerProps {
   routines: GymRoutine[];
@@ -70,6 +74,8 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
   // Exercise Progress Modal & fallback local overrides (used when onUpdateExercise is not passed)
   const [selectedExerciseIdForModal, setSelectedExerciseIdForModal] = useState<string | null>(null);
+  const [selectedExerciseIdForVideoModal, setSelectedExerciseIdForVideoModal] = useState<string | null>(null);
+  const [selectedExerciseIdForWeightModal, setSelectedExerciseIdForWeightModal] = useState<string | null>(null);
   const [exerciseOverrides, setExerciseOverrides] = useState<
     Record<string, Omit<Partial<GymExercise>, 'completedSets'>>
   >({});
@@ -103,6 +109,43 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     selectedExerciseIdForModal
       ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForModal) || null
       : null;
+
+  const selectedExerciseForVideoModal =
+    selectedExerciseIdForVideoModal
+      ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForVideoModal) || null
+      : null;
+
+  const selectedExerciseForWeightModal =
+    selectedExerciseIdForWeightModal
+      ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForWeightModal) || null
+      : null;
+
+  const handleSaveQuickWeight = (newWeight: number, reps: string) => {
+    if (!selectedExerciseForWeightModal) return;
+
+    const currentPR =
+      selectedExerciseForWeightModal.personalRecordKg ||
+      (selectedExerciseForWeightModal.weightKg
+        ? Math.round(selectedExerciseForWeightModal.weightKg * 1.1)
+        : 80);
+    const isNewPR = newWeight > currentPR;
+
+    const newHistoryEntry: ExerciseHistoryEntry = {
+      date: new Date().toISOString().split('T')[0],
+      weightKg: newWeight,
+      reps: reps.trim(),
+    };
+
+    const updated: GymExercise = {
+      ...selectedExerciseForWeightModal,
+      weightKg: newWeight,
+      reps: reps.trim(),
+      personalRecordKg: isNewPR ? newWeight : currentPR,
+      history: [...(selectedExerciseForWeightModal.history || []), newHistoryEntry],
+    };
+
+    handleUpdateExerciseFromModal(updated);
+  };
 
   // Calculate day progress
   let totalSets = 0;
@@ -373,6 +416,20 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                             <span>PR {exercise.personalRecordKg} kg</span>
                           </span>
                         )}
+
+                        {exercise.history && exercise.history.length > 1 && (() => {
+                          const previousEntry = exercise.history[exercise.history.length - 2];
+                          const deltaKg = exercise.weightKg !== undefined && previousEntry
+                            ? Number((exercise.weightKg - previousEntry.weightKg).toFixed(1))
+                            : 0;
+                          if (deltaKg <= 0) return null;
+                          return (
+                            <span className="t-badge t-badge-ok t-num">
+                              <ArrowUpRight className="w-3.5 h-3.5" />
+                              <span>+{deltaKg} kg vs previa</span>
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[14px] text-[var(--muted)]">
@@ -433,17 +490,42 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                         })}
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                        {/* 1. Quick Load Weight Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExerciseIdForWeightModal(exercise.id)}
+                          className="t-btn t-btn-primary !min-h-[44px] !px-3 !text-[13px]"
+                          title="Subir peso levantado para este ejercicio (sobrecarga progresiva)"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Cargar peso</span>
+                        </button>
+
+                        {/* 2. Video / Technique Guide Button */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedExerciseIdForVideoModal(exercise.id)}
+                          className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px] !border-[color-mix(in_oklab,var(--action)_35%,transparent)] hover:!border-[var(--action)]"
+                          title="Ver video explicativo y técnica de biomecánica"
+                        >
+                          <Video className="w-3.5 h-3.5 text-[var(--action)]" />
+                          <span className="hidden sm:inline">Ver técnica / video</span>
+                          <span className="sm:hidden">Video</span>
+                        </button>
+
+                        {/* 3. Progress / 1RM Modal */}
                         <button
                           type="button"
                           onClick={() => setSelectedExerciseIdForModal(exercise.id)}
                           className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px]"
                           title="Ver récord personal, calculadora 1RM e historial"
                         >
-                          <TrendingUp className="w-4 h-4 text-[var(--action)]" />
-                          <span>Ver progreso / 1RM</span>
+                          <TrendingUp className="w-3.5 h-3.5 text-[var(--action)]" />
+                          <span>1RM</span>
                         </button>
 
+                        {/* 4. Delete */}
                         <button
                           type="button"
                           onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
@@ -617,6 +699,26 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         isOpen={Boolean(selectedExerciseForModal)}
         onClose={() => setSelectedExerciseIdForModal(null)}
         onUpdateExercise={handleUpdateExerciseFromModal}
+      />
+
+      {/* Exercise Video & Technique Modal */}
+      <ExerciseVideoModal
+        key={selectedExerciseForVideoModal?.id ?? 'video-closed'}
+        exercise={selectedExerciseForVideoModal}
+        isOpen={Boolean(selectedExerciseForVideoModal)}
+        onClose={() => setSelectedExerciseIdForVideoModal(null)}
+        onOpenWeightLog={() => {
+          setSelectedExerciseIdForWeightModal(selectedExerciseIdForVideoModal);
+        }}
+      />
+
+      {/* Quick Weight Progress Logging Modal */}
+      <QuickWeightModal
+        key={selectedExerciseForWeightModal?.id ?? 'weight-closed'}
+        exercise={selectedExerciseForWeightModal}
+        isOpen={Boolean(selectedExerciseForWeightModal)}
+        onClose={() => setSelectedExerciseIdForWeightModal(null)}
+        onSaveWeight={handleSaveQuickWeight}
       />
     </div>
   );

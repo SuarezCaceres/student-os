@@ -7,6 +7,8 @@ import {
   Plus,
   Award,
   Dumbbell,
+  ArrowUpRight,
+  Sparkles,
 } from 'lucide-react';
 import type { GymExercise, ExerciseHistoryEntry } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
@@ -83,6 +85,10 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
           },
         ];
 
+  const latestEntry = historyEntries[historyEntries.length - 1];
+  const previousEntry = historyEntries.length > 1 ? historyEntries[historyEntries.length - 2] : null;
+  const progressDelta = previousEntry ? Number((latestEntry.weightKg - previousEntry.weightKg).toFixed(1)) : 0;
+
   const handleOpenEditPR = () => {
     setPrInput(currentPR);
     setEditingPR(true);
@@ -146,8 +152,8 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
       maxWidth="2xl"
     >
       <div className="space-y-6">
-        {/* Top Summary: 2 clean panels */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Top Summary: 3 clean panels */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
           {/* Panel 1: Personal Record (PR) */}
           <div className="bg-[var(--surface-2)] rounded-[14px] p-4 border border-[var(--line)] flex flex-col justify-between gap-3">
             <div className="flex items-center justify-between gap-2">
@@ -159,7 +165,7 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
                 <button
                   type="button"
                   onClick={handleOpenEditPR}
-                  className="t-btn t-btn-ghost !px-3 !text-[13px] -my-1.5"
+                  className="t-btn t-btn-ghost !px-2.5 !py-1 !text-xs -my-1"
                 >
                   Editar
                 </button>
@@ -178,16 +184,16 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
                   step={0.5}
                   value={prInput}
                   onChange={(e) => setPrInput(Number(e.target.value))}
-                  className="t-input t-num !bg-[var(--surface)]"
+                  className="t-input t-num !bg-[var(--surface)] text-sm"
                 />
                 <div className="flex items-center gap-2">
-                  <button type="submit" className="t-btn t-btn-primary flex-1 !px-3 !text-[14px]">
-                    Guardar PR
+                  <button type="submit" className="t-btn t-btn-primary flex-1 !px-2.5 !py-1 !text-xs">
+                    Guardar
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingPR(false)}
-                    className="t-btn t-btn-ghost !px-3 !text-[14px]"
+                    className="t-btn t-btn-ghost !px-2.5 !py-1 !text-xs"
                   >
                     Cancelar
                   </button>
@@ -198,7 +204,7 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
                 <div className="t-num text-2xl sm:text-3xl font-semibold text-[var(--ink)] tracking-tight">
                   {currentPR} kg
                 </div>
-                <p className="text-[13px] text-[var(--muted)] mt-1">
+                <p className="text-xs text-[var(--muted)] mt-1">
                   Mejor marca personal registrada
                 </p>
               </div>
@@ -215,8 +221,31 @@ export const ExerciseProgressModal: React.FC<ExerciseProgressModalProps> = ({
               <div className="t-num text-2xl sm:text-3xl font-semibold text-[var(--action)] tracking-tight">
                 {estimated1RM} kg
               </div>
-              <p className="text-[13px] text-[var(--muted)] mt-1">
-                Peso máximo estimado a 1 repetición
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Peso máximo estimado a 1 rep
+              </p>
+            </div>
+          </div>
+
+          {/* Panel 3: Progressive Overload Delta */}
+          <div className="bg-[var(--surface-2)] rounded-[14px] p-4 border border-[var(--line)] flex flex-col justify-between gap-3">
+            <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--muted)]">
+              <TrendingUp className="w-4 h-4 text-[var(--ok)] shrink-0" />
+              <span>Sobrecarga Progresiva</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className={`t-num text-2xl sm:text-3xl font-semibold tracking-tight ${
+                  progressDelta > 0 ? 'text-[var(--ok)]' : 'text-[var(--ink)]'
+                }`}>
+                  {progressDelta > 0 ? `+${progressDelta}` : progressDelta} kg
+                </span>
+                {progressDelta > 0 && <ArrowUpRight className="w-5 h-5 text-[var(--ok)] shrink-0" />}
+              </div>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                {progressDelta > 0
+                  ? 'Aumento de carga vs sesión anterior'
+                  : 'Carga constante mantenida'}
               </p>
             </div>
           </div>

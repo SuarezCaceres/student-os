@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.4.0 (Rediseño de LearningView: Timeline Semestral S1..S16 con Hitos, Prompts Feynman, Atajo Ctrl+S y Eliminación de Slop Cruzado)`  
+> **Versión actual:** `v2.4.1 (Sobrecarga Progresiva de Cargas, Modal Rápido de Peso, Video Animado de Biomecánica y Guía Técnica en Gimnasio)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -91,7 +91,9 @@ student-os/
 │   │   │   └── OverviewBento.tsx        # Tablero Bento con vista unificada de prioridades de hoy y widget de Aprendizaje
 │   │   ├── gym/
 │   │   │   ├── ExerciseProgressModal.tsx # Historial de cargas, récord personal (PR) y calculadora 1RM (Epley)
-│   │   │   ├── GymTracker.tsx           # Tracker de rutinas, series interactivas y pesos
+│   │   │   ├── ExerciseVideoModal.tsx    # Reproductor de video animado de técnica y biomecánica (60fps loop, pautas)
+│   │   │   ├── GymTracker.tsx           # Tracker de rutinas, series interactivas, botones de técnica y cargas
+│   │   │   ├── QuickWeightModal.tsx     # Modal rápido de sobrecarga progresiva con deltas (+1, +2.5, +5kg)
 │   │   │   └── RestTimerFloating.tsx    # Cronómetro flotante de descanso entre series (presets 45s-120s)
 │   │   ├── kanban/
 │   │   │   ├── KanbanBoard.tsx          # Tablero Kanban con buscador en tiempo real y filtros
@@ -168,8 +170,19 @@ student-os/
 ### 3. Gym & Fitness Tracker (`src/components/gym/`)
 - **Rutinas Diarias (Lunes a Domingo):** Preselección automática del día de hoy (Push, Pull, Legs, etc.).
 - **Burbujas de Series:** Marcado táctil de `S1`, `S2`, `S3`, `S4`.
+- **Sobrecarga Progresiva & Registro Rápido de Peso (`QuickWeightModal.tsx`):**
+  - Botón táctil directo `+ Cargar peso` en cada ejercicio.
+  - Ajuste rápido mediante chips de delta (`+1 kg`, `+2.5 kg`, `+5 kg`, `-2.5 kg`) e input numérico.
+  - Detección automática de Récord Personal (PR) y cálculo visual del incremento (`+2.5 kg vs previa`).
+  - Persistencia reactiva en `history` y `localStorage`.
+- **Video Animado de Biomecánica y Guía Técnica (`ExerciseVideoModal.tsx`):**
+  - Botón dedicado `Ver técnica / video` con reproductor looping de alta definición (WebM, póster `/bench-press-poster.jpg` y video `/videos/bench-press-technique.webm`).
+  - Animación de un joven atleta en ropa deportiva ejecutando el ejercicio en un gimnasio moderno.
+  - Controles accesibles: Play/Pausa, reinicio, selector de velocidad (0.75x, 1x, 1.25x), silenciar y pantalla completa.
+  - Pestañas técnicas: Posición inicial (retracción escapular, leg drive), trayectoria óptima, respiración con Maniobra de Valsalva y errores comunes a evitar.
 - **Rest Timer Flotante:** Temporizador de descanso entre series con presets (45s, 60s, 90s, 120s) y aviso al terminar.
-- **Historial de PRs & Calculadora 1RM:** Cálculo de repetición máxima estimada mediante la fórmula de Epley:
+- **Historial de PRs & Calculadora 1RM (`ExerciseProgressModal.tsx`):**
+  - Panel triple: Récord personal, 1RM estimado (Epley) y sobrecarga progresiva calculada.
   $$\text{1RM} = \text{Peso} \times \left(1 + \frac{\text{Reps}}{30}\right)$$
 - **Botón "Finalizar Rutina":** Dispara macro-celebración de confeti e incrementa la racha diaria.
 
@@ -249,7 +262,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.3.1)** | `2d709e3`, `373e555` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.4.1)** | `TBD` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
+| `feat/ui-taste-foundation` | v2.3.1 | `2d709e3`, `373e555`, `5fef05f` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
 | `feat/ui-taste-foundation` | v2.3.0 | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
 | `feat/audit-a11y-core-opt` | Fusionada | `9268ae7` | Trabajo del Agente 1 (Focus Trap, prefers-reduced-motion, SectionHeader h1, useCallback/useMemo) |
 | `feat/audit-landing-auth-polish` | Fusionada | `95efa37`, `1c561fb` | Trabajo del Agente 2 (AuthModal labels htmlFor, selección contrast, táctil 44px) |
@@ -264,7 +278,8 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.3.1)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 287ms.
-- **Detector Mecánico Impeccable:** `impeccable detect` con `0` findings (`[]`) en todo `src/`.
+## 🚀 7. Verificación del Sistema (v2.4.1)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 378ms.
+- **Detector Mecánico Impeccable:** `npx impeccable detect src/ --json` con `0` findings (`[]`) en todo `src/`.
 - **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.
+- **Video & Multimedia:** Video WebM nativo a 30fps generado y almacenado localmente en `public/videos/bench-press-technique.webm` (1.15 MB) y póster `public/bench-press-poster.jpg`.

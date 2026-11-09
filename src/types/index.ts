@@ -31,6 +31,16 @@ export interface ExerciseHistoryEntry {
   reps: string;
 }
 
+export interface ExerciseTechniqueGuide {
+  videoUrl?: string;
+  posterUrl?: string;
+  muscleGroups: string[];
+  setupCues: string[];
+  executionCues: string[];
+  breathingCues: string;
+  commonMistakes: string[];
+}
+
 export interface GymExercise {
   id: string;
   name: string;
@@ -42,6 +52,7 @@ export interface GymExercise {
   personalRecordKg?: number;
   restSeconds?: number;
   history?: ExerciseHistoryEntry[];
+  technique?: ExerciseTechniqueGuide;
 }
 
 export interface GymRoutine {
