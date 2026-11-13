@@ -47,6 +47,54 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authen
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated;
 
+-- 2b) Tablas conocidas hoy (Ola 2-3). El bucle del paso 1 ya las cubre; esta comprobacion las nombra
+--     para que el script FALLE EN ALTO (en vez de dejar una tabla abierta) si alguna existe sin RLS forzada.
+--       profiles         (base.prisma)   - perfil minimo del usuario
+--       sync_records     (sync.prisma)   - datos de la app por usuario (jsonb)
+--       user_sync_state  (sync.prisma)   - cursor y ultima sincronizacion
+--     Si una tabla aun no existe en el esquema (migracion no aplicada) se omite sin error.
+DO $$
+DECLARE
+  target_schema text := 'public';
+  expected text[] := ARRAY['profiles', 'sync_records', 'user_sync_state'];
+  t text;
+  oid_ regclass;
+  missing text[] := ARRAY[]::text[];
+BEGIN
+  FOREACH t IN ARRAY expected LOOP
+    oid_ := to_regclass(format('%I.%I', target_schema, t));
+    IF oid_ IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM pg_class WHERE oid = oid_ AND relrowsecurity AND relforcerowsecurity
+    ) THEN
+      missing := missing || t;
+    END IF;
+  END LOOP;
+  IF array_length(missing, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'RLS no esta activa y forzada en: %', array_to_string(missing, ', ');
+  END IF;
+END
+$$;
+
+-- 2c) GOOGLE (Ola 3): tablas con secretos. DESCOMENTAR y ajustar los nombres a los que defina google.prisma
+--     cuando se fusione. No requieren politicas: el bucle del paso 1 ya las deja en "denegar todo" para
+--     anon/authenticated y la API (rol con BYPASSRLS) es la unica que las lee. Nunca se exponen por la Data API.
+--       google_connections  (refresh token CIFRADO AES-256-GCM, correo de la cuenta, scopes, fecha de conexion)
+--       google_oauth_states (state/PKCE verifier temporales del flujo de autorizacion)
+--
+-- DO $$
+-- DECLARE
+--   t text;
+-- BEGIN
+--   FOREACH t IN ARRAY ARRAY['google_connections', 'google_oauth_states'] LOOP
+--     IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
+--       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+--       EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', t);
+--       EXECUTE format('REVOKE ALL ON TABLE public.%I FROM anon, authenticated', t);
+--     END IF;
+--   END LOOP;
+-- END
+-- $$;
+
 -- 3) Verificacion: debe devolver 0 filas (ninguna tabla de la app sin RLS).
 --    SELECT schemaname, tablename FROM pg_tables
 --    WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' AND NOT rowsecurity;
