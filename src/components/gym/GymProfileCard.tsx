@@ -1,6 +1,10 @@
 import React from 'react';
-import { Dumbbell, Scale, Edit3 } from 'lucide-react';
+import { Dumbbell, Scale, Edit3, Bell } from 'lucide-react';
 import type { DayOfWeek } from '../../types';
+import {
+  DEFAULT_GYM_REMINDER_MINUTES,
+  formatReminderSummary,
+} from '../../utils/reminderPresets';
 import {
   type UserGymProfile,
   type BmiCategory,
@@ -118,6 +122,16 @@ export const GymProfileCard: React.FC<GymProfileCardProps> = ({
               </span>
             );
           })}
+        </div>
+
+        <div className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] pt-0.5">
+          <Bell className="w-3.5 h-3.5 text-[var(--action)] shrink-0" aria-hidden="true" />
+          <span>
+            Aviso:{' '}
+            <strong className="font-medium text-[var(--ink)]">
+              {formatReminderSummary(profile.reminderMinutesBefore ?? DEFAULT_GYM_REMINDER_MINUTES)}
+            </strong>
+          </span>
         </div>
       </div>
 

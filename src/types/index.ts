@@ -73,6 +73,9 @@ export interface CalendarBlock {
   category: Category;
   location?: string;
   googleEventId?: string;
+  googleHtmlLink?: string;
+  reminderMinutes?: number[];
+  syncWithGoogle?: boolean;
 }
 
 export type AssignmentType = 'tarea' | 'proyecto' | 'examen' | 'laboratorio';
@@ -187,6 +190,7 @@ export interface GymAttendanceLog {
   rescheduledSlotEnd?: string;
   rescheduledCalendarBlockId?: string;
   googleEventId?: string;
+  reminderMinutes?: number[];
   streakProtected?: boolean;
 }
 
@@ -202,6 +206,7 @@ export interface UserGymProfile {
   targetWeightKg?: number;
   bmi: number;
   bmiCategory: BmiCategory;
+  reminderMinutesBefore?: number[];
   configuredAt: string;
 }
 

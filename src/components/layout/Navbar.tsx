@@ -28,7 +28,12 @@ export interface NavbarProps {
   isFreeWeek?: boolean;
   hasReflectionThisWeek?: boolean;
   onNavigateLanding?: () => void;
-  userSession?: { name: string; email: string } | null;
+  userSession?: {
+    name: string;
+    email: string;
+    avatarUrl?: string;
+    provider?: 'google' | 'local' | 'demo';
+  } | null;
   onLogout?: () => void;
 }
 
@@ -46,12 +51,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   userSession,
   onLogout,
 }) => {
-  const learningBadge = isFreeWeek
-    ? 'Libre'
-    : !hasReflectionThisWeek
-      ? 'Pendiente'
-      : undefined;
-
   const desktopOptions: SegmentOption<NavTab>[] = [
     {
       id: 'overview',
@@ -82,7 +81,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: 'learning',
       label: 'Aprendizaje',
       icon: <BookOpen className="w-4 h-4" />,
-      badge: learningBadge,
     },
   ];
 
@@ -102,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <header className="sticky top-0 z-40 w-full bg-[var(--bg)] border-b border-[var(--line)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-[72px] flex items-center justify-between gap-2.5 sm:gap-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-5 2xl:px-8 h-14 sm:h-[72px] flex items-center justify-between gap-2 sm:gap-2.5 2xl:gap-4">
           {/* Brand + Contextual Academic Week */}
           <div className="flex items-center gap-2.5 shrink-0">
             <button
@@ -126,7 +124,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('learning')}
-              className="t-badge hidden xl:inline-flex min-h-[44px] px-3.5 cursor-pointer hover:border-[var(--line-strong)] hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2"
+              className="t-badge hidden 2xl:inline-flex min-h-[44px] px-3.5 cursor-pointer hover:border-[var(--line-strong)] hover:text-[var(--ink)] transition-colors focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2"
               title="Ver aprendizaje de esta semana"
             >
               <span className="t-num font-medium text-[var(--ink)]">
@@ -149,6 +147,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               options={desktopOptions}
               value={activeTab}
               onChange={setActiveTab}
+              size="sm"
               ariaLabel="Vistas principales"
               className="max-w-full"
             />
@@ -160,7 +159,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 type="button"
                 onClick={onNavigateLanding}
-                className="t-btn t-btn-ghost px-2.5 sm:px-3 text-xs"
+                className="t-btn t-btn-ghost hidden sm:inline-flex px-2.5 2xl:px-3 text-[13px]"
                 title="Ver portal de presentación de StudentOS"
               >
                 <span>Portal</span>
@@ -170,12 +169,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => onOpenQuickAdd('university')}
-              className="t-btn t-btn-primary px-3 sm:px-4 min-w-[44px]"
+              className="t-btn t-btn-primary px-3 2xl:px-4 min-w-[44px]"
               title="Agregar entrega, ejercicio, tarea o recurso"
               aria-label="Agregar rápido"
             >
               <Plus className="w-4 h-4 shrink-0" />
-              <span className="hidden min-[380px]:inline">Agregar</span>
+              <span className="hidden sm:inline">Agregar</span>
             </button>
 
             <button
@@ -207,10 +206,30 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {userSession && (
-              <div className="hidden lg:flex items-center gap-1 pl-1 border-l border-[var(--line)]">
-                <span className="text-xs font-mono text-[var(--muted)] max-w-[90px] truncate" title={userSession.email}>
-                  {userSession.name}
-                </span>
+              <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-[var(--line)]">
+                {userSession.avatarUrl ? (
+                  <img
+                    src={userSession.avatarUrl}
+                    alt={userSession.name}
+                    referrerPolicy="no-referrer"
+                    className="w-7 h-7 rounded-full object-cover border border-[var(--line)] shrink-0"
+                  />
+                ) : null}
+                <div className="min-w-0 flex items-center gap-1.5">
+                  {userSession.provider === 'google' && (
+                    <span
+                      title={`Conectado con Google (${userSession.email})`}
+                      aria-label="Sesión con Google"
+                      className="w-2 h-2 rounded-full bg-[var(--ok)] shrink-0"
+                    />
+                  )}
+                  <span
+                    className="text-[13px] font-medium text-[var(--muted)] max-w-[84px] truncate"
+                    title={`${userSession.name} (${userSession.email})`}
+                  >
+                    {userSession.name.split(/\s+/)[0] || userSession.name}
+                  </span>
+                </div>
                 {onLogout && (
                   <button
                     type="button"

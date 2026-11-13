@@ -1,12 +1,14 @@
 import React, { useEffect, useId, useState } from 'react';
 import {
   AlertCircle,
+  CalendarCheck2,
   CalendarClock,
   Check,
   CheckCircle2,
   Clock,
   Dumbbell,
   Plus,
+  RefreshCw,
   Settings2,
   Timer,
   Trophy,
@@ -59,7 +61,9 @@ export interface GymTrackerProps {
   calendarBlocks?: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
   isGoogleConnected?: boolean;
+  isSyncingGymToGoogle?: boolean;
   onOpenGoogleSync?: () => void;
+  onSyncGymWeekToGoogle?: () => Promise<void> | void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
   onLogBodyWeight?: (newWeightKg: number) => void;
   onStartSession?: (payload: {
@@ -82,6 +86,7 @@ export interface GymTrackerProps {
     fromDate: string;
     toDay: DayOfWeek;
     mode: RescheduleMode;
+    reminderMinutes?: number[];
     selectedSlot?: {
       dateIso: string;
       startTime: string;
@@ -119,7 +124,9 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   calendarBlocks = [],
   externalBusyByDate,
   isGoogleConnected = false,
+  isSyncingGymToGoogle = false,
   onOpenGoogleSync,
+  onSyncGymWeekToGoogle,
   onSaveGymPlan,
   onLogBodyWeight,
   onStartSession,
@@ -498,6 +505,29 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               <span>{gymProfile ? 'Mi perfil gym' : 'Configurar gym'}</span>
             </button>
 
+            {onSyncGymWeekToGoogle && (
+              <button
+                type="button"
+                onClick={isGoogleConnected ? onSyncGymWeekToGoogle : onOpenGoogleSync}
+                disabled={isSyncingGymToGoogle}
+                className="t-btn t-btn-secondary"
+                title="Publicar tus sesiones de entrenamiento de esta semana en Google Calendar con avisos previos"
+              >
+                {isSyncingGymToGoogle ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-[var(--action)] shrink-0" aria-hidden="true" />
+                ) : (
+                  <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                )}
+                <span>
+                  {isSyncingGymToGoogle
+                    ? 'Sincronizando gym...'
+                    : isGoogleConnected
+                      ? 'Sincronizar Gym con Google'
+                      : 'Conectar avisos Google'}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -704,6 +734,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           goal={gymProfile?.goal}
           gymType={gymProfile?.gymType}
           customGymName={gymProfile?.customGymName}
+          defaultReminderMinutes={gymProfile?.reminderMinutesBefore}
           rescheduleOptions={getRescheduleOptions(
             activeMissFlow.dayOfWeek,
             routines,

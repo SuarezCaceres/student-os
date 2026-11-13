@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, CalendarCheck2 } from 'lucide-react';
 import type {
   AppState,
   UniversityAssignment,
@@ -18,6 +18,8 @@ import { triggerConfetti } from '../../utils/confetti';
 import { ModalShell } from '../common/ModalShell';
 import { SegmentedControl } from '../common/SegmentedControl';
 import type { SegmentOption } from '../common/SegmentedControl';
+import { ReminderPresetPicker } from '../calendar/ReminderPresetPicker';
+import { DEFAULT_BLOCK_REMINDER_MINUTES } from '../../utils/reminderPresets';
 
 export type QuickAddTab = 'university' | 'gym' | 'kanban' | 'calendar' | 'learning';
 
@@ -31,6 +33,7 @@ export interface QuickAddModalProps {
   onAddCalendarBlock: (block: CalendarBlock) => void;
   onAddLearningResource?: (resource: LearningResource, week?: number) => void;
   initialTab?: QuickAddTab;
+  isGoogleConnected?: boolean;
 }
 
 const COMMON_COURSES = [
@@ -73,6 +76,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   onAddCalendarBlock,
   onAddLearningResource,
   initialTab,
+  isGoogleConnected = false,
 }) => {
   const [activeTab, setActiveTab] = useState<QuickAddTab>(initialTab);
 
@@ -103,6 +107,10 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   const [calStart, setCalStart] = useState('09:00');
   const [calEnd, setCalEnd] = useState('11:00');
   const [calCategory, setCalCategory] = useState<Category>('universidad');
+  const [calReminderMinutes, setCalReminderMinutes] = useState<number[]>(
+    DEFAULT_BLOCK_REMINDER_MINUTES
+  );
+  const [calSyncGoogle, setCalSyncGoogle] = useState<boolean>(Boolean(isGoogleConnected));
 
   // Learning Resource Form
   const [resTitle, setResTitle] = useState('');
@@ -184,6 +192,8 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
       endTime: calEnd,
       title: calTitle.trim(),
       category: calCategory,
+      reminderMinutes: calReminderMinutes,
+      syncWithGoogle: Boolean(isGoogleConnected && calSyncGoogle),
     };
 
     onAddCalendarBlock(newBlock);
@@ -606,6 +616,33 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
               <option value="trabajo">Trabajo</option>
               <option value="personal">Personal</option>
             </select>
+          </div>
+
+          <div className="pt-2 border-t border-[var(--line)] space-y-3">
+            <ReminderPresetPicker
+              compact
+              value={calReminderMinutes}
+              onChange={setCalReminderMinutes}
+              label="Aviso en Google Calendar"
+              helperText="Se crea una alarma nativa en tu calendario de Google."
+            />
+
+            {isGoogleConnected && (
+              <label
+                htmlFor="qa-cal-sync-google"
+                className="min-h-[44px] flex items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink)] cursor-pointer hover:border-[var(--action)] transition-colors"
+              >
+                <input
+                  id="qa-cal-sync-google"
+                  type="checkbox"
+                  checked={calSyncGoogle}
+                  onChange={(e) => setCalSyncGoogle(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--action)] shrink-0 cursor-pointer"
+                />
+                <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Guardar también en Google Calendar (con alarma)</span>
+              </label>
+            )}
           </div>
 
           <button type="submit" className="t-btn t-btn-primary w-full mt-2">

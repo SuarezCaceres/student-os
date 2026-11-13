@@ -15,18 +15,22 @@ import type { CalendarBlock, DayOfWeek } from '../../types';
 import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
-  fetchGoogleBusyIntervalsForWeek,
+  fetchGoogleEventsAndBusyForWeek,
   getConfiguredGoogleClientId,
   getStoredAccessToken,
   getStoredGoogleMeta,
+  hasEnvGoogleClientId,
   saveCustomGoogleClientId,
   upsertGoogleGymEvent,
+  type GoogleCalendarEvent,
   type GoogleCalendarMeta,
 } from '../../services/googleCalendar';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import { getCurrentWeekDateMap } from '../../utils/gymAttendance';
 import { exportCalendarToICS } from '../../utils/icsExport';
 import { ModalShell } from '../common/ModalShell';
+import { ReminderPresetPicker } from './ReminderPresetPicker';
+import { DEFAULT_BLOCK_REMINDER_MINUTES } from '../../utils/reminderPresets';
 
 export interface GoogleCalendarSyncModalProps {
   isOpen: boolean;
@@ -34,6 +38,11 @@ export interface GoogleCalendarSyncModalProps {
   calendarBlocks: CalendarBlock[];
   weekDates?: Record<DayOfWeek, string>;
   onBusyIntervalsSynced?: (busyByDate: Record<string, BusyInterval[]>) => void;
+  onWeekEventsSynced?: (
+    events: GoogleCalendarEvent[],
+    busyByDate: Record<string, BusyInterval[]>
+  ) => void;
+  onBlockGoogleSynced?: (blockId: string, eventId: string, htmlLink?: string) => void;
   onConnectionChange?: (connected: boolean, accessToken?: string | null) => void;
 }
 
@@ -46,6 +55,11 @@ interface SyncContentProps {
   calendarBlocks: CalendarBlock[];
   weekDates?: Record<DayOfWeek, string>;
   onBusyIntervalsSynced?: (busyByDate: Record<string, BusyInterval[]>) => void;
+  onWeekEventsSynced?: (
+    events: GoogleCalendarEvent[],
+    busyByDate: Record<string, BusyInterval[]>
+  ) => void;
+  onBlockGoogleSynced?: (blockId: string, eventId: string, htmlLink?: string) => void;
   onConnectionChange?: (connected: boolean, accessToken?: string | null) => void;
 }
 
@@ -53,16 +67,24 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
   calendarBlocks,
   weekDates,
   onBusyIntervalsSynced,
+  onWeekEventsSynced,
+  onBlockGoogleSynced,
   onConnectionChange,
 }) => {
   const clientIdInputId = useId();
   const clientIdHelpId = useId();
   const guidePanelId = useId();
+  const devPanelId = useId();
 
+  const envHasClientId = hasEnvGoogleClientId();
   const [clientIdInput, setClientIdInput] = useState<string>(() => getConfiguredGoogleClientId());
   const [meta, setMeta] = useState<GoogleCalendarMeta>(() => getStoredGoogleMeta());
   const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAccessToken());
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isDevConfigOpen, setIsDevConfigOpen] = useState(!envHasClientId);
+  const [pushReminderMinutes, setPushReminderMinutes] = useState<number[]>(
+    DEFAULT_BLOCK_REMINDER_MINUTES
+  );
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncingBusy, setIsSyncingBusy] = useState(false);
@@ -140,17 +162,21 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
     setIsSyncingBusy(true);
     try {
       const token = await acquireTokenOrThrow();
-      const busyByDate = await fetchGoogleBusyIntervalsForWeek(token, resolvedWeekDates);
+      const { events, busyByDate } = await fetchGoogleEventsAndBusyForWeek(
+        token,
+        resolvedWeekDates
+      );
       const totalBusy = Object.values(busyByDate).reduce((sum, list) => sum + list.length, 0);
       setMeta(getStoredGoogleMeta());
-      setBusyEventCount(totalBusy);
+      setBusyEventCount(events.length);
+      onWeekEventsSynced?.(events, busyByDate);
       onBusyIntervalsSynced?.(busyByDate);
       setStatus({
         type: 'ok',
         text:
-          totalBusy === 0
-            ? 'Disponibilidad sincronizada: tu Google Calendar no tiene eventos ocupados esta semana.'
-            : `Disponibilidad sincronizada: se detectaron ${totalBusy} bloque${totalBusy === 1 ? '' : 's'} ocupado${totalBusy === 1 ? '' : 's'} esta semana.`,
+          events.length === 0
+            ? 'Calendario sincronizado: no hay eventos externos en Google Calendar esta semana.'
+            : `Sincronizado: ${events.length} evento${events.length === 1 ? '' : 's'} de Google (${totalBusy} bloque${totalBusy === 1 ? '' : 's'} ocupado${totalBusy === 1 ? '' : 's'}) cargado${events.length === 1 ? '' : 's'} en tu Horario.`,
       });
     } catch (err) {
       const refreshedToken = getStoredAccessToken();
@@ -192,20 +218,23 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
         setPushProgress({ current: idx + 1, total: calendarBlocks.length });
         if (!dateIso) continue;
 
-        await upsertGoogleGymEvent(token, {
+        const saved = await upsertGoogleGymEvent(token, {
+          eventId: block.googleEventId,
           title: block.title,
           dateIso,
           startTime: block.startTime,
           endTime: block.endTime,
           location: block.location,
-          description: `Bloque de ${block.category} exportado desde StudentOS PRO MAX (${block.day}).`,
+          description: `Bloque de ${block.category} exportado desde StudentOS (${block.day}).`,
+          reminderMinutes: block.reminderMinutes ?? pushReminderMinutes,
         });
+        onBlockGoogleSynced?.(block.id, saved.eventId, saved.htmlLink);
         exportedCount += 1;
       }
 
       setStatus({
         type: 'ok',
-        text: `Se enviaron ${exportedCount} bloque${exportedCount === 1 ? '' : 's'} de tu semana actual a Google Calendar.`,
+        text: `Se enviaron ${exportedCount} bloque${exportedCount === 1 ? '' : 's'} de tu semana actual a Google Calendar con avisos configurados.`,
       });
     } catch (err) {
       if (!getStoredAccessToken()) {
@@ -385,42 +414,70 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
             <span>Descargar .ics (sin login)</span>
           </button>
         </div>
+
+        <div className="pt-2 border-t border-[var(--line)]">
+          <ReminderPresetPicker
+            compact
+            value={pushReminderMinutes}
+            onChange={setPushReminderMinutes}
+            label="Aviso predeterminado al enviar bloques"
+            helperText="Google notificará cada bloque exportado con esta anticipación (si no tenía otro aviso)."
+          />
+        </div>
       </div>
 
-      {/* Row 3: Optional OAuth Client ID */}
+      {/* Row 3: Optional Developer OAuth Client ID (collapsed automatically when env var is set) */}
       <div className="t-row space-y-2.5">
-        <label htmlFor={clientIdInputId} className="t-label flex items-center gap-1.5 mb-0">
-          <KeyRound className="w-4 h-4 text-[var(--muted)] shrink-0" aria-hidden="true" />
-          <span>Google OAuth Client ID (opcional si ya configuraste VITE_GOOGLE_CLIENT_ID)</span>
-        </label>
-
-        <p id={clientIdHelpId} className="text-[13px] text-[var(--muted)] leading-relaxed">
-          Se guarda únicamente en tu navegador (<span className="t-num">localStorage</span>). No
-          requiere backend ni clave secreta.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            id={clientIdInputId}
-            type="text"
-            value={clientIdInput}
-            onChange={(e) => setClientIdInput(e.target.value)}
-            aria-describedby={clientIdHelpId}
-            placeholder="1234567890-abcdef.apps.googleusercontent.com"
-            autoCorrect="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            className="t-input t-num flex-1"
+        <button
+          type="button"
+          aria-expanded={isDevConfigOpen}
+          aria-controls={devPanelId}
+          onClick={() => setIsDevConfigOpen((prev) => !prev)}
+          className="w-full min-h-[44px] flex items-center justify-between gap-3 py-1 text-left text-[14px] font-medium text-[var(--ink)] hover:text-[var(--action)] transition-colors cursor-pointer"
+        >
+          <span className="inline-flex items-center gap-2">
+            <KeyRound className="w-4 h-4 text-[var(--muted)] shrink-0" aria-hidden="true" />
+            <span>Opciones de desarrollador (Google OAuth Client ID)</span>
+          </span>
+          <ChevronDown
+            className={`w-4 h-4 shrink-0 text-[var(--muted)] transition-transform duration-150 motion-reduce:transition-none ${
+              isDevConfigOpen ? 'rotate-180' : ''
+            }`}
+            aria-hidden="true"
           />
-          <button
-            type="button"
-            onClick={handleSaveClientId}
-            disabled={isBusy}
-            className="t-btn t-btn-secondary shrink-0"
-          >
-            Guardar ID
-          </button>
-        </div>
+        </button>
+
+        {isDevConfigOpen && (
+          <div id={devPanelId} className="space-y-2.5 pt-1">
+            <p id={clientIdHelpId} className="text-[13px] text-[var(--muted)] leading-relaxed">
+              Se guarda únicamente en tu navegador (<span className="t-num">localStorage</span>). No
+              requiere backend ni clave secreta.
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                id={clientIdInputId}
+                type="text"
+                value={clientIdInput}
+                onChange={(e) => setClientIdInput(e.target.value)}
+                aria-describedby={clientIdHelpId}
+                placeholder="1234567890-abcdef.apps.googleusercontent.com"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                className="t-input t-num flex-1"
+              />
+              <button
+                type="button"
+                onClick={handleSaveClientId}
+                disabled={isBusy}
+                className="t-btn t-btn-secondary shrink-0"
+              >
+                Guardar ID
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Row 4: Collapsible 3-step Authorized Origins Guide */}
@@ -488,6 +545,8 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
   calendarBlocks,
   weekDates,
   onBusyIntervalsSynced,
+  onWeekEventsSynced,
+  onBlockGoogleSynced,
   onConnectionChange,
 }) => {
   return (
@@ -510,6 +569,8 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
           calendarBlocks={calendarBlocks}
           weekDates={weekDates}
           onBusyIntervalsSynced={onBusyIntervalsSynced}
+          onWeekEventsSynced={onWeekEventsSynced}
+          onBlockGoogleSynced={onBlockGoogleSynced}
           onConnectionChange={onConnectionChange}
         />
       )}

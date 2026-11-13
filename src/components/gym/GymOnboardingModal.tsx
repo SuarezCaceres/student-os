@@ -15,6 +15,8 @@ import {
 import type { DayOfWeek, GymRoutine } from '../../types';
 import { ModalShell } from '../common/ModalShell';
 import { getLocalIsoDate } from '../../utils/gymAttendance';
+import { ReminderPresetPicker } from '../calendar/ReminderPresetPicker';
+import { DEFAULT_GYM_REMINDER_MINUTES } from '../../utils/reminderPresets';
 import {
   GYM_CATALOG,
   GOAL_CATALOG,
@@ -127,6 +129,9 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   const [targetWeightKg, setTargetWeightKg] = useState<string>(
     initialProfile?.targetWeightKg ? String(initialProfile.targetWeightKg) : ''
   );
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number[]>(
+    initialProfile?.reminderMinutesBefore ?? DEFAULT_GYM_REMINDER_MINUTES
+  );
   const [replaceRoutines, setReplaceRoutines] = useState<boolean>(!initialProfile);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -219,6 +224,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       targetWeightKg: parsedTarget,
       bmi: bmiInfo.bmi,
       bmiCategory: bmiInfo.category,
+      reminderMinutesBefore,
       configuredAt: getLocalIsoDate(),
     };
 
@@ -706,6 +712,17 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
                   <span>&ge;30</span>
                 </div>
               </div>
+            </div>
+
+            {/* Alarma predeterminada antes de entrenar */}
+            <div className="p-4 rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)]">
+              <ReminderPresetPicker
+                compact
+                value={reminderMinutesBefore}
+                onChange={setReminderMinutesBefore}
+                label="Aviso predeterminado antes de entrenar"
+                helperText="Se usará al programar o sincronizar tus sesiones con Google Calendar."
+              />
             </div>
 
             {/* Smart Routine Confirmation if Existing Routines Exist */}

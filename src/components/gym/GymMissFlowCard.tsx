@@ -30,6 +30,8 @@ import {
 } from '../../utils/gymAttendance';
 import { getGymDisplayName } from '../../utils/routineGenerator';
 import { SmartSlotReschedulePicker } from './SmartSlotReschedulePicker';
+import { ReminderPresetPicker } from '../calendar/ReminderPresetPicker';
+import { DEFAULT_GYM_REMINDER_MINUTES } from '../../utils/reminderPresets';
 
 export interface GymMissFlowCardProps {
   dayOfWeek: DayOfWeek;
@@ -42,6 +44,7 @@ export interface GymMissFlowCardProps {
   goal?: FitnessGoal;
   gymType?: GymType;
   customGymName?: string;
+  defaultReminderMinutes?: number[];
   rescheduleOptions: RescheduleOption[];
   calendarBlocks?: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
@@ -62,6 +65,7 @@ export interface GymMissFlowCardProps {
     fromDate: string;
     toDay: DayOfWeek;
     mode: RescheduleMode;
+    reminderMinutes?: number[];
     selectedSlot?: {
       dateIso: string;
       startTime: string;
@@ -82,6 +86,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
   goal,
   gymType,
   customGymName,
+  defaultReminderMinutes,
   rescheduleOptions,
   calendarBlocks = [],
   externalBusyByDate,
@@ -102,6 +107,9 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
     return first ? `${first.targetDay}::${first.mode}` : '';
   });
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
+  const [reminderMinutes, setReminderMinutes] = useState<number[]>(
+    () => defaultReminderMinutes ?? DEFAULT_GYM_REMINDER_MINUTES
+  );
 
   const stageOneHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const stageTwoHeadingRef = useRef<HTMLHeadingElement | null>(null);
@@ -176,6 +184,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
       fromDate: dateIso,
       toDay: selectedOption.targetDay,
       mode: selectedOption.mode,
+      reminderMinutes,
       selectedSlot: activeSlot
         ? {
             dateIso: activeSlot.dateIso,
@@ -513,7 +522,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
               )}
 
               {rescheduleOptions.length > 0 && selectedOption && (
-                <div className="pt-4 border-t border-[var(--line)]">
+                <div className="pt-4 border-t border-[var(--line)] space-y-4">
                   <SmartSlotReschedulePicker
                     slots={smartSlots}
                     selectedSlotId={activeSlot?.id ?? ''}
@@ -525,6 +534,20 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                     legendText={`Horario libre de 2 horas para el ${selectedOption.targetDay}`}
                     emptyMessage={`No encontramos un hueco libre de 2 horas el ${selectedOption.targetDay} entre 07:00 y 22:00. Igual puedes reprogramar la rutina en tu plan semanal.`}
                   />
+
+                  <div className="pt-3 border-t border-[var(--line)]">
+                    <ReminderPresetPicker
+                      compact
+                      value={reminderMinutes}
+                      onChange={setReminderMinutes}
+                      label="Alarma antes de tu entreno reprogramado"
+                      helperText={
+                        isGoogleConnected
+                          ? 'Se agregará esta alarma popup directa en Google Calendar.'
+                          : 'Se guardará en tu bloque y se aplicará al conectar Google Calendar.'
+                      }
+                    />
+                  </div>
                 </div>
               )}
 

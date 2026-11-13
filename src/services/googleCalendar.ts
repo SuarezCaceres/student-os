@@ -7,13 +7,22 @@ export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
 const GOOGLE_TOKEN_SESSION_KEY = 'student_os_gcal_token';
 
 const GOOGLE_GSI_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
+const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
 const GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_CALENDAR_SCOPES =
-  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+  'openid profile email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+
+export interface GoogleUserProfile {
+  name?: string;
+  email?: string;
+  avatarUrl?: string;
+}
 
 export interface GoogleCalendarMeta {
   connected: boolean;
   email?: string;
+  userName?: string;
+  avatarUrl?: string;
   calendarName?: string;
   connectedAt?: string;
   lastSyncedAt?: string;
@@ -23,6 +32,20 @@ export interface GoogleCalendarConnectionResult {
   accessToken: string;
   expiresAt: number;
   meta: GoogleCalendarMeta;
+  user: GoogleUserProfile;
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  title: string;
+  day: DayOfWeek;
+  dateIso: string;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  isAllDay?: boolean;
+  location?: string;
+  htmlLink?: string;
+  reminderMinutes?: number[];
 }
 
 export interface UpsertGoogleGymEventParams {
@@ -34,6 +57,7 @@ export interface UpsertGoogleGymEventParams {
   location?: string;
   description?: string;
   timeZone?: string;
+  reminderMinutes?: number[];
 }
 
 export interface UpsertGoogleGymEventResult {
@@ -139,6 +163,14 @@ function saveStoredMeta(meta: GoogleCalendarMeta): void {
 }
 
 /**
+ * Checks whether VITE_GOOGLE_CLIENT_ID is configured via environment variables.
+ */
+export function hasEnvGoogleClientId(): boolean {
+  const envRecord = import.meta.env as Record<string, string | undefined> | undefined;
+  return Boolean((envRecord?.VITE_GOOGLE_CLIENT_ID ?? '').trim());
+}
+
+/**
  * Returns the Google OAuth 2.0 Client ID from localStorage override or VITE_GOOGLE_CLIENT_ID.
  */
 export function getConfiguredGoogleClientId(): string {
@@ -169,6 +201,8 @@ export function getStoredGoogleMeta(): GoogleCalendarMeta {
     return {
       connected: Boolean(parsed?.connected),
       email: typeof parsed?.email === 'string' ? parsed.email : undefined,
+      userName: typeof parsed?.userName === 'string' ? parsed.userName : undefined,
+      avatarUrl: typeof parsed?.avatarUrl === 'string' ? parsed.avatarUrl : undefined,
       calendarName: typeof parsed?.calendarName === 'string' ? parsed.calendarName : undefined,
       connectedAt: typeof parsed?.connectedAt === 'string' ? parsed.connectedAt : undefined,
       lastSyncedAt: typeof parsed?.lastSyncedAt === 'string' ? parsed.lastSyncedAt : undefined,
@@ -299,6 +333,31 @@ async function ensureGoogleIdentityScriptLoaded(): Promise<GoogleOAuth2Api> {
   return loadedApi;
 }
 
+export async function fetchGoogleUserProfile(accessToken: string): Promise<GoogleUserProfile> {
+  if (!accessToken.trim()) return {};
+  try {
+    const response = await fetch(GOOGLE_USERINFO_URL, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    if (!response.ok) return {};
+    const data = (await response.json()) as {
+      name?: string;
+      email?: string;
+      picture?: string;
+    };
+    return {
+      name: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : undefined,
+      email: typeof data.email === 'string' && data.email.trim() ? data.email.trim() : undefined,
+      avatarUrl:
+        typeof data.picture === 'string' && data.picture.trim() ? data.picture.trim() : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function fetchPrimaryCalendarMetadata(
   accessToken: string
 ): Promise<{ email?: string; calendarName?: string }> {
@@ -321,11 +380,89 @@ async function fetchPrimaryCalendarMetadata(
   }
 }
 
+function requestOAuthToken(
+  oauth2: GoogleOAuth2Api,
+  clientId: string,
+  prompt: string,
+  timeoutMs?: number
+): Promise<{ accessToken: string; expiresAt: number }> {
+  return new Promise<{ accessToken: string; expiresAt: number }>((resolve, reject) => {
+    let settled = false;
+    let timerId: number | null = null;
+
+    const cleanup = () => {
+      if (timerId !== null && typeof window !== 'undefined') {
+        window.clearTimeout(timerId);
+        timerId = null;
+      }
+    };
+
+    if (timeoutMs && typeof window !== 'undefined') {
+      timerId = window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('Tiempo de espera agotado al validar la sesión de Google.'));
+      }, timeoutMs);
+    }
+
+    const tokenClient = oauth2.initTokenClient({
+      client_id: clientId,
+      scope: GOOGLE_CALENDAR_SCOPES,
+      callback: (response: GoogleTokenResponse) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+
+        if (response.error) {
+          const msg =
+            response.error === 'access_denied'
+              ? 'Permiso cancelado. Debes aceptar el acceso a tu perfil y calendario para sincronizar.'
+              : `Error de autorización con Google: ${response.error_description || response.error}`;
+          reject(new Error(msg));
+          return;
+        }
+
+        if (!response.access_token) {
+          reject(new Error('Google no devolvió un token de acceso válido.'));
+          return;
+        }
+
+        const expiresInSec = Number(response.expires_in ?? 3600);
+        const expiresAt = Date.now() + Math.max(60, expiresInSec) * 1000;
+        resolve({ accessToken: response.access_token, expiresAt });
+      },
+      error_callback: (err) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (err?.type === 'popup_closed') {
+          reject(
+            new Error('Cerraste la ventana de inicio de sesión de Google antes de completar.')
+          );
+        } else if (err?.type === 'popup_failed_to_open') {
+          reject(
+            new Error(
+              'Tu navegador bloqueó la ventana emergente de Google. Permite popups para este sitio.'
+            )
+          );
+        } else {
+          reject(
+            new Error(err?.message || 'No se pudo completar la autenticación con Google.')
+          );
+        }
+      },
+    });
+
+    tokenClient.requestAccessToken({ prompt });
+  });
+}
+
 /**
- * Initiates Google OAuth 2.0 Token Client flow and caches token + connection metadata.
+ * Unified 1-step Google Sign-In + Calendar authorization (`openid profile email` + calendar scopes).
  */
-export async function connectGoogleCalendar(
-  clientIdOverride?: string
+export async function signInWithGoogleAccount(
+  clientIdOverride?: string,
+  options?: { prompt?: string }
 ): Promise<GoogleCalendarConnectionResult> {
   const customId = clientIdOverride?.trim();
   if (customId) {
@@ -335,74 +472,34 @@ export async function connectGoogleCalendar(
   const clientId = customId || getConfiguredGoogleClientId();
   if (!clientId) {
     throw new Error(
-      'Falta tu Client ID de Google OAuth 2.0. Configúralo en VITE_GOOGLE_CLIENT_ID o ingrésalo en Ajustes de Google Calendar.'
+      'Falta tu Client ID de Google OAuth 2.0. Configúralo en VITE_GOOGLE_CLIENT_ID o ingrésalo en Opciones de desarrollador.'
     );
   }
 
   const oauth2 = await ensureGoogleIdentityScriptLoaded();
-
-  const tokenResult = await new Promise<{ accessToken: string; expiresAt: number }>(
-    (resolve, reject) => {
-      let settled = false;
-
-      const tokenClient = oauth2.initTokenClient({
-        client_id: clientId,
-        scope: GOOGLE_CALENDAR_SCOPES,
-        callback: (response: GoogleTokenResponse) => {
-          if (settled) return;
-          settled = true;
-
-          if (response.error) {
-            const msg =
-              response.error === 'access_denied'
-                ? 'Permiso cancelado. Debes aceptar el acceso al calendario para sincronizar.'
-                : `Error de autorización con Google: ${response.error_description || response.error}`;
-            reject(new Error(msg));
-            return;
-          }
-
-          if (!response.access_token) {
-            reject(new Error('Google no devolvió un token de acceso válido.'));
-            return;
-          }
-
-          const expiresInSec = Number(response.expires_in ?? 3600);
-          const expiresAt = Date.now() + Math.max(60, expiresInSec) * 1000;
-          resolve({ accessToken: response.access_token, expiresAt });
-        },
-        error_callback: (err) => {
-          if (settled) return;
-          settled = true;
-          if (err?.type === 'popup_closed') {
-            reject(new Error('Cerraste la ventana de inicio de sesión de Google antes de completar.'));
-          } else if (err?.type === 'popup_failed_to_open') {
-            reject(
-              new Error(
-                'Tu navegador bloqueó la ventana emergente de Google. Permite popups para este sitio.'
-              )
-            );
-          } else {
-            reject(
-              new Error(
-                err?.message || 'No se pudo completar la autenticación con Google Calendar.'
-              )
-            );
-          }
-        },
-      });
-
-      const previousMeta = getStoredGoogleMeta();
-      tokenClient.requestAccessToken({ prompt: previousMeta.connected ? '' : 'consent' });
-    }
-  );
+  const previousMeta = getStoredGoogleMeta();
+  const prompt = options?.prompt ?? (previousMeta.connected ? '' : 'consent');
+  const tokenResult = await requestOAuthToken(oauth2, clientId, prompt);
 
   saveTokenToMemoryAndSession(tokenResult.accessToken, tokenResult.expiresAt);
-  const profile = await fetchPrimaryCalendarMetadata(tokenResult.accessToken);
+  const [userProfile, calProfile] = await Promise.all([
+    fetchGoogleUserProfile(tokenResult.accessToken),
+    fetchPrimaryCalendarMetadata(tokenResult.accessToken),
+  ]);
+
+  const resolvedEmail = userProfile.email ?? calProfile.email;
+  const user: GoogleUserProfile = {
+    name: userProfile.name,
+    email: resolvedEmail,
+    avatarUrl: userProfile.avatarUrl,
+  };
 
   const meta: GoogleCalendarMeta = {
     connected: true,
-    email: profile.email,
-    calendarName: profile.calendarName || 'Calendario principal',
+    email: resolvedEmail,
+    userName: user.name,
+    avatarUrl: user.avatarUrl,
+    calendarName: calProfile.calendarName || 'Calendario principal',
     connectedAt: new Date().toISOString(),
   };
   saveStoredMeta(meta);
@@ -411,7 +508,38 @@ export async function connectGoogleCalendar(
     accessToken: tokenResult.accessToken,
     expiresAt: tokenResult.expiresAt,
     meta,
+    user,
   };
+}
+
+/**
+ * Initiates Google OAuth 2.0 Token Client flow and caches token + connection metadata.
+ */
+export async function connectGoogleCalendar(
+  clientIdOverride?: string
+): Promise<GoogleCalendarConnectionResult> {
+  return signInWithGoogleAccount(clientIdOverride);
+}
+
+/**
+ * Silently restores an active Google access token if the user already connected previously.
+ */
+export async function trySilentGoogleReconnect(): Promise<string | null> {
+  const cached = getStoredAccessToken();
+  if (cached) return cached;
+
+  const meta = getStoredGoogleMeta();
+  const clientId = getConfiguredGoogleClientId();
+  if (!meta.connected || !clientId) return null;
+
+  try {
+    const oauth2 = await ensureGoogleIdentityScriptLoaded();
+    const tokenResult = await requestOAuthToken(oauth2, clientId, '', 6000);
+    saveTokenToMemoryAndSession(tokenResult.accessToken, tokenResult.expiresAt);
+    return tokenResult.accessToken;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -473,6 +601,225 @@ function buildErrorFromGoogleResponse(status: number, bodyText: string, fallback
     // Keep generic fallback
   }
   return new Error(`${fallback} (HTTP ${status}).`);
+}
+
+function parseIsoInstantMs(iso: string): number {
+  const temporalGlobal = (
+    globalThis as typeof globalThis & {
+      Temporal?: { Instant?: { from?: (value: string) => { epochMilliseconds: number } } };
+    }
+  ).Temporal;
+
+  if (temporalGlobal?.Instant?.from) {
+    try {
+      return temporalGlobal.Instant.from(iso).epochMilliseconds;
+    } catch {
+      // Fallback to Date.parse below
+    }
+  }
+  return Date.parse(iso);
+}
+
+function getWeekBoundsFromDates(weekDates: Record<DayOfWeek, string>) {
+  const dayEntries = ORDERED_DAYS.map((day) => ({ day, dateIso: weekDates[day] })).filter((entry) =>
+    Boolean(entry.dateIso)
+  );
+  if (dayEntries.length === 0) return null;
+
+  const sortedIsos = [...dayEntries].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+  const firstParts = parseLocalDateParts(sortedIsos[0].dateIso);
+  const lastParts = parseLocalDateParts(sortedIsos[sortedIsos.length - 1].dateIso);
+
+  const weekStartLocal = new Date(firstParts.year, firstParts.month - 1, firstParts.day, 0, 0, 0, 0);
+  const weekEndLocal = new Date(
+    lastParts.year,
+    lastParts.month - 1,
+    lastParts.day + 1,
+    0,
+    0,
+    0,
+    0
+  );
+
+  return { dayEntries, weekStartLocal, weekEndLocal };
+}
+
+/**
+ * Fetches full Google Calendar events (`singleEvents=true`) for the current week and builds both
+ * displayable `GoogleCalendarEvent[]` (with `reminders.overrides`) and `busyByDate`.
+ */
+export async function fetchGoogleEventsAndBusyForWeek(
+  accessToken: string,
+  weekDates: Record<DayOfWeek, string>
+): Promise<{
+  events: GoogleCalendarEvent[];
+  busyByDate: Record<string, BusyInterval[]>;
+}> {
+  if (!accessToken.trim()) {
+    throw new Error('Necesitas conectar tu cuenta de Google Calendar primero.');
+  }
+
+  const timeZone = getBrowserTimeZone();
+  const bounds = getWeekBoundsFromDates(weekDates);
+  if (!bounds) {
+    return { events: [], busyByDate: {} };
+  }
+
+  const { dayEntries, weekStartLocal, weekEndLocal } = bounds;
+  const query = new URLSearchParams({
+    timeMin: weekStartLocal.toISOString(),
+    timeMax: weekEndLocal.toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    timeZone,
+    maxResults: '250',
+  });
+
+  const response = await fetch(
+    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events?${query.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw buildErrorFromGoogleResponse(
+      response.status,
+      errText,
+      'No se pudieron obtener los eventos de Google Calendar'
+    );
+  }
+
+  const data = (await response.json()) as {
+    defaultReminders?: Array<{ method?: string; minutes?: number }>;
+    items?: Array<{
+      id?: string;
+      status?: string;
+      summary?: string;
+      location?: string;
+      htmlLink?: string;
+      transparency?: string;
+      start?: { dateTime?: string; date?: string };
+      end?: { dateTime?: string; date?: string };
+      reminders?: {
+        useDefault?: boolean;
+        overrides?: Array<{ method?: string; minutes?: number }>;
+      };
+    }>;
+  };
+
+  const defaultPopupMinutes = (data.defaultReminders ?? [])
+    .filter((r) => typeof r.minutes === 'number')
+    .map((r) => Math.round(r.minutes as number));
+
+  const busyByDate: Record<string, BusyInterval[]> = {};
+  for (const entry of dayEntries) {
+    busyByDate[entry.dateIso] = [];
+  }
+
+  const events: GoogleCalendarEvent[] = [];
+
+  for (const item of data.items ?? []) {
+    if (!item.id || item.status === 'cancelled') continue;
+
+    const title = item.summary?.trim() || 'Evento de Google Calendar';
+    const overrideMinutes = (item.reminders?.overrides ?? [])
+      .filter((r) => typeof r.minutes === 'number')
+      .map((r) => Math.round(r.minutes as number));
+    const reminderMinutes =
+      overrideMinutes.length > 0
+        ? overrideMinutes
+        : item.reminders?.useDefault
+          ? defaultPopupMinutes
+          : undefined;
+
+    if (item.start?.date && !item.start?.dateTime) {
+      const startIso = item.start.date;
+      const endIso = item.end?.date ?? startIso;
+      for (const { day, dateIso } of dayEntries) {
+        if (dateIso >= startIso && dateIso < endIso) {
+          events.push({
+            id: item.id,
+            title,
+            day,
+            dateIso,
+            startTime: '07:00',
+            endTime: '08:00',
+            isAllDay: true,
+            location: item.location?.trim() || undefined,
+            htmlLink: item.htmlLink,
+            reminderMinutes,
+          });
+        }
+      }
+      continue;
+    }
+
+    if (!item.start?.dateTime || !item.end?.dateTime) continue;
+
+    const eventStartMs = parseIsoInstantMs(item.start.dateTime);
+    const eventEndMs = parseIsoInstantMs(item.end.dateTime);
+    if (!Number.isFinite(eventStartMs) || !Number.isFinite(eventEndMs) || eventEndMs <= eventStartMs) {
+      continue;
+    }
+
+    const blocksAvailability = item.transparency !== 'transparent';
+
+    for (const { day, dateIso } of dayEntries) {
+      const { year, month, day: dayNum } = parseLocalDateParts(dateIso);
+      const dayStartMs = new Date(year, month - 1, dayNum, 0, 0, 0, 0).getTime();
+      const dayEndMs = new Date(year, month - 1, dayNum + 1, 0, 0, 0, 0).getTime();
+
+      if (eventStartMs < dayEndMs && eventEndMs > dayStartMs) {
+        const clampedStartMs = Math.max(eventStartMs, dayStartMs);
+        const clampedEndMs = Math.min(eventEndMs, dayEndMs);
+
+        const startTime =
+          clampedStartMs === dayStartMs ? '00:00' : formatTimeInZone(clampedStartMs, timeZone);
+        const endTime =
+          clampedEndMs === dayEndMs ? '24:00' : formatTimeInZone(clampedEndMs, timeZone);
+
+        if (startTime !== endTime) {
+          events.push({
+            id: item.id,
+            title,
+            day,
+            dateIso,
+            startTime,
+            endTime,
+            isAllDay: false,
+            location: item.location?.trim() || undefined,
+            htmlLink: item.htmlLink,
+            reminderMinutes,
+          });
+
+          if (blocksAvailability) {
+            busyByDate[dateIso].push({
+              startTime,
+              endTime,
+              title,
+              source: 'google',
+              dateIso,
+              day,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  const existingMeta = getStoredGoogleMeta();
+  if (existingMeta.connected) {
+    saveStoredMeta({
+      ...existingMeta,
+      lastSyncedAt: new Date().toISOString(),
+    });
+  }
+
+  return { events, busyByDate };
 }
 
 /**
@@ -624,7 +971,17 @@ export async function upsertGoogleGymEvent(
   }
 
   const timeZone = params.timeZone || getBrowserTimeZone();
-  const payload = {
+  const payload: {
+    summary: string;
+    location?: string;
+    description: string;
+    start: { dateTime: string; timeZone: string };
+    end: { dateTime: string; timeZone: string };
+    reminders?: {
+      useDefault: boolean;
+      overrides: Array<{ method: 'popup'; minutes: number }>;
+    };
+  } = {
     summary: params.title.trim() || 'Sesión de Gimnasio',
     location: params.location?.trim() || undefined,
     description: params.description?.trim() || 'Programado desde StudentOS PRO MAX.',
@@ -637,6 +994,24 @@ export async function upsertGoogleGymEvent(
       timeZone,
     },
   };
+
+  if (params.reminderMinutes !== undefined) {
+    const validMinutes = Array.from(
+      new Set(
+        params.reminderMinutes
+          .filter((m) => Number.isFinite(m) && m >= 0 && m <= 40_320)
+          .map((m) => Math.round(m))
+      )
+    ).slice(0, 5);
+
+    payload.reminders = {
+      useDefault: false,
+      overrides: validMinutes.map((minutes) => ({
+        method: 'popup',
+        minutes,
+      })),
+    };
+  }
 
   const attemptRequest = async (method: 'POST' | 'PATCH', targetEventId?: string) => {
     const endpoint = targetEventId
@@ -679,6 +1054,11 @@ export async function upsertGoogleGymEvent(
     htmlLink: created.htmlLink,
   };
 }
+
+/**
+ * Alias for creating or updating any general schedule block in the user's primary Google Calendar.
+ */
+export const upsertGoogleCalendarEvent = upsertGoogleGymEvent;
 
 /**
  * Deletes an event from the user's primary Google Calendar (no-op if already absent).
