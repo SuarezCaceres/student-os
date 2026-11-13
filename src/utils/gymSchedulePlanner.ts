@@ -10,6 +10,7 @@ import {
   type FreeTwoHourSlot,
 } from './calendarSlotFinder';
 import { getCurrentWeekDateMap } from './gymAttendance';
+import { expandCalendarBlocksToSegments } from './workSchedule';
 
 export type PreferredTrainingPeriod = 'auto' | 'manana' | 'tarde' | 'noche';
 
@@ -46,8 +47,8 @@ export interface SlotConflictValidation {
 export const GYM_SESSION_DURATION_MINUTES = 120;
 
 export const MANUAL_GYM_START_OPTIONS: string[] = Array.from(
-  { length: (20 - 7) * 2 + 1 },
-  (_, index) => minutesToTimeString(7 * 60 + index * 30)
+  { length: (20 - 6) * 2 + 1 },
+  (_, index) => minutesToTimeString(6 * 60 + index * 30)
 );
 
 function buildEffectiveExternalBusyByDate(
@@ -96,7 +97,8 @@ function getPeriodPreferenceScoreAdjustment(
   if (preferredPeriod === 'auto') return 0;
 
   if (preferredPeriod === 'manana') {
-    if (startMinutes >= 7 * 60 && startMinutes < 12 * 60) return 35;
+    if (startMinutes === 6 * 60) return 38;
+    if (startMinutes > 6 * 60 && startMinutes < 12 * 60) return 35;
     if (startMinutes < 14 * 60) return 8;
     return -12;
   }
@@ -159,13 +161,18 @@ export function getDayOccupiedTimeline(params: {
     });
   }
 
-  for (const block of calendarBlocks) {
-    if (block.day !== day) continue;
+  const localSegments = expandCalendarBlocksToSegments(calendarBlocks);
+  for (const seg of localSegments) {
+    if (seg.day !== day) continue;
+    const title =
+      seg.segmentRole === 'overnight_continuation'
+        ? `${seg.block.title} (turno ${seg.originDay})`
+        : seg.block.title;
     pushUnique({
-      id: `local-${block.id}`,
-      title: block.title,
-      startTime: block.startTime,
-      endTime: block.endTime,
+      id: `local-${seg.segmentId}`,
+      title,
+      startTime: seg.startTime,
+      endTime: seg.endTime,
       source: 'local',
     });
   }
@@ -207,7 +214,7 @@ export function validateGymSlotAgainstCalendar(params: {
   if (slotStart < CALENDAR_START_MINUTES || slotEnd > CALENDAR_END_MINUTES) {
     return {
       hasConflict: true,
-      conflictTitle: 'Horario fuera de rango permitido (07:00–22:00)',
+      conflictTitle: 'Horario fuera de rango permitido (06:00–22:00)',
       conflictSource: 'local',
       conflictStart: minutesToTimeString(slotStart),
       conflictEnd: minutesToTimeString(slotEnd),
@@ -231,17 +238,21 @@ export function validateGymSlotAgainstCalendar(params: {
     }
   }
 
-  for (const block of calendarBlocks) {
-    if (block.day !== day) continue;
-    const blockStart = timeStringToMinutes(block.startTime);
-    const blockEnd = timeStringToMinutes(block.endTime);
+  const localSegments = expandCalendarBlocksToSegments(calendarBlocks);
+  for (const seg of localSegments) {
+    if (seg.day !== day) continue;
+    const blockStart = timeStringToMinutes(seg.startTime);
+    const blockEnd = timeStringToMinutes(seg.endTime);
     if (Math.max(slotStart, blockStart) < Math.min(slotEnd, blockEnd)) {
       return {
         hasConflict: true,
-        conflictTitle: block.title,
+        conflictTitle:
+          seg.segmentRole === 'overnight_continuation'
+            ? `${seg.block.title} (turno ${seg.originDay})`
+            : seg.block.title,
         conflictSource: 'local',
-        conflictStart: block.startTime,
-        conflictEnd: block.endTime,
+        conflictStart: seg.startTime,
+        conflictEnd: seg.endTime,
       };
     }
   }
@@ -365,7 +376,7 @@ export function recommendWeeklyGymSlots(params: {
     }
 
     const fallbackStart =
-      preferredPeriod === 'manana' ? '08:00' : preferredPeriod === 'tarde' ? '15:00' : '18:00';
+      preferredPeriod === 'manana' ? '06:00' : preferredPeriod === 'tarde' ? '15:00' : '18:00';
     const fallbackEnd = minutesToTimeString(
       timeStringToMinutes(fallbackStart) + GYM_SESSION_DURATION_MINUTES
     );

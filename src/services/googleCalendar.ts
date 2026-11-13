@@ -1,6 +1,7 @@
 import type { DayOfWeek } from '../types';
 import type { BusyInterval } from '../utils/calendarSlotFinder';
 import { ORDERED_DAYS } from '../utils/routineGenerator';
+import { isOvernightTimeRange, shiftIsoDate } from '../utils/workSchedule';
 
 export const GOOGLE_CLIENT_ID_STORAGE_KEY = 'student_os_gcal_client_id';
 export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
@@ -945,8 +946,12 @@ export async function fetchGoogleBusyIntervalsForWeek(
 function toLocalRfc3339(dateIso: string, timeStr: string): string {
   const { year, month, day } = parseLocalDateParts(dateIso);
   const [hRaw = '0', mRaw = '0'] = timeStr.trim().split(':');
-  const hour = Math.max(0, Math.min(23, Number.parseInt(hRaw, 10) || 0));
-  const minute = Math.max(0, Math.min(59, Number.parseInt(mRaw, 10) || 0));
+  const parsedH = Number.parseInt(hRaw, 10) || 0;
+  const parsedM = Number.parseInt(mRaw, 10) || 0;
+  // Support '24:00' by rolling cleanly into 00:00 of the next calendar day
+  const isEndOfDayMidnight = parsedH === 24 && parsedM === 0;
+  const hour = isEndOfDayMidnight ? 24 : Math.max(0, Math.min(23, parsedH));
+  const minute = isEndOfDayMidnight ? 0 : Math.max(0, Math.min(59, parsedM));
 
   const localDate = new Date(year, month - 1, day, hour, minute, 0, 0);
   const offsetMinutes = -localDate.getTimezoneOffset();
@@ -971,6 +976,9 @@ export async function upsertGoogleGymEvent(
   }
 
   const timeZone = params.timeZone || getBrowserTimeZone();
+  const resolvedEndDateIso = isOvernightTimeRange(params.startTime, params.endTime)
+    ? shiftIsoDate(params.dateIso, 1)
+    : params.dateIso;
   const payload: {
     summary: string;
     location?: string;
@@ -990,7 +998,7 @@ export async function upsertGoogleGymEvent(
       timeZone,
     },
     end: {
-      dateTime: toLocalRfc3339(params.dateIso, params.endTime),
+      dateTime: toLocalRfc3339(resolvedEndDateIso, params.endTime),
       timeZone,
     },
   };

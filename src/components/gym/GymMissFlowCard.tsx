@@ -532,7 +532,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                     isGoogleConnected={isGoogleConnected}
                     onOpenGoogleSync={onOpenGoogleSync}
                     legendText={`Horario libre de 2 horas para el ${selectedOption.targetDay}`}
-                    emptyMessage={`No encontramos un hueco libre de 2 horas el ${selectedOption.targetDay} entre 07:00 y 22:00. Igual puedes reprogramar la rutina en tu plan semanal.`}
+                    emptyMessage={`No encontramos un hueco libre de 2 horas el ${selectedOption.targetDay} entre 06:00 y 22:00. Igual puedes reprogramar la rutina en tu plan semanal.`}
                   />
 
                   <div className="pt-3 border-t border-[var(--line)]">

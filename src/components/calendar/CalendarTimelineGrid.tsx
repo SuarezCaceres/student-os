@@ -12,10 +12,19 @@ import {
   Bell,
   CalendarCheck2,
   ExternalLink,
+  Moon,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek, Category } from '../../types';
+import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
 import { formatReminderSummary } from '../../utils/reminderPresets';
+import {
+  expandCalendarBlocksToSegments,
+  getNextDayOfWeek,
+  parseTimeToMinutes,
+  type ExpandedBlockSegment,
+} from '../../utils/workSchedule';
 
 export interface CalendarTimelineGridProps {
   blocks: CalendarBlock[];
@@ -25,6 +34,8 @@ export interface CalendarTimelineGridProps {
   selectedMobileDay?: DayOfWeek;
   onSelectMobileDay?: (day: DayOfWeek) => void;
   onRequestAddBlock?: (day: DayOfWeek) => void;
+  workShift?: WorkShiftConfig;
+  onEditWorkShift?: () => void;
 }
 
 const DAYS_OF_WEEK: { day: DayOfWeek; short: string }[] = [
@@ -47,25 +58,25 @@ const DAYS_INDEX_MAP: DayOfWeek[] = [
   'Sábado',
 ];
 
-const START_HOUR = 7; // 07:00
-const END_HOUR = 22; // 22:00
-const TOTAL_HOURS = END_HOUR - START_HOUR; // 15 hours
-const HOUR_HEIGHT = 68; // px per hour
+const FOCUSED_START_HOUR = 6; // 06:00 default view (includes 06:00-08:00 gym & 22:00-24:00 night shift start)
+const FULL_START_HOUR = 0; // 00:00 expanded dawn view
+const END_HOUR = 24; // 24:00
+const HOUR_HEIGHT = 64; // px per hour
 
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
-  return (h || 0) * 60 + (m || 0);
+interface TimelineCollisionEntry {
+  id: string;
+  parentId: string;
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
 }
 
-function checkIntervalCollision(
-  a: { id: string; day: DayOfWeek; startTime: string; endTime: string },
-  b: { id: string; day: DayOfWeek; startTime: string; endTime: string }
-): boolean {
-  if (a.id === b.id || a.day !== b.day) return false;
-  const startA = timeToMinutes(a.startTime);
-  const endA = timeToMinutes(a.endTime);
-  const startB = timeToMinutes(b.startTime);
-  const endB = timeToMinutes(b.endTime);
+function checkIntervalCollision(a: TimelineCollisionEntry, b: TimelineCollisionEntry): boolean {
+  if (a.id === b.id || a.parentId === b.parentId || a.day !== b.day) return false;
+  const startA = parseTimeToMinutes(a.startTime);
+  const endA = parseTimeToMinutes(a.endTime);
+  const startB = parseTimeToMinutes(b.startTime);
+  const endB = parseTimeToMinutes(b.endTime);
 
   return startA < endB && startB < endA;
 }
@@ -86,11 +97,14 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
   selectedMobileDay,
   onSelectMobileDay,
   onRequestAddBlock,
+  workShift,
+  onEditWorkShift,
 }) => {
   const [timeSnapshot, setTimeSnapshot] = useState(readCurrentTimeSnapshot);
   const [internalMobileDay, setInternalMobileDay] = useState<DayOfWeek>(
     () => readCurrentTimeSnapshot().todayDay
   );
+  const [showEarlyMorning, setShowEarlyMorning] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -110,7 +124,9 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
     }
   };
 
-  const timelineStartMinutes = START_HOUR * 60;
+  const activeStartHour = showEarlyMorning ? FULL_START_HOUR : FOCUSED_START_HOUR;
+  const totalHours = END_HOUR - activeStartHour;
+  const timelineStartMinutes = activeStartHour * 60;
   const timelineEndMinutes = END_HOUR * 60;
   const isCurrentTimeVisible =
     currentMinutes >= timelineStartMinutes && currentMinutes <= timelineEndMinutes;
@@ -150,7 +166,10 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
     }
   };
 
-  const hoursArray = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
+  const hoursArray = Array.from({ length: totalHours + 1 }, (_, i) => activeStartHour + i);
+
+  // Expand overnight blocks into clean same-day [00:00, 24:00] segments
+  const expandedLocalSegments = expandCalendarBlocksToSegments(blocks);
 
   // Deduplicate Google Calendar events already mirrored onto a local block via googleEventId
   const syncedGoogleIds = new Set(
@@ -162,32 +181,127 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
   const timedExternalGoogle = externalGoogleEvents.filter((ev) => !ev.isAllDay);
   const allDayExternalGoogle = externalGoogleEvents.filter((ev) => ev.isAllDay);
 
-  const allTimedIntervals = [
-    ...blocks.map((b) => ({ id: b.id, day: b.day, startTime: b.startTime, endTime: b.endTime })),
+  const allTimedIntervals: TimelineCollisionEntry[] = [
+    ...expandedLocalSegments.map((seg) => ({
+      id: seg.segmentId,
+      parentId: seg.block.id,
+      day: seg.day,
+      startTime: seg.startTime,
+      endTime: seg.endTime,
+    })),
     ...timedExternalGoogle.map((ev) => ({
       id: `gcal-${ev.id}-${ev.dateIso}`,
+      parentId: `gcal-${ev.id}`,
       day: ev.day,
       startTime: ev.startTime,
       endTime: ev.endTime,
     })),
   ];
 
-  // Detect any conflicting blocks across the week (including against Google events) for clear feedback
-  const conflictingBlocks = blocks.filter((block) =>
-    allTimedIntervals.some((other) => checkIntervalCollision(block, other))
+  // Detect any conflicting segments across the 24h week (even when madrugada is folded)
+  const conflictingSegments = expandedLocalSegments.filter((seg) =>
+    allTimedIntervals.some((other) =>
+      checkIntervalCollision(
+        {
+          id: seg.segmentId,
+          parentId: seg.block.id,
+          day: seg.day,
+          startTime: seg.startTime,
+          endTime: seg.endTime,
+        },
+        other
+      )
+    )
   );
-  const conflictingDays = Array.from(new Set(conflictingBlocks.map((b) => b.day)));
+  const conflictingDays = Array.from(new Set(conflictingSegments.map((s) => s.day)));
+
+  const earlyMorningCount =
+    expandedLocalSegments.filter((seg) => parseTimeToMinutes(seg.startTime) < 6 * 60).length +
+    timedExternalGoogle.filter((ev) => parseTimeToMinutes(ev.startTime) < 6 * 60).length;
 
   const countDayItems = (day: DayOfWeek) =>
-    blocks.filter((b) => b.day === day).length +
+    expandedLocalSegments.filter((seg) => seg.day === day).length +
     externalGoogleEvents.filter((ev) => ev.day === day).length;
 
   const activeMobileDayCount = countDayItems(activeMobileDay);
 
   return (
     <div className="space-y-3">
+      {/* Night Shift Summary Chip & Focused 06:00–24:00 vs Expand Dawn 00:00–06:00 Bar */}
+      {(workShift?.enabled || earlyMorningCount > 0) && (
+        <div className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--ink)] min-w-0">
+            <span className="t-badge t-badge-ok">
+              <Moon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span className="t-num">
+                {workShift?.enabled
+                  ? `${workShift.title}: ${workShift.startTime}–${workShift.endTime}`
+                  : 'Bloques de madrugada'}
+              </span>
+            </span>
+            {workShift?.enabled && (
+              <span className="text-[var(--muted)]">
+                {workShift.restDay ? (
+                  <>
+                    Descanso:{' '}
+                    <strong className="text-[var(--ink)] font-medium">
+                      noche de {workShift.restDay}
+                    </strong>{' '}
+                    <span className="t-num">
+                      (sin entrada {workShift.startTime} → {getNextDayOfWeek(workShift.restDay)}{' '}
+                      {workShift.endTime})
+                    </span>
+                  </>
+                ) : (
+                  'Turno diario (7 días/semana)'
+                )}
+              </span>
+            )}
+            {!workShift?.enabled && earlyMorningCount > 0 && (
+              <span className="text-[var(--muted)] t-num">
+                {earlyMorningCount} {earlyMorningCount === 1 ? 'bloque' : 'bloques'} entre 00:00 y 06:00
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onEditWorkShift && (
+              <button
+                type="button"
+                onClick={onEditWorkShift}
+                className="t-btn t-btn-ghost text-[13px] px-3 min-h-[44px]"
+              >
+                <Briefcase className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Editar turno</span>
+              </button>
+            )}
+            <button
+              type="button"
+              aria-pressed={showEarlyMorning}
+              onClick={() => setShowEarlyMorning((prev) => !prev)}
+              className={`min-h-[44px] px-3 py-1.5 rounded-[10px] border text-[13px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                showEarlyMorning
+                  ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] text-[var(--action)]'
+                  : 'border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--action)]'
+              }`}
+            >
+              {showEarlyMorning ? (
+                <ChevronUp className="w-4 h-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )}
+              <span>
+                {showEarlyMorning
+                  ? 'Vista enfocada (06:00–24:00)'
+                  : `Ver madrugada (00:00–06:00)${earlyMorningCount > 0 ? ` · ${earlyMorningCount}` : ''}`}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Conflict Notice */}
-      {conflictingBlocks.length > 0 && (
+      {conflictingSegments.length > 0 && (
         <div
           role="status"
           className="rounded-[14px] border border-[color-mix(in_oklab,var(--danger)_36%,var(--line))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--surface))] px-4 py-3 flex items-start gap-3"
@@ -202,9 +316,9 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
             </span>
             <span>
               Tienes{' '}
-              {conflictingBlocks.length === 1
+              {conflictingSegments.length === 1
                 ? '1 bloque que se cruza'
-                : `${conflictingBlocks.length} bloques que se cruzan`}{' '}
+                : `${conflictingSegments.length} bloques que se cruzan`}{' '}
               en <span className="font-medium">{conflictingDays.join(', ')}</span>. Revisa los bloques
               resaltados en rojo.
             </span>
@@ -344,10 +458,10 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           })}
         </div>
 
-        {/* Timeline Body (07:00 to 22:00) */}
+        {/* Timeline Body */}
         <div
           className="grid grid-cols-[58px_minmax(0,1fr)] md:grid-cols-[64px_repeat(7,minmax(0,1fr))] relative"
-          style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}
+          style={{ height: `${totalHours * HOUR_HEIGHT}px` }}
         >
           {/* Horizontal Hour Hairlines */}
           <div className="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
@@ -377,25 +491,47 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           {DAYS_OF_WEEK.map(({ day }) => {
             const isToday = day === todayDay;
             const isMobileActive = day === activeMobileDay;
-            const dayBlocks = blocks
-              .filter((b) => b.day === day)
+            const daySegments = expandedLocalSegments
+              .filter((seg) => seg.day === day)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
             const dayGoogleTimed = timedExternalGoogle
               .filter((ev) => ev.day === day)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-            const unifiedDayIntervals = [
-              ...dayBlocks.map((b) => ({
+            type UnifiedTimelineItem =
+              | {
+                  kind: 'local';
+                  id: string;
+                  parentId: string;
+                  day: DayOfWeek;
+                  startTime: string;
+                  endTime: string;
+                  segment: ExpandedBlockSegment;
+                }
+              | {
+                  kind: 'google';
+                  id: string;
+                  parentId: string;
+                  day: DayOfWeek;
+                  startTime: string;
+                  endTime: string;
+                  event: GoogleCalendarEvent;
+                };
+
+            const unifiedDayIntervals: UnifiedTimelineItem[] = [
+              ...daySegments.map((seg) => ({
                 kind: 'local' as const,
-                id: b.id,
-                day: b.day,
-                startTime: b.startTime,
-                endTime: b.endTime,
-                block: b,
+                id: seg.segmentId,
+                parentId: seg.block.id,
+                day: seg.day,
+                startTime: seg.startTime,
+                endTime: seg.endTime,
+                segment: seg,
               })),
               ...dayGoogleTimed.map((ev) => ({
                 kind: 'google' as const,
                 id: `gcal-${ev.id}-${ev.dateIso}`,
+                parentId: `gcal-${ev.id}`,
                 day: ev.day,
                 startTime: ev.startTime,
                 endTime: ev.endTime,
@@ -403,12 +539,22 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
               })),
             ].sort((a, b) => a.startTime.localeCompare(b.startTime) || a.endTime.localeCompare(b.endTime));
 
+            // Filter strictly within visible [timelineStartMinutes, timelineEndMinutes] before lane placement
+            // so collapsed madrugada (00:00-06:00) blocks never leak a stub at 06:00-06:30.
+            const visibleDayIntervals = unifiedDayIntervals.filter((item) => {
+              const rawStart = parseTimeToMinutes(item.startTime);
+              const rawEnd = parseTimeToMinutes(item.endTime);
+              return rawEnd > timelineStartMinutes && rawStart < timelineEndMinutes;
+            });
+
             // Compute side-by-side lane placement for colliding items so overlapping events stay readable
             const placedIntervals = (() => {
               const laneEnds: number[] = [];
-              const initial = unifiedDayIntervals.map((item) => {
-                const s = Math.max(timelineStartMinutes, Math.min(timelineEndMinutes - 30, timeToMinutes(item.startTime)));
-                const e = Math.min(timelineEndMinutes, Math.max(s + 30, timeToMinutes(item.endTime)));
+              const initial = visibleDayIntervals.map((item) => {
+                const rawStart = parseTimeToMinutes(item.startTime);
+                const rawEnd = parseTimeToMinutes(item.endTime);
+                const s = Math.max(timelineStartMinutes, Math.min(timelineEndMinutes - 30, rawStart));
+                const e = Math.min(timelineEndMinutes, Math.max(s + 30, rawEnd));
                 let lane = laneEnds.findIndex((endVal) => endVal <= s);
                 if (lane === -1) {
                   lane = laneEnds.length;
@@ -537,16 +683,25 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                     );
                   }
 
-                  const block = item.block;
+                  const segment = item.segment;
+                  const block = segment.block;
                   const styles = getCategoryStyles(block.category);
                   const Icon = styles.icon;
                   const hasAlarm = Boolean(
                     block.reminderMinutes && block.reminderMinutes.length > 0
                   );
+                  const displayTimeCompact =
+                    heightPx < 52 || laneCount > 1
+                      ? segment.startTime
+                      : segment.segmentRole === 'overnight_start'
+                      ? `${block.startTime}–${block.endTime} (+1d)`
+                      : segment.segmentRole === 'overnight_continuation'
+                      ? `00:00–${segment.endTime} (turno ${segment.originDay.slice(0, 3)})`
+                      : `${segment.startTime}–${segment.endTime}`;
 
                   return (
                     <div
-                      key={block.id}
+                      key={segment.segmentId}
                       style={{
                         top: `${topPx + 1}px`,
                         height: `${heightPx}px`,
@@ -571,9 +726,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                                 hasConflict ? 'text-[var(--danger)]' : styles.accentText
                               }`}
                             >
-                              {heightPx < 52 || laneCount > 1
-                                ? block.startTime
-                                : `${block.startTime}–${block.endTime}`}
+                              {displayTimeCompact}
                             </span>
                             {heightPx < 52 && (
                               <span className="text-[13px] font-medium text-[var(--ink)] truncate">

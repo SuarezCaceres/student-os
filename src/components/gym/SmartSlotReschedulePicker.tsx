@@ -33,7 +33,7 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
   isGoogleConnected = false,
   onOpenGoogleSync,
   legendText = 'Elige un bloque libre de 2 horas para reprogramar tu sesión',
-  emptyMessage = 'No hay ventanas libres de 2 horas entre las 07:00 y 22:00 en los días disponibles de esta semana.',
+  emptyMessage = 'No hay ventanas libres de 2 horas entre las 06:00 y 22:00 en los días disponibles de esta semana.',
 }) => {
   const baseId = useId();
   const radioGroupName = `${baseId}-smart-slot-group`;
@@ -63,7 +63,7 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
           <p className="text-[13px] text-[var(--muted)] leading-snug">
             {isGoogleConnected
               ? 'Cruce verificado contra tu Horario semanal y Google Calendar.'
-              : 'Calculado sobre tus bloques de Horario semanal (07:00 – 22:00).'}
+              : 'Calculado sobre tus bloques de Horario semanal (06:00 – 22:00).'}
           </p>
 
           {onOpenGoogleSync && (

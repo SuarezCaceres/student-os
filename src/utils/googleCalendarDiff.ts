@@ -8,6 +8,7 @@ import {
 } from './calendarSlotFinder';
 import { getCurrentWeekDateMap } from './gymAttendance';
 import { ORDERED_DAYS } from './routineGenerator';
+import { expandCalendarBlocksToSegments, isOvernightTimeRange } from './workSchedule';
 
 export const GOOGLE_SNAPSHOT_STORAGE_KEY = 'student_os_gcal_snapshot_v1';
 
@@ -267,7 +268,9 @@ function buildSolutionOptionsForBlock(params: {
   const { block, otherBlocks, externalBusyByDate, weekDates } = params;
   const startMin = timeStringToMinutes(block.startTime);
   const endMin = timeStringToMinutes(block.endTime);
-  const durationMinutes = Math.max(30, endMin - startMin || 120);
+  const durationMinutes = isOvernightTimeRange(block.startTime, block.endTime)
+    ? Math.max(30, 24 * 60 - startMin + endMin)
+    : Math.max(30, endMin - startMin || 120);
 
   // Order candidate days starting on the same day, then subsequent days of the week
   const dayIdx = ORDERED_DAYS.indexOf(block.day);
@@ -322,18 +325,19 @@ export function evaluateScheduleConflicts(params: {
   );
 
   // Build external timed busy intervals excluding all-day chips and mirrored StudentOS blocks
+  const expandedSegments = expandCalendarBlocksToSegments(blocks);
   const externalTimedByDay = new Map<DayOfWeek, Array<{ start: number; end: number; title: string }>>();
   const filteredBusyForSolver: Record<string, BusyInterval[]> = {};
 
   for (const [dateIso, list] of Object.entries(externalBusyByDate)) {
     filteredBusyForSolver[dateIso] = list.filter((item) => {
-      const matchesMirrored = blocks.some(
-        (b) =>
-          b.googleEventId &&
-          b.day === item.day &&
-          b.startTime === item.startTime &&
-          b.endTime === item.endTime &&
-          b.title.trim() === item.title.trim()
+      const matchesMirrored = expandedSegments.some(
+        (seg) =>
+          seg.block.googleEventId &&
+          seg.day === item.day &&
+          seg.startTime === item.startTime &&
+          seg.endTime === item.endTime &&
+          seg.block.title.trim() === item.title.trim()
       );
       return !matchesMirrored;
     });
@@ -352,18 +356,17 @@ export function evaluateScheduleConflicts(params: {
 
   const conflicts: ScheduleConflictDetail[] = [];
 
-  for (const block of blocks) {
-    const bStart = timeStringToMinutes(block.startTime);
-    const bEnd = timeStringToMinutes(block.endTime);
+  for (const seg of expandedSegments) {
+    const bStart = timeStringToMinutes(seg.startTime);
+    const bEnd = timeStringToMinutes(seg.endTime);
     if (bEnd <= bStart) continue;
 
-    const externalMatches = (externalTimedByDay.get(block.day) ?? []).filter(
+    const externalMatches = (externalTimedByDay.get(seg.day) ?? []).filter(
       (ext) => bStart < ext.end && ext.start < bEnd
     );
 
-    const otherBlocks = blocks.filter((b) => b.id !== block.id);
-    const siblingMatches = otherBlocks.filter((sib) => {
-      if (sib.day !== block.day) return false;
+    const siblingMatches = expandedSegments.filter((sib) => {
+      if (sib.block.id === seg.block.id || sib.day !== seg.day) return false;
       const sStart = timeStringToMinutes(sib.startTime);
       const sEnd = timeStringToMinutes(sib.endTime);
       return bStart < sEnd && sStart < bEnd;
@@ -383,22 +386,22 @@ export function evaluateScheduleConflicts(params: {
     const overlapStart = minutesToTimeString(Math.max(bStart, conflictStartMin));
     const overlapEnd = minutesToTimeString(Math.min(bEnd, conflictEndMin));
 
-    // Treat sibling block as occupied too when solving
+    const otherBlocks = blocks.filter((b) => b.id !== seg.block.id);
     const solutions = buildSolutionOptionsForBlock({
-      block,
+      block: seg.block,
       otherBlocks,
       externalBusyByDate: filteredBusyForSolver,
       weekDates,
     });
 
     conflicts.push({
-      id: `conflict-${block.id}-${block.day}-${overlapStart.replace(':', '')}`,
-      day: block.day,
-      dateIso: weekDates[block.day] ?? '',
+      id: `conflict-${seg.segmentId}-${seg.day}-${overlapStart.replace(':', '')}`,
+      day: seg.day,
+      dateIso: weekDates[seg.day] ?? '',
       overlapStart,
       overlapEnd,
-      localBlock: block,
-      conflictingWithTitle: firstExternal ? firstExternal.title : firstSibling!.title,
+      localBlock: seg.block,
+      conflictingWithTitle: firstExternal ? firstExternal.title : firstSibling!.block.title,
       conflictingWithSource: firstExternal ? 'google' : 'local',
       conflictingStart: minutesToTimeString(conflictStartMin),
       conflictingEnd: minutesToTimeString(conflictEndMin),
@@ -437,9 +440,28 @@ export function applyMobileMirrorAndEvaluateImpact(params: {
   );
 
   const changes = diffGoogleEvents(previousEvents, nextEvents, linkedGoogleEventIds);
-  const nextById = new Map<string, GoogleCalendarEvent>();
+  const nextSlicesById = new Map<string, GoogleCalendarEvent[]>();
   for (const ev of nextEvents) {
-    if (!nextById.has(ev.id)) nextById.set(ev.id, ev);
+    const list = nextSlicesById.get(ev.id) ?? [];
+    list.push(ev);
+    nextSlicesById.set(ev.id, list);
+  }
+
+  const nextById = new Map<string, GoogleCalendarEvent>();
+  for (const [id, slices] of nextSlicesById.entries()) {
+    if (slices.length >= 2) {
+      const sorted = [...slices].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
+      const first = sorted[0];
+      const second = sorted[1];
+      if (first.endTime === '24:00' && second.startTime === '00:00') {
+        nextById.set(id, {
+          ...first,
+          endTime: second.endTime,
+        });
+        continue;
+      }
+    }
+    nextById.set(id, slices[0]);
   }
 
   const deletedEventIds = new Set(

@@ -16,8 +16,9 @@ import {
   CalendarCheck2,
   RefreshCw,
   ExternalLink,
+  Moon,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek, Category } from '../../types';
+import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
 import { triggerConfetti } from '../../utils/confetti';
 import { exportCalendarToICS } from '../../utils/icsExport';
@@ -27,10 +28,18 @@ import { ModalShell } from '../common/ModalShell';
 import { CalendarTimelineGrid } from './CalendarTimelineGrid';
 import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
 import { ReminderPresetPicker } from './ReminderPresetPicker';
+import { WorkShiftModal } from './WorkShiftModal';
 import {
   DEFAULT_BLOCK_REMINDER_MINUTES,
   formatReminderSummary,
 } from '../../utils/reminderPresets';
+import {
+  DEFAULT_NIGHT_WORK_SHIFT,
+  doCalendarBlocksCollide,
+  expandCalendarBlocksToSegments,
+  isOvernightTimeRange,
+  parseTimeToMinutes,
+} from '../../utils/workSchedule';
 
 export interface WeeklyCalendarProps {
   blocks: CalendarBlock[];
@@ -42,6 +51,9 @@ export interface WeeklyCalendarProps {
   googleBusyCount?: number;
   onOpenGoogleSync?: () => void;
   onRefreshGoogleWeek?: () => void;
+  workShift?: WorkShiftConfig;
+  isSavingWorkShift?: boolean;
+  onSaveWorkShift?: (config: WorkShiftConfig, options: { syncToGoogle: boolean }) => Promise<void> | void;
 }
 
 const DAYS_OF_WEEK: DayOfWeek[] = [
@@ -64,19 +76,8 @@ const DAYS_INDEX_MAP: DayOfWeek[] = [
   'Sábado',
 ];
 
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
-  return (h || 0) * 60 + (m || 0);
-}
-
 function checkBlockCollision(a: CalendarBlock, b: CalendarBlock): boolean {
-  if (a.id === b.id || a.day !== b.day) return false;
-  const startA = timeToMinutes(a.startTime);
-  const endA = timeToMinutes(a.endTime);
-  const startB = timeToMinutes(b.startTime);
-  const endB = timeToMinutes(b.endTime);
-
-  return startA < endB && startB < endA;
+  return doCalendarBlocksCollide(a, b);
 }
 
 export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
@@ -89,11 +90,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   googleBusyCount = 0,
   onOpenGoogleSync,
   onRefreshGoogleWeek,
+  workShift,
+  isSavingWorkShift = false,
+  onSaveWorkShift,
 }) => {
   const [todayDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
   const [viewMode, setViewMode] = useState<'grid' | 'columns'>('grid');
   const [mobileDay, setMobileDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
   const [isFallbackSyncOpen, setIsFallbackSyncOpen] = useState(false);
+  const [isWorkShiftModalOpen, setIsWorkShiftModalOpen] = useState(false);
+  const resolvedWorkShift = workShift ?? { ...DEFAULT_NIGHT_WORK_SHIFT, enabled: false };
   const [showGoogleEvents, setShowGoogleEvents] = useState(true);
 
   const handleOpenGoogleSync = () => {
@@ -145,8 +151,8 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     const trimmedTitle = formTitle.trim();
     if (!trimmedTitle) return;
 
-    if (timeToMinutes(formEnd) <= timeToMinutes(formStart)) {
-      setTimeError('La hora de fin debe ser posterior a la hora de inicio.');
+    if (parseTimeToMinutes(formEnd) === parseTimeToMinutes(formStart)) {
+      setTimeError('La hora de fin debe ser distinta a la hora de inicio.');
       return;
     }
 
@@ -225,8 +231,9 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     title: formTitle || 'Nuevo bloque',
     category: formCategory,
   };
+  const formIsOvernight = isOvernightTimeRange(formStart, formEnd);
   const modalConflicts =
-    timeToMinutes(formEnd) > timeToMinutes(formStart)
+    parseTimeToMinutes(formEnd) !== parseTimeToMinutes(formStart)
       ? blocks.filter((existing) => checkBlockCollision(previewCandidate, existing))
       : [];
 
@@ -271,6 +278,24 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   aria-hidden="true"
                 />
                 <span>{isGoogleSyncing ? 'Actualizando...' : 'Actualizar Google'}</span>
+              </button>
+            )}
+
+            {onSaveWorkShift && (
+              <button
+                type="button"
+                onClick={() => setIsWorkShiftModalOpen(true)}
+                className="t-btn t-btn-secondary"
+                title="Configurar turno laboral recurrente (ej. 22:00–06:00 y día de descanso)"
+              >
+                <Briefcase className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Turno laboral</span>
+                {workShift?.enabled && (
+                  <span
+                    aria-label="Turno activo"
+                    className="w-2 h-2 rounded-full bg-[var(--ok)] shrink-0"
+                  />
+                )}
               </button>
             )}
 
@@ -368,20 +393,23 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           selectedMobileDay={mobileDay}
           onSelectMobileDay={setMobileDay}
           onRequestAddBlock={openAddModal}
+          workShift={workShift}
+          onEditWorkShift={onSaveWorkShift ? () => setIsWorkShiftModalOpen(true) : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {DAYS_OF_WEEK.map((day) => {
             const isToday = day === todayDay;
-            const dayBlocks = blocks
-              .filter((b) => b.day === day)
+            const expandedAllSegments = expandCalendarBlocksToSegments(blocks);
+            const daySegments = expandedAllSegments
+              .filter((seg) => seg.day === day)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
             const dayGoogle = showGoogleEvents
               ? externalGoogleEvents
                   .filter((ev) => ev.day === day)
                   .sort((a, b) => a.startTime.localeCompare(b.startTime))
               : [];
-            const totalDayCount = dayBlocks.length + dayGoogle.length;
+            const totalDayCount = daySegments.length + dayGoogle.length;
 
             return (
               <article
@@ -419,9 +447,10 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     </div>
                   ) : (
                     <div className="mt-3">
-                      {dayBlocks.map((block) => {
+                      {daySegments.map((segment) => {
+                        const block = segment.block;
                         const meta = getCategoryMeta(block.category);
-                        const hasConflict = dayBlocks.some((other) =>
+                        const hasConflict = blocks.some((other) =>
                           checkBlockCollision(block, other)
                         );
                         const hasAlarm = Boolean(
@@ -430,7 +459,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
 
                         return (
                           <div
-                            key={block.id}
+                            key={segment.segmentId}
                             className="t-row group flex items-start justify-between gap-2.5"
                           >
                             <div className="min-w-0 flex-1">
@@ -447,7 +476,11 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                                     hasConflict ? 'text-[var(--danger)]' : 'text-[var(--muted)]'
                                   }`}
                                 >
-                                  {block.startTime} – {block.endTime}
+                                  {segment.segmentRole === 'overnight_start'
+                                    ? `${block.startTime} – ${block.endTime} (+1d)`
+                                    : segment.segmentRole === 'overnight_continuation'
+                                    ? `00:00 – ${segment.endTime} · turno ${segment.originDay}`
+                                    : `${segment.startTime} – ${segment.endTime}`}
                                 </span>
                                 <span className={meta.badgeClass}>
                                   {meta.label}
@@ -692,6 +725,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
             </p>
           )}
 
+          {!timeError && formIsOvernight && (
+            <div className="rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2 flex items-center gap-2 text-[13px] text-[var(--muted)]">
+              <Moon className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span>
+                Bloque nocturno: cruza medianoche y termina al día siguiente a las{' '}
+                <span className="t-num font-medium text-[var(--ink)]">{formEnd}</span>.
+              </span>
+            </div>
+          )}
+
           {!timeError && modalConflicts.length > 0 && (
             <div className="rounded-[12px] border border-[color-mix(in_oklab,var(--warn)_38%,var(--line))] bg-[color-mix(in_oklab,var(--warn)_10%,var(--surface))] px-3.5 py-2.5 flex items-start gap-2.5 text-[13px] text-[var(--ink)]">
               <AlertTriangle
@@ -769,6 +812,18 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           isOpen={isFallbackSyncOpen}
           onClose={() => setIsFallbackSyncOpen(false)}
           calendarBlocks={blocks}
+        />
+      )}
+
+      {onSaveWorkShift && (
+        <WorkShiftModal
+          isOpen={isWorkShiftModalOpen}
+          onClose={() => setIsWorkShiftModalOpen(false)}
+          workShift={resolvedWorkShift}
+          isGoogleConnected={isGoogleConnected}
+          isSaving={isSavingWorkShift}
+          onOpenGoogleSync={handleOpenGoogleSync}
+          onSave={onSaveWorkShift}
         />
       )}
     </section>

@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  
-> **Versión actual:** `v2.10.0 (Limpieza Real de Demo, Onboarding Gym 5 Pasos Anti-Cruces y Auto-Sync Inteligente Google)`  
+> **Versión actual:** `v2.11.0 (Turno Nocturno 22:00–06:00, Descanso Jueves y Franja Gym 06:00–08:00)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -46,7 +46,7 @@ Las herramientas tradicionales de productividad (Notion, Jira, Trello, Google Ca
 - **Zero-Friction UX:** Creación de registros en 1 o 2 clics o directamente mediante inputs *inline* con la tecla `Enter`.
 - **Estructura Académica Real:** Calendario semestral estructurado por semanas (1 a 16), calculadora de promedio ponderado (GPA en escala 0-20), rúbricas interactivas y enlaces de entrega.
 - **Gym & Fitness Integrado:** Seguimiento interactivo de series (S1, S2, S3, S4), pesos en kg, repeticiones, Rest Timer para descansos, calculadora de 1RM e historial de PRs.
-- **Horario Semanal Inteligente:** Grilla horaria visual (07:00 a 22:00) con detección de colisiones de horario y exportador a Google Calendar (`.ics`).
+- **Horario Semanal Inteligente:** Grilla horaria enfocada (06:00 a 24:00) expandible a 24h completas (00:00–24:00) para turnos de madrugada (22:00–06:00 con descanso configurado), detección de colisiones de horario trans-medianoche y sincronización bidireccional con Google Calendar / `.ics`.
 - **Arquitectura Bento Grid & Hábitos:** Dashboard visual que consolida lo que el estudiante tiene que hacer **hoy**, hábitos diarios (agua, sueño, pomodoro) y backup/restore en `.json`.
 - **100% Offline & Privado:** Persistencia reactiva en `localStorage` (`student_os_state_v1`) sin depender de bases de datos lentas.
 
@@ -286,7 +286,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.10.0)** | `0666490`, `e5f0042` | Limpieza selectiva de bloques de calendario mock `cb-1`..`cb-14` para cuentas reales (`accountDataCleanup.ts`), Onboarding Gym ampliado a **5 pasos** con selector visual anti-cruces contra Google Calendar y bloques locales (`gymSchedulePlanner.ts`, `GymScheduleStepContent.tsx`), auto-sincronización sin botón (`focus` / `visibilitychange` / 45s) con espejo inteligente de ediciones desde móvil, banner no invasivo (`GoogleChangeBanner.tsx`) y modal evaluador con soluciones en 1 clic (`GoogleImpactModal.tsx`, `googleCalendarDiff.ts`) |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.11.0)** | — | Turno laboral recurrente de madrugada (`22:00–06:00`, 6 noches/semana, descanso noche de Jueves) inicializado en cuentas reales (`workSchedule.ts`, `WorkShiftModal.tsx`, `App.tsx`) con sincronización cross-midnight (`dateIso` → `dateIso+1`) a Google Calendar y `.ics`; extensión de franja Gym desde `06:00 AM` (`06:00–08:00` en `calendarSlotFinder.ts`, `gymSchedulePlanner.ts`, `GymScheduleStepContent.tsx` y `SmartSlotReschedulePicker.tsx`); tablero enfocado `06:00–24:00` con chip resumen y expansión `Ver madrugada (00:00–06:00)` en `CalendarTimelineGrid.tsx`, vista por días/modal nocturno en `WeeklyCalendar.tsx`, tarjeta `Agenda de hoy` actualizada en `OverviewBento.tsx` y ajuste de `SectionHeader.tsx`; sobrescritura/borrado directo de horario anterior de gimnasio (`gymScheduleFilter.ts`, `GymOnboardingModal.tsx`, `GymScheduleStepContent.tsx`, `GymTracker.tsx`) sin auto-cruces (p. ej. `07:00–09:00` → `06:00–08:00`), limpieza de eventos huérfanos en Google Calendar al reducir días y validación estricta por día contra Trabajo nocturno, Universidad y Google Calendar |
+| `feat/ui-taste-foundation` | v2.10.0 | `0666490`, `e5f0042`, `4003cda` | Limpieza selectiva de bloques de calendario mock `cb-1`..`cb-14` para cuentas reales (`accountDataCleanup.ts`), Onboarding Gym ampliado a **5 pasos** con selector visual anti-cruces contra Google Calendar y bloques locales (`gymSchedulePlanner.ts`, `GymScheduleStepContent.tsx`), auto-sincronización sin botón (`focus` / `visibilitychange` / 45s) con espejo inteligente de ediciones desde móvil, banner no invasivo (`GoogleChangeBanner.tsx`) y modal evaluador con soluciones en 1 clic (`GoogleImpactModal.tsx`, `googleCalendarDiff.ts`) |
 | `feat/ui-taste-foundation` | v2.9.0 | `6770a06`+ | Google Sign-In Unificado (`openid profile email` + Calendar scopes en 1 paso desde `AuthModal`), vista nativa de eventos Google Calendar dentro de `WeeklyCalendar` / `CalendarTimelineGrid` (sin duplicados por `googleEventId` y con carriles laterales en colisiones), avisos reales `reminders.overrides` vía `ReminderPresetPicker` en `Agendar bloque`, `QuickAddModal`, `GymOnboardingModal`, `GymMissFlowCard` y `GoogleCalendarSyncModal`, además de ajuste responsive en `Navbar` |
 | `feat/ui-taste-foundation` | v2.8.0 | `6770a06` | Pulido `/ui-ux-pro-max` Fase 1 + Fase 2 (`calendarSlotFinder.ts`, `googleCalendar.ts` OAuth 2.0 GIS/API v3, `GoogleCalendarSyncModal.tsx`, `SmartSlotReschedulePicker.tsx`) |
 | `feat/ui-taste-foundation` | v2.7.0 | `748c072` | Fase 1 Asistencia Diaria Gym: Start Gate (`Iniciemos con el entrenamiento de hoy`), faltas retroactivas, mensajes de aliento, racha protegida y reprogramación semanal |
@@ -309,7 +310,12 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.10.0)
+## 🚀 7. Verificación del Sistema (v2.11.0)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con `0` errores.
+- **Linter Estático:** `npx.cmd oxlint` con `0` advertencias y `0` errores sobre los 19 archivos creados/modificados (`types/index.ts`, `workSchedule.ts`, `calendarSlotFinder.ts`, `gymSchedulePlanner.ts`, `gymScheduleFilter.ts`, `googleCalendarDiff.ts`, `icsExport.ts`, `googleCalendar.ts`, `SectionHeader.tsx`, `CalendarTimelineGrid.tsx`, `WeeklyCalendar.tsx`, `WorkShiftModal.tsx`, `OverviewBento.tsx`, `GymTracker.tsx`, `GymOnboardingModal.tsx`, `GymScheduleStepContent.tsx`, `SmartSlotReschedulePicker.tsx`, `GymMissFlowCard.tsx`, `App.tsx`).
+- **Prueba E2E Playwright (`verify_night_shift_and_06am.mjs`, Chromium Desktop Dark/Light + Mobile `390x844`):** validados semilla automática del turno nocturno `22:00–06:00` (6 turnos, noche del Jueves libre), Onboarding Gym Paso 5 sugiriendo y priorizando `06:00–08:00` sin cruces tras finalizar turno a las `06:00`, edición de horario existente (`07:00–09:00` → `06:00–08:00`) con toggle de sobrescritura activo por defecto sin auto-cruces, alerta por día al desactivar sobrescritura o chocar con evento Google externo (`Clase de Algoritmos`), limpieza de eventos Google huérfanos al bajar de 4 a 3 días, botón directo `"Borrar horario anterior"` limpiando bloques locales y eventos Google, vista enfocada `06:00–24:00` y expansión completa 24h `00:00–06:00`, tarjeta `Agenda de hoy` con resumen nocturno, y edición/sincronización desde `WorkShiftModal` enviando eventos cross-midnight (`dateIso` 22:00 → `dateIso+1` 06:00) a Google Calendar API sin colisiones ni desbordamiento móvil.
+
+### Verificación v2.10.0
 - **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con `0` errores.
 - **Linter Estático:** `npx.cmd oxlint` con `0` advertencias y `0` errores en los 9 módulos creados/actualizados (`App.tsx`, `googleCalendarDiff.ts`, `accountDataCleanup.ts`, `gymSchedulePlanner.ts`, `GoogleChangeBanner.tsx`, `GoogleImpactModal.tsx`, `GymScheduleStepContent.tsx`, `GymOnboardingModal.tsx`, `GymTracker.tsx`).
 - **Prueba E2E Playwright (Chromium, modo claro/oscuro y móvil `390x844`):** validados login unificado con Google, limpieza de bloques `cb-1`..`cb-14` preservando Kanban/Universidad/Gym, apertura automática del onboarding Gym en 5 pasos con bloqueo en vivo ante eventos de Google Calendar, creación/push de los 4 bloques con `reminders.overrides`, auto-sync silencioso al volver el foco (`focus`/`visibilitychange`) sin presionar botones, banner `"Sin cruces"` vs `"Dónde choca"`, solución en 1 clic enviando `PATCH` a Google Calendar (bajando conflictos a `0`), espejo inteligente de ediciones desde móvil y cero desbordamiento horizontal ni errores de consola.

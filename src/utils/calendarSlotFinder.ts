@@ -1,9 +1,10 @@
 import type { CalendarBlock, DayOfWeek } from '../types';
 import { getCurrentWeekDateMap } from './gymAttendance';
+import { expandCalendarBlocksToSegments } from './workSchedule';
 
-export const CALENDAR_START_HOUR = 7; // 07:00 (matches CalendarTimelineGrid)
-export const CALENDAR_END_HOUR = 22; // 22:00 (matches CalendarTimelineGrid)
-export const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60; // 420
+export const CALENDAR_START_HOUR = 6; // 06:00 (allows 06:00-08:00 post-shift training)
+export const CALENDAR_END_HOUR = 22; // 22:00 (matches night shift start / evening cut-off)
+export const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60; // 360
 export const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60; // 1320
 
 export interface BusyInterval {
@@ -131,7 +132,7 @@ function buildSlotDescription(
     return `Despejado antes de "${nextBlock.title}" (inicia ${minutesToTimeString(nextBlock.start)})${tightSuffix}.`;
   }
   if (rawBusy.length === 0) {
-    return 'Día completamente libre dentro de la franja 07:00 – 22:00.';
+    return 'Día completamente libre dentro de la franja 06:00 – 22:00.';
   }
   return 'Ventana continua de 2 horas sin cruces en tu agenda.';
 }
@@ -154,11 +155,11 @@ function scoreCandidateSlot(params: {
     score += 3;
   }
 
-  // Light natural preference for balanced student training windows without excluding morning/evening
+  // Light natural preference for balanced training windows (including 06:00-08:00 post-shift)
   if (startMin >= 16 * 60 && startMin <= 19 * 60 + 30) {
     score += 16;
-  } else if (startMin >= 8 * 60 && startMin <= 10 * 60 + 30) {
-    score += 13;
+  } else if (startMin >= 6 * 60 && startMin <= 10 * 60 + 30) {
+    score += 14;
   } else if (startMin >= 14 * 60 && startMin < 16 * 60) {
     score += 12;
   } else if (startMin >= 20 * 60) {
@@ -241,8 +242,9 @@ function generateDayCandidates(params: {
       });
     }
 
+    // Do not bleed buffer past dayStartBound for overnight blocks finishing right at 06:00
     if (
-      interval.end > dayStartBound - effectiveBuffer &&
+      interval.end > dayStartBound &&
       interval.start < CALENDAR_END_MINUTES + effectiveBuffer
     ) {
       bufferedClamped.push({
@@ -359,12 +361,13 @@ export function findFreeTwoHourSlots(options: SlotFinderOptions): FreeTwoHourSlo
       minStartMinutesByDay?.[day] ?? CALENDAR_START_MINUTES
     );
 
-    const localIntervals: MinuteRange[] = calendarBlocks
-      .filter((b) => b.day === day)
-      .map((b) => ({
-        start: timeStringToMinutes(b.startTime),
-        end: timeStringToMinutes(b.endTime),
-        title: b.title || 'Bloque ocupado',
+    const expandedSegments = expandCalendarBlocksToSegments(calendarBlocks);
+    const localIntervals: MinuteRange[] = expandedSegments
+      .filter((seg) => seg.day === day)
+      .map((seg) => ({
+        start: timeStringToMinutes(seg.startTime),
+        end: timeStringToMinutes(seg.endTime),
+        title: seg.block.title || 'Bloque ocupado',
       }));
 
     const googleIntervals: MinuteRange[] = (dateIso ? externalBusyByDate?.[dateIso] : undefined)?.map(

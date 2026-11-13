@@ -18,11 +18,13 @@ import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import { getCurrentWeekDateMap, getLocalIsoDate } from '../../utils/gymAttendance';
 import {
   GYM_SESSION_DURATION_MINUTES,
+  MANUAL_GYM_START_OPTIONS,
   recommendWeeklyGymSlots,
   validateGymSlotAgainstCalendar,
   type PreferredTrainingPeriod,
   type ScheduledGymSlotDraft,
 } from '../../utils/gymSchedulePlanner';
+import { stripMatchingGymSources } from '../../utils/gymScheduleFilter';
 import { minutesToTimeString, timeStringToMinutes } from '../../utils/calendarSlotFinder';
 import { GymScheduleStepContent } from './GymScheduleStepContent';
 import { ModalShell } from '../common/ModalShell';
@@ -50,6 +52,7 @@ export interface GymOnboardingCompletePayload {
   profile: UserGymProfile;
   generatedRoutines: GymRoutine[];
   replaceRoutines: boolean;
+  replacePreviousGymSchedule?: boolean;
   preferredPeriod?: PreferredTrainingPeriod;
   scheduledGymSlots?: Array<{
     day: DayOfWeek;
@@ -70,6 +73,7 @@ export interface GymOnboardingModalProps {
   weekDates?: Record<DayOfWeek, string>;
   isGoogleConnected?: boolean;
   isGoogleSyncing?: boolean;
+  onClearPreviousGymBlocks?: () => Promise<void> | void;
   onComplete: (payload: GymOnboardingCompletePayload) => void;
 }
 
@@ -114,6 +118,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
   weekDates,
   isGoogleConnected = false,
   isGoogleSyncing = false,
+  onClearPreviousGymBlocks,
   onComplete,
 }) => {
   if (!isOpen) return null;
@@ -130,6 +135,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
       weekDates={weekDates}
       isGoogleConnected={isGoogleConnected}
       isGoogleSyncing={isGoogleSyncing}
+      onClearPreviousGymBlocks={onClearPreviousGymBlocks}
       onComplete={onComplete}
     />
   );
@@ -146,6 +152,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   weekDates,
   isGoogleConnected = false,
   isGoogleSyncing = false,
+  onClearPreviousGymBlocks,
   onComplete,
 }) => {
   const formId = useId();
@@ -178,11 +185,32 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   const [reminderMinutesBefore, setReminderMinutesBefore] = useState<number[]>(
     initialProfile?.reminderMinutesBefore ?? DEFAULT_GYM_REMINDER_MINUTES
   );
+  const existingGymBlocks = useMemo(
+    () => calendarBlocks.filter((b) => b.category === 'gym'),
+    [calendarBlocks]
+  );
+
   const [replaceRoutines, setReplaceRoutines] = useState<boolean>(!initialProfile);
+  const [replacePreviousGymSchedule, setReplacePreviousGymSchedule] = useState<boolean>(
+    () => existingGymBlocks.length > 0
+  );
+  const [isClearingPreviousGym, setIsClearingPreviousGym] = useState<boolean>(false);
+  const [didClearPreviousGym, setDidClearPreviousGym] = useState<boolean>(false);
   const [preferredPeriod, setPreferredPeriod] = useState<PreferredTrainingPeriod>('auto');
   const [slotOverridesByDay, setSlotOverridesByDay] = useState<
     Partial<Record<DayOfWeek, { startTime: string; source: 'recommended' | 'custom' }>>
-  >({});
+  >(() => {
+    if (!initialProfile || existingGymBlocks.length === 0) return {};
+    const seeded: Partial<
+      Record<DayOfWeek, { startTime: string; source: 'recommended' | 'custom' }>
+    > = {};
+    for (const block of existingGymBlocks) {
+      if (!seeded[block.day] && MANUAL_GYM_START_OPTIONS.includes(block.startTime)) {
+        seeded[block.day] = { startTime: block.startTime, source: 'custom' };
+      }
+    }
+    return seeded;
+  });
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const parsedHeight = Number(heightCm);
@@ -215,13 +243,44 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     });
   };
 
+  const { planningCalendarBlocks, planningGoogleEvents, planningExternalBusyByDate } =
+    useMemo(() => {
+      if (!replacePreviousGymSchedule || existingGymBlocks.length === 0) {
+        return {
+          planningCalendarBlocks: calendarBlocks,
+          planningGoogleEvents: googleEvents,
+          planningExternalBusyByDate: externalBusyByDate,
+        };
+      }
+
+      const { filteredGoogleEvents, filteredBusyByDate } = stripMatchingGymSources({
+        gymBlocks: existingGymBlocks,
+        googleEvents,
+        externalBusyByDate,
+        weekDates: effectiveWeekDates,
+      });
+
+      return {
+        planningCalendarBlocks: calendarBlocks.filter((b) => b.category !== 'gym'),
+        planningGoogleEvents: googleEvents ? filteredGoogleEvents : undefined,
+        planningExternalBusyByDate: externalBusyByDate ? filteredBusyByDate : undefined,
+      };
+    }, [
+      replacePreviousGymSchedule,
+      existingGymBlocks,
+      calendarBlocks,
+      googleEvents,
+      externalBusyByDate,
+      effectiveWeekDates,
+    ]);
+
   const slotDrafts: ScheduledGymSlotDraft[] = useMemo(() => {
     const recommendedDrafts = recommendWeeklyGymSlots({
       selectedDays,
       preferredPeriod,
-      calendarBlocks,
-      externalBusyByDate,
-      googleEvents,
+      calendarBlocks: planningCalendarBlocks,
+      externalBusyByDate: planningExternalBusyByDate,
+      googleEvents: planningGoogleEvents,
       weekDates: effectiveWeekDates,
     });
 
@@ -236,9 +295,9 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
         day: recDraft.day,
         dateIso: recDraft.dateIso,
         startTime: override.startTime,
-        calendarBlocks,
-        externalBusyByDate,
-        googleEvents,
+        calendarBlocks: planningCalendarBlocks,
+        externalBusyByDate: planningExternalBusyByDate,
+        googleEvents: planningGoogleEvents,
       });
 
       return {
@@ -257,14 +316,33 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   }, [
     selectedDays,
     preferredPeriod,
-    calendarBlocks,
-    externalBusyByDate,
-    googleEvents,
+    planningCalendarBlocks,
+    planningExternalBusyByDate,
+    planningGoogleEvents,
     effectiveWeekDates,
     slotOverridesByDay,
   ]);
 
   const hasScheduleConflict = slotDrafts.some((draft) => draft.hasConflict);
+
+  const handleToggleReplacePreviousGym = (nextValue: boolean) => {
+    setErrorMsg(null);
+    setReplacePreviousGymSchedule(nextValue);
+  };
+
+  const handleClearPreviousGym = async () => {
+    if (!onClearPreviousGymBlocks || existingGymBlocks.length === 0) return;
+    setErrorMsg(null);
+    setIsClearingPreviousGym(true);
+    try {
+      await onClearPreviousGymBlocks();
+      setSlotOverridesByDay({});
+      setReplacePreviousGymSchedule(true);
+      setDidClearPreviousGym(true);
+    } finally {
+      setIsClearingPreviousGym(false);
+    }
+  };
 
   const handleSelectSlotStart = (
     day: DayOfWeek,
@@ -369,6 +447,8 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       profile,
       generatedRoutines,
       replaceRoutines: !hasExistingRoutines || replaceRoutines,
+      replacePreviousGymSchedule:
+        existingGymBlocks.length > 0 ? replacePreviousGymSchedule : true,
       preferredPeriod,
       scheduledGymSlots: slotDrafts.map(({ day, dateIso, startTime, endTime }) => ({
         day,
@@ -933,12 +1013,18 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
             slotDrafts={slotDrafts}
             onSelectSlotStart={handleSelectSlotStart}
             onRecommendAll={handleRecommendAllSlots}
-            calendarBlocks={calendarBlocks}
-            externalBusyByDate={externalBusyByDate}
-            googleEvents={googleEvents}
+            calendarBlocks={planningCalendarBlocks}
+            externalBusyByDate={planningExternalBusyByDate}
+            googleEvents={planningGoogleEvents}
             weekDates={effectiveWeekDates}
             isGoogleConnected={isGoogleConnected}
             isGoogleSyncing={isGoogleSyncing}
+            previousGymBlocks={existingGymBlocks}
+            replacePreviousGymSchedule={replacePreviousGymSchedule}
+            onToggleReplacePreviousGymSchedule={handleToggleReplacePreviousGym}
+            onClearPreviousGymBlocks={onClearPreviousGymBlocks ? handleClearPreviousGym : undefined}
+            isClearingPreviousGym={isClearingPreviousGym}
+            didClearPreviousGym={didClearPreviousGym}
             showSubmitSummaryError={hasScheduleConflict}
             summaryErrorRef={scheduleSummaryErrorRef}
           />

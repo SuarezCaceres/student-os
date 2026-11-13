@@ -76,6 +76,18 @@ export interface CalendarBlock {
   googleHtmlLink?: string;
   reminderMinutes?: number[];
   syncWithGoogle?: boolean;
+  isRecurringWorkShift?: boolean;
+}
+
+export interface WorkShiftConfig {
+  enabled: boolean;
+  title: string;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm (<= startTime indicates overnight shift ending next day)
+  restDay: DayOfWeek | null; // Night the user does NOT start a shift (e.g. Jueves 22:00 -> Viernes 06:00)
+  location?: string;
+  reminderMinutes?: number[];
+  syncWithGoogle?: boolean;
 }
 
 export type AssignmentType = 'tarea' | 'proyecto' | 'examen' | 'laboratorio';
@@ -217,6 +229,7 @@ export interface AppState {
   streak: number;
   theme: 'dark' | 'light';
   dailyHabits?: DailyHabits;
+  workShift?: WorkShiftConfig;
   gymProfile?: UserGymProfile;
   weightHistory?: WeightHistoryEntry[];
   gymAttendanceLogs?: GymAttendanceLog[];

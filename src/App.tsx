@@ -15,6 +15,7 @@ import type {
   DailyHabits,
   GymAttendanceLog,
   MissReasonId,
+  WorkShiftConfig,
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -31,6 +32,12 @@ import {
   REAL_ACCOUNT_CLEANUP_FLAG_KEY,
   applyRealAccountCalendarCleanup,
 } from './utils/accountDataCleanup';
+import {
+  WORK_SHIFT_INIT_FLAG_KEY,
+  applyWorkShiftConfigToBlocks,
+  ensureDefaultWorkShiftForRealAccount,
+} from './utils/workSchedule';
+import { stripMatchingGymSources } from './utils/gymScheduleFilter';
 import { calculateBmi, getGymDisplayName } from './utils/routineGenerator';
 import {
   applyRoutineReschedule,
@@ -83,6 +90,7 @@ export const App: React.FC = () => {
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
   const [isGoogleSyncing, setIsGoogleSyncing] = useState(false);
   const [isSyncingGymToGoogle, setIsSyncingGymToGoogle] = useState(false);
+  const [isSavingWorkShift, setIsSavingWorkShift] = useState(false);
   const [isGoogleConnected, setIsGoogleConnected] = useState<boolean>(() =>
     Boolean(getStoredGoogleMeta().connected && getStoredAccessToken())
   );
@@ -149,19 +157,25 @@ export const App: React.FC = () => {
     }
   });
 
-  // One-time migration for already authenticated real sessions to strip static cb-1..cb-14 seed blocks
+  // One-time migration for authenticated real sessions: strip cb-1..cb-14 seed blocks & seed 22:00-06:00 work shift
   useEffect(() => {
     if (currentView !== 'app' || !userSession?.isLoggedIn) return;
+    let cleanedDone = false;
+    let shiftDone = false;
     try {
-      if (localStorage.getItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY) === '1') return;
+      cleanedDone = localStorage.getItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY) === '1';
+      shiftDone = localStorage.getItem(WORK_SHIFT_INIT_FLAG_KEY) === '1';
+      if (cleanedDone && shiftDone) return;
       localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
+      localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
     } catch {
       // Ignore storage errors
     }
     setState((prev) => {
-      const cleaned = applyRealAccountCalendarCleanup(prev);
-      calendarBlocksRef.current = cleaned.calendarBlocks;
-      return cleaned;
+      const cleaned = cleanedDone ? prev : applyRealAccountCalendarCleanup(prev);
+      const withWorkShift = shiftDone ? cleaned : ensureDefaultWorkShiftForRealAccount(cleaned);
+      calendarBlocksRef.current = withWorkShift.calendarBlocks;
+      return withWorkShift;
     });
   }, [currentView, userSession, setState]);
 
@@ -292,6 +306,7 @@ export const App: React.FC = () => {
     try {
       localStorage.removeItem('student_os_user_session');
       localStorage.removeItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY);
+      localStorage.removeItem(WORK_SHIFT_INIT_FLAG_KEY);
     } catch {
       // ignore
     }
@@ -841,14 +856,72 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
+  const purgeGoogleCacheForGymBlocks = useCallback(
+    (blocksToPurge: CalendarBlock[]): string[] => {
+      if (blocksToPurge.length === 0) return [];
+      const { filteredGoogleEvents, removedGoogleEventIds, filteredBusyByDate } =
+        stripMatchingGymSources({
+          gymBlocks: blocksToPurge,
+          googleEvents: googleEventsRef.current,
+          externalBusyByDate: googleBusyByDateRef.current,
+          weekDates,
+        });
+
+      googleEventsRef.current = filteredGoogleEvents;
+      setGoogleEvents(filteredGoogleEvents);
+      saveGoogleEventsSnapshot(filteredGoogleEvents);
+
+      googleBusyByDateRef.current = filteredBusyByDate;
+      setGoogleBusyByDate(filteredBusyByDate);
+
+      return removedGoogleEventIds;
+    },
+    [weekDates]
+  );
+
+  const handleClearPreviousGymBlocks = useCallback(async () => {
+    const existingGymBlocks = calendarBlocksRef.current.filter((b) => b.category === 'gym');
+    if (existingGymBlocks.length === 0) return;
+
+    const updatedBlocks = calendarBlocksRef.current.filter((b) => b.category !== 'gym');
+    calendarBlocksRef.current = updatedBlocks;
+
+    setState((prev) => ({
+      ...prev,
+      calendarBlocks: prev.calendarBlocks.filter((b) => b.category !== 'gym'),
+    }));
+
+    const removedGoogleEventIds = purgeGoogleCacheForGymBlocks(existingGymBlocks);
+    if (removedGoogleEventIds.length === 0) return;
+
+    const activeToken =
+      getStoredAccessToken() || (isGoogleConnected ? await trySilentGoogleReconnect() : null);
+    if (!activeToken) return;
+
+    for (const eventId of removedGoogleEventIds) {
+      try {
+        await deleteGoogleGymEvent(activeToken, eventId);
+      } catch {
+        // Ignore deletion error for offline or already-deleted Google events
+      }
+    }
+
+    await refreshGoogleCalendarWeek({
+      explicitToken: activeToken,
+      source: 'internal_mutation',
+    });
+  }, [isGoogleConnected, purgeGoogleCacheForGymBlocks, refreshGoogleCalendarWeek, setState]);
+
   const handleSaveGymPlan = useCallback(
     (payload: GymOnboardingCompletePayload) => {
       const today = getLocalIsoDate();
       const mondayIso = getCurrentWeekDateMap().Lunes;
       const slots = payload.scheduledGymSlots ?? [];
       const reminderMinutes = payload.profile.reminderMinutesBefore ?? [30];
+      const shouldReplacePreviousGym = payload.replacePreviousGymSchedule ?? true;
       const hasToken = Boolean(getStoredAccessToken());
 
+      const previousGymBlocks = calendarBlocksRef.current.filter((b) => b.category === 'gym');
       const scheduledBlocksWithDates: Array<{ block: CalendarBlock; dateIso: string }> = [];
       if (slots.length > 0) {
         const gymLocation = getGymDisplayName(
@@ -859,9 +932,11 @@ export const App: React.FC = () => {
           ? payload.generatedRoutines
           : state.gymRoutines;
         const existingGymByDay = new Map<DayOfWeek, CalendarBlock>();
-        for (const existingBlock of calendarBlocksRef.current) {
-          if (existingBlock.category === 'gym' && !existingGymByDay.has(existingBlock.day)) {
-            existingGymByDay.set(existingBlock.day, existingBlock);
+        if (shouldReplacePreviousGym) {
+          for (const existingBlock of previousGymBlocks) {
+            if (!existingGymByDay.has(existingBlock.day)) {
+              existingGymByDay.set(existingBlock.day, existingBlock);
+            }
           }
         }
 
@@ -871,7 +946,9 @@ export const App: React.FC = () => {
           seenDays.add(slot.day);
 
           const routineForDay = effectiveRoutines.find((r) => r.dayOfWeek === slot.day);
-          const previousSameDay = existingGymByDay.get(slot.day);
+          const previousSameDay = shouldReplacePreviousGym
+            ? existingGymByDay.get(slot.day)
+            : undefined;
           const builtBlock: CalendarBlock = {
             ...buildGymCalendarBlockPayload({
               day: slot.day,
@@ -893,10 +970,26 @@ export const App: React.FC = () => {
         }
       }
 
+      const reusedGoogleEventIds = new Set(
+        scheduledBlocksWithDates
+          .map((item) => item.block.googleEventId)
+          .filter((id): id is string => Boolean(id))
+      );
+
+      const previousGoogleEventIds =
+        shouldReplacePreviousGym && scheduledBlocksWithDates.length > 0
+          ? purgeGoogleCacheForGymBlocks(previousGymBlocks)
+          : [];
+      const orphanedGoogleEventIds = previousGoogleEventIds.filter(
+        (id) => !reusedGoogleEventIds.has(id)
+      );
+
       const nextCalendarBlocks =
         scheduledBlocksWithDates.length > 0
           ? [
-              ...calendarBlocksRef.current.filter((b) => b.category !== 'gym'),
+              ...(shouldReplacePreviousGym
+                ? calendarBlocksRef.current.filter((b) => b.category !== 'gym')
+                : calendarBlocksRef.current),
               ...scheduledBlocksWithDates.map((item) => item.block),
             ]
           : undefined;
@@ -926,11 +1019,22 @@ export const App: React.FC = () => {
 
       setIsFirstGymOnboardingOpen(false);
 
-      if (scheduledBlocksWithDates.length > 0 && (isGoogleConnected || hasToken)) {
+      if (
+        (scheduledBlocksWithDates.length > 0 || orphanedGoogleEventIds.length > 0) &&
+        (isGoogleConnected || hasToken)
+      ) {
         void (async () => {
           const activeToken =
             getStoredAccessToken() || (isGoogleConnected ? await trySilentGoogleReconnect() : null);
           if (!activeToken) return;
+
+          for (const eventId of orphanedGoogleEventIds) {
+            try {
+              await deleteGoogleGymEvent(activeToken, eventId);
+            } catch {
+              // Ignore deletion errors for orphaned or offline Google gym events
+            }
+          }
 
           const syncedMetaByBlockId = new Map<string, { eventId: string; htmlLink?: string }>();
           for (const { block, dateIso } of scheduledBlocksWithDates) {
@@ -979,7 +1083,14 @@ export const App: React.FC = () => {
         })();
       }
     },
-    [state.gymRoutines, weekDates, isGoogleConnected, refreshGoogleCalendarWeek, setState]
+    [
+      state.gymRoutines,
+      weekDates,
+      isGoogleConnected,
+      purgeGoogleCacheForGymBlocks,
+      refreshGoogleCalendarWeek,
+      setState,
+    ]
   );
 
   const handleLogBodyWeight = useCallback((newWeightKg: number) => {
@@ -1081,6 +1192,104 @@ export const App: React.FC = () => {
       }
     },
     [state.calendarBlocks, setState]
+  );
+
+  const handleSaveWorkShift = useCallback(
+    async (nextConfig: WorkShiftConfig, options: { syncToGoogle: boolean }) => {
+      setIsSavingWorkShift(true);
+      try {
+        try {
+          localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
+        } catch {
+          // Ignore storage errors
+        }
+
+        const { blocks: updatedBlocks, removedGoogleEventIds, shiftBlocks } =
+          applyWorkShiftConfigToBlocks(calendarBlocksRef.current, nextConfig);
+
+        calendarBlocksRef.current = updatedBlocks;
+        setState((prev) => ({
+          ...prev,
+          workShift: nextConfig,
+          calendarBlocks: updatedBlocks,
+        }));
+
+        const activeToken =
+          getStoredAccessToken() || (isGoogleConnected ? await trySilentGoogleReconnect() : null);
+
+        if (activeToken && removedGoogleEventIds.length > 0) {
+          const removedSet = new Set(removedGoogleEventIds);
+          const nextEvents = googleEventsRef.current.filter((ev) => !removedSet.has(ev.id));
+          googleEventsRef.current = nextEvents;
+          setGoogleEvents(nextEvents);
+          saveGoogleEventsSnapshot(nextEvents);
+          for (const eventId of removedGoogleEventIds) {
+            try {
+              await deleteGoogleGymEvent(activeToken, eventId);
+            } catch {
+              // Ignore deletion errors for already-removed Google events
+            }
+          }
+        }
+
+        if (options.syncToGoogle && nextConfig.enabled && activeToken && shiftBlocks.length > 0) {
+          const syncedMetaByBlockId = new Map<string, { eventId: string; htmlLink?: string }>();
+          for (const shiftBlock of shiftBlocks) {
+            const dateIso = weekDates[shiftBlock.day];
+            if (!dateIso) continue;
+            try {
+              const saved = await upsertGoogleCalendarEvent(activeToken, {
+                eventId: shiftBlock.googleEventId,
+                title: shiftBlock.title,
+                dateIso,
+                startTime: shiftBlock.startTime,
+                endTime: shiftBlock.endTime,
+                location: shiftBlock.location,
+                description: `Turno laboral recurrente configurado en StudentOS (${shiftBlock.day}).`,
+                reminderMinutes: nextConfig.reminderMinutes ?? [30],
+              });
+              syncedMetaByBlockId.set(shiftBlock.id, saved);
+            } catch {
+              // Keep local shift block intact if Google push fails
+            }
+          }
+
+          if (syncedMetaByBlockId.size > 0) {
+            setState((latest) => {
+              const nextBlocks = latest.calendarBlocks.map((block) => {
+                const saved = syncedMetaByBlockId.get(block.id);
+                return saved
+                  ? {
+                      ...block,
+                      googleEventId: saved.eventId,
+                      googleHtmlLink: saved.htmlLink ?? block.googleHtmlLink,
+                      syncWithGoogle: true,
+                    }
+                  : block;
+              });
+              calendarBlocksRef.current = nextBlocks;
+              return {
+                ...latest,
+                calendarBlocks: nextBlocks,
+              };
+            });
+          }
+
+          await refreshGoogleCalendarWeek({
+            explicitToken: activeToken,
+            source: 'internal_mutation',
+          });
+        } else if (activeToken && removedGoogleEventIds.length > 0) {
+          await refreshGoogleCalendarWeek({
+            explicitToken: activeToken,
+            source: 'internal_mutation',
+          });
+        }
+      } finally {
+        setIsSavingWorkShift(false);
+      }
+    },
+    [isGoogleConnected, weekDates, refreshGoogleCalendarWeek, setState]
   );
 
   const handleReEvaluateGoogleImpact = useCallback(async () => {
@@ -1315,6 +1524,7 @@ export const App: React.FC = () => {
           setUserSession(user);
           try {
             localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
+            localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
           } catch {
             // Ignore storage errors
           }
@@ -1322,10 +1532,11 @@ export const App: React.FC = () => {
           const firstName = user.name.trim().split(/\s+/)[0];
           setState((prev) => {
             const cleaned = applyRealAccountCalendarCleanup(prev);
-            calendarBlocksRef.current = cleaned.calendarBlocks;
+            const withWorkShift = ensureDefaultWorkShiftForRealAccount(cleaned);
+            calendarBlocksRef.current = withWorkShift.calendarBlocks;
             return {
-              ...cleaned,
-              studentName: firstName || cleaned.studentName,
+              ...withWorkShift,
+              studentName: firstName || withWorkShift.studentName,
             };
           });
 
@@ -1432,6 +1643,7 @@ export const App: React.FC = () => {
               onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
               onSyncGymWeekToGoogle={handleSyncGymWeekToGoogle}
               onSaveGymPlan={handleSaveGymPlan}
+              onClearPreviousGymBlocks={handleClearPreviousGymBlocks}
               onLogBodyWeight={handleLogBodyWeight}
               onStartSession={handleStartGymSession}
               onLogMissedWorkout={handleLogMissedWorkout}
@@ -1455,6 +1667,9 @@ export const App: React.FC = () => {
               googleBusyCount={googleBusyCount}
               onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
               onRefreshGoogleWeek={() => void refreshGoogleCalendarWeek({ source: 'manual_sync' })}
+              workShift={state.workShift}
+              isSavingWorkShift={isSavingWorkShift}
+              onSaveWorkShift={handleSaveWorkShift}
             />
           )}
 
@@ -1549,6 +1764,7 @@ export const App: React.FC = () => {
           weekDates={weekDates}
           isGoogleConnected={isGoogleConnected}
           isGoogleSyncing={isGoogleSyncing}
+          onClearPreviousGymBlocks={handleClearPreviousGymBlocks}
           onComplete={(payload) => {
             handleSaveGymPlan(payload);
             setIsFirstGymOnboardingOpen(false);

@@ -10,6 +10,7 @@ import {
   Sun,
   Sunset,
   Moon,
+  Trash2,
   Wand2,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek } from '../../types';
@@ -41,6 +42,12 @@ export interface GymScheduleStepContentProps {
   weekDates: Record<DayOfWeek, string>;
   isGoogleConnected?: boolean;
   isGoogleSyncing?: boolean;
+  previousGymBlocks?: CalendarBlock[];
+  replacePreviousGymSchedule?: boolean;
+  onToggleReplacePreviousGymSchedule?: (nextValue: boolean) => void;
+  onClearPreviousGymBlocks?: () => Promise<void> | void;
+  isClearingPreviousGym?: boolean;
+  didClearPreviousGym?: boolean;
   showSubmitSummaryError?: boolean;
   summaryErrorRef?: React.RefObject<HTMLDivElement | null>;
 }
@@ -52,7 +59,7 @@ const PERIOD_OPTIONS: Array<{
   Icon: React.FC<{ className?: string }>;
 }> = [
   { id: 'auto', label: 'Automático', hint: 'Mejor horario', Icon: Sparkles },
-  { id: 'manana', label: 'Mañana', hint: '07:00–12:00', Icon: Sun },
+  { id: 'manana', label: 'Mañana', hint: '06:00–12:00', Icon: Sun },
   { id: 'tarde', label: 'Tarde', hint: '14:00–18:00', Icon: Sunset },
   { id: 'noche', label: 'Noche', hint: '18:00–22:00', Icon: Moon },
 ];
@@ -70,6 +77,12 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
   weekDates,
   isGoogleConnected = false,
   isGoogleSyncing = false,
+  previousGymBlocks = [],
+  replacePreviousGymSchedule = true,
+  onToggleReplacePreviousGymSchedule,
+  onClearPreviousGymBlocks,
+  isClearingPreviousGym = false,
+  didClearPreviousGym = false,
   showSubmitSummaryError = false,
   summaryErrorRef,
 }) => {
@@ -169,6 +182,94 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
         </div>
       </div>
 
+      {/* Gestión de horario anterior de gimnasio (sobrescribir o borrar) */}
+      {previousGymBlocks.length > 0 && (
+        <div
+          className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3"
+          data-testid="previous-gym-schedule-panel"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarSync className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span className="text-[13px] font-bold text-[var(--ink)]">
+                Horario anterior de gimnasio ({previousGymBlocks.length}{' '}
+                {previousGymBlocks.length === 1 ? 'sesión' : 'sesiones'})
+              </span>
+              <span
+                className={`t-badge ${replacePreviousGymSchedule ? 't-badge-ok' : 't-badge-accent'}`}
+              >
+                {replacePreviousGymSchedule ? 'Se reemplazará al guardar' : 'Conservado'}
+              </span>
+            </div>
+
+            {onClearPreviousGymBlocks && (
+              <button
+                type="button"
+                onClick={() => void onClearPreviousGymBlocks()}
+                disabled={isClearingPreviousGym}
+                aria-label="Borrar horario anterior de gimnasio"
+                className="min-h-[44px] inline-flex items-center gap-2 px-3 py-2 rounded-[10px] border border-[var(--danger)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--danger)] hover:bg-[color-mix(in_oklab,var(--danger)_8%,var(--surface))] disabled:opacity-50 transition-colors"
+              >
+                <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>
+                  {isClearingPreviousGym ? 'Borrando horario...' : 'Borrar horario anterior'}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {previousGymBlocks.map((block) => (
+              <span
+                key={block.id}
+                className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[13px] font-medium text-[var(--ink)] t-num"
+              >
+                <span>{block.day}</span>
+                <span className="text-[var(--muted)]">
+                  {block.startTime}–{block.endTime}
+                </span>
+              </span>
+            ))}
+          </div>
+
+          {onToggleReplacePreviousGymSchedule && (
+            <label
+              htmlFor={`${baseId}-replace-prev-gym`}
+              className="min-h-[44px] flex items-start gap-2.5 cursor-pointer select-none pt-0.5"
+            >
+              <input
+                id={`${baseId}-replace-prev-gym`}
+                type="checkbox"
+                checked={replacePreviousGymSchedule}
+                onChange={(e) => onToggleReplacePreviousGymSchedule(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[var(--action)] shrink-0"
+              />
+              <span className="text-[13px] leading-snug text-[var(--muted)]">
+                <strong className="font-semibold text-[var(--ink)] block">
+                  Sobrescribir / reemplazar horario anterior de gimnasio al guardar
+                </strong>
+                {replacePreviousGymSchedule
+                  ? 'Tus sesiones anteriores de gym no causan auto-cruces (p. ej. cambiar de 07:00–09:00 a 06:00–08:00). Trabajo nocturno, Universidad y Google Calendar se validan por cada día.'
+                  : 'Modo comparación activo: si eliges una hora que choca con tu horario anterior de gym, aparecerá alerta de cruce por cada día.'}
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+
+      {didClearPreviousGym && previousGymBlocks.length === 0 && (
+        <div
+          role="status"
+          className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 flex items-center gap-2.5 text-[13px] text-[var(--ink)]"
+        >
+          <CheckCircle2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+          <span>
+            Horario anterior de gimnasio borrado de StudentOS y Google Calendar. Configura tus
+            nuevos horarios por cada día sin auto-cruces.
+          </span>
+        </div>
+      )}
+
       {/* Focusable Error Summary si intenta guardar con algún cruce activo */}
       {showSubmitSummaryError && conflictedDrafts.length > 0 && (
         <div
@@ -229,7 +330,7 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
             externalBusyByDate,
             googleEvents,
             weekDates,
-            limit: 3,
+            limit: 4,
           });
 
           const selectId = `${baseId}-select-${day}`;
@@ -340,7 +441,7 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
                   </div>
                 ) : (
                   <p className="text-[13px] text-[var(--warn)]">
-                    No quedan ventanas completas de 2 horas sin cruce entre 07:00 y 22:00 ese día.
+                    No quedan ventanas completas de 2 horas sin cruce entre 06:00 y 22:00 ese día.
                   </p>
                 )}
               </div>

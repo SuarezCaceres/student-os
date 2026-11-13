@@ -11,6 +11,7 @@ import {
   Database,
   BookOpen,
   ExternalLink,
+  Moon,
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
 import { TiktokIcon } from '../common/TiktokIcon';
@@ -28,6 +29,12 @@ import { triggerConfetti } from '../../utils/confetti';
 import type { NavTab } from '../layout/Navbar';
 import { DailyHabitsCard } from './DailyHabitsCard';
 import { BackupModal } from './BackupModal';
+import {
+  expandCalendarBlocksToSegments,
+  getNextDayOfWeek,
+  isOvernightTimeRange,
+  parseTimeToMinutes,
+} from '../../utils/workSchedule';
 
 export interface OverviewBentoProps {
   state: AppState;
@@ -90,9 +97,12 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
     .filter((k) => k.status === 'in_progress')
     .slice(0, 4);
 
-  const todayBlocks = state.calendarBlocks
-    .filter((b) => b.day === todayDay)
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const todaySegments = expandCalendarBlocksToSegments(state.calendarBlocks)
+    .filter((seg) => seg.day === todayDay)
+    .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
+
+  const workShift = state.workShift;
+  const isWorkRestTonight = Boolean(workShift?.enabled && workShift.restDay === todayDay);
 
   const currentWeek = state.currentAcademicWeek;
   const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === currentWeek);
@@ -306,28 +316,72 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
               </button>
             </div>
 
-            {todayBlocks.length === 0 ? (
+            {workShift?.enabled && (
+              <div className="mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 flex items-center justify-between gap-2 text-[13px]">
+                <span className="flex items-center gap-1.5 text-[var(--ink)] min-w-0">
+                  <Moon className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {isWorkRestTonight ? (
+                      <>
+                        Descanso hoy (sin entrada{' '}
+                        <span className="t-num font-medium">{workShift.startTime}</span>)
+                      </>
+                    ) : (
+                      <>
+                        Turno:{' '}
+                        <span className="t-num font-medium">
+                          {workShift.startTime}–{workShift.endTime}
+                        </span>
+                        {isOvernightTimeRange(workShift.startTime, workShift.endTime) ? ' (+1d)' : ''}
+                      </>
+                    )}
+                  </span>
+                </span>
+                {workShift.restDay && (
+                  <span className="t-badge shrink-0">Descanso: {workShift.restDay.slice(0, 3)}</span>
+                )}
+              </div>
+            )}
+
+            {todaySegments.length === 0 ? (
               <p className="py-8 text-[14px] text-[var(--muted)]">
                 No tienes clases ni bloques agendados para hoy.
               </p>
             ) : (
               <div>
-                {todayBlocks.map((b) => (
-                  <div key={b.id} className="t-row">
-                    <div className="t-num text-[13px] font-medium text-[var(--action)] flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {b.startTime} – {b.endTime}
-                      </span>
+                {todaySegments.map((seg) => {
+                  const b = seg.block;
+                  return (
+                    <div key={seg.segmentId} className="t-row">
+                      <div className="t-num text-[13px] font-medium text-[var(--action)] flex flex-wrap items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {seg.segmentRole === 'overnight_start'
+                            ? `${b.startTime} – ${b.endTime} (+1d)`
+                            : seg.segmentRole === 'overnight_continuation'
+                            ? `00:00 – ${seg.endTime}`
+                            : `${seg.startTime} – ${seg.endTime}`}
+                        </span>
+                        {seg.segmentRole === 'overnight_continuation' && (
+                          <span className="text-[var(--muted)] font-normal">
+                            · cierre turno {seg.originDay}
+                          </span>
+                        )}
+                        {seg.segmentRole === 'overnight_start' && (
+                          <span className="text-[var(--muted)] font-normal">
+                            · termina {getNextDayOfWeek(seg.day)} {b.endTime}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
+                        {b.title}
+                      </h4>
+                      {b.location && (
+                        <p className="text-[13px] text-[var(--muted)] mt-0.5">{b.location}</p>
+                      )}
                     </div>
-                    <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
-                      {b.title}
-                    </h4>
-                    {b.location && (
-                      <p className="text-[13px] text-[var(--muted)] mt-0.5">{b.location}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

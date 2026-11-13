@@ -70,6 +70,7 @@ export interface GymTrackerProps {
   onOpenGoogleSync?: () => void;
   onSyncGymWeekToGoogle?: () => Promise<void> | void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
+  onClearPreviousGymBlocks?: () => Promise<void> | void;
   onLogBodyWeight?: (newWeightKg: number) => void;
   onStartSession?: (payload: {
     dayOfWeek: DayOfWeek;
@@ -137,6 +138,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   onOpenGoogleSync,
   onSyncGymWeekToGoogle,
   onSaveGymPlan,
+  onClearPreviousGymBlocks,
   onLogBodyWeight,
   onStartSession,
   onLogMissedWorkout,
@@ -1159,6 +1161,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         weekDates={weekDates}
         isGoogleConnected={isGoogleConnected}
         isGoogleSyncing={isGoogleSyncing || isSyncingGymToGoogle}
+        onClearPreviousGymBlocks={onClearPreviousGymBlocks}
         onComplete={(payload) => {
           onSaveGymPlan?.(payload);
           setPinnedMissDay(null);
