@@ -196,7 +196,7 @@ export const GymProfileCard: React.FC<GymProfileCardProps> = ({
             </div>
           </div>
 
-          <div className="flex justify-between items-center text-[11px] text-[var(--muted)] t-num pt-1 px-0.5">
+          <div className="flex justify-between items-center text-[13px] text-[var(--muted)] t-num pt-1 px-0.5">
             <span>&lt; 18.5</span>
             <span>18.5 - 24.9</span>
             <span>25.0 - 29.9</span>

@@ -264,6 +264,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
 
           {step < TOTAL_STEPS ? (
             <button
+              key="wizard-next-btn"
               type="button"
               onClick={handleNextStep}
               className="t-btn t-btn-primary"
@@ -273,6 +274,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
             </button>
           ) : (
             <button
+              key="wizard-submit-btn"
               type="submit"
               form={`${formId}-onboarding-form`}
               className="t-btn t-btn-primary"
@@ -432,7 +434,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
                     </span>
                     <span
                       className={`text-[13px] ${
-                        isSelected ? 'text-[var(--action-ink)] opacity-90' : 'text-[var(--muted)]'
+                        isSelected ? 'text-[var(--action-ink)] font-medium' : 'text-[var(--muted)]'
                       }`}
                     >
                       días

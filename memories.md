@@ -2,8 +2,8 @@
 
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
-> **Ubicación:** `C:\Users\mateo\Documents\proyects\student-os`  
-> **Versión actual:** `v2.5.3 (Generación de Videos Animados de Movimiento Biomecánico por Ejercicio: Press de Banca, Sentadillas, Dominadas y Cardio en WebM 30fps)`  
+> **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  
+> **Versión actual:** `v2.6.0 (Asistente de Onboarding Gym 4 Pasos, Perfil Físico con Medidor OMS de IMC, Generador Adaptativo de Rutinas por Sede y Frecuencia 2–6 Días, y Recuperación Activa)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -168,7 +168,17 @@ student-os/
 - **Buscador en Tiempo Real:** Filtro instantáneo por texto, descripción o etiquetas (`#tags`).
 - **Filtros por Prioridad y Categoría:** Separación clara entre Universidad, Trabajo, Gym y Personal.
 
-### 3. Gym & Fitness Tracker (`src/components/gym/`)
+### 3. Gym & Fitness Tracker (`src/components/gym/` & `src/utils/routineGenerator.ts`)
+- **Asistente Onboarding de 4 Pasos (`GymOnboardingModal.tsx`) & Motor de Rutinas (`routineGenerator.ts`):**
+  - Se abre automáticamente en la primera visita si no hay perfil configurado y puede editarse en cualquier momento desde `Mi perfil gym`.
+  - **Paso 1 (Sede):** Selección entre *Smart Fit*, *Gimnasio UTP / Universidad*, *Gimnasio Comercial / de Barrio*, *Casa / Calistenia* u *Otro* personalizado; adapta los ejercicios generados al equipamiento real.
+  - **Paso 2 (Frecuencia y Días):** Selector de `2`, `3`, `4`, `5` o `6` días por semana con asignación automática de división muscular (*Full Body*, *Push/Pull/Legs*, *Torso/Pierna*) y selección exacta de días en la semana.
+  - **Paso 3 (Objetivo y Nivel):** *Ganar músculo (Hipertrofia)*, *Fuerza máxima*, *Perder grasa / Definición* (incluye bloque Cardio Zona 2) o *Salud general*, calibrando series, repeticiones y tiempo del cronómetro (`45s`/`60s`/`90s`/`120s`).
+  - **Paso 4 (Antropometría & IMC en vivo):** Registro de altura (`cm`), peso actual (`kg`) y peso meta opcional con cálculo instantáneo de IMC OMS y opción segura para reemplazar o conservar rutinas previas.
+- **Tarjeta de Perfil Físico e Indicador IMC (`GymProfileCard.tsx`) + Check-In de Peso (`WeightCheckInModal.tsx`):**
+  - Banda superior con divisores hairline 1px mostrando sede, objetivo, días activos, altura/peso y barra visual de rango IMC OMS con historial de peso corporal.
+- **Día de Recuperación Activa (`GymRestDayBanner.tsx`):**
+  - Banner limpio en días no entrenables según el split semanal, con recomendaciones de movilidad, hidratación y sueño más salto directo al próximo día de entreno.
 - **Tarjetas Visuales Multimedia por Ejercicio (`ExerciseCard.tsx`):**
   - Cada ejercicio se presenta como una tarjeta visual enriquecida con thumbnail ilustrado de un atleta en ropa de gym realizando el movimiento.
   - Al presionar directamente sobre la imagen o tarjeta, se despliega el popup modal del video animado con pautas biomecánicas.
@@ -276,7 +286,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.5.3)** | `TBD` | Biblioteca completa de videos animados de movimiento por ejercicio (Press de banca, Sentadillas, Dominadas, Cardio a 30fps) |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.6.0)** | `044ffad`, `a296254` | Onboarding Gym 4 pasos, generador adaptativo 2–6 días, `GymProfileCard`, medidor IMC OMS, `WeightCheckInModal` y `GymRestDayBanner` |
+| `feat/ui-taste-foundation` | v2.5.3 | `d5c6371` | Biblioteca completa de videos animados de movimiento por ejercicio (Press de banca, Sentadillas, Dominadas, Cardio a 30fps) |
 | `feat/ui-taste-foundation` | v2.5.1 | `10aff7a` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
 | `feat/ui-taste-foundation` | v2.4.1 | `20e2c85` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
 | `feat/ui-taste-foundation` | v2.3.1 | `2d709e3`, `373e555`, `5fef05f` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
@@ -294,10 +305,10 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.5.3)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en 400ms.
-- **Detector Mecánico Impeccable:** `npx impeccable detect src/ --json` con `0` findings (`[]`) en todo `src/`.
-- **Salud de Auditoría Impeccable:** **20 / 20 (Excelente)** en A11y, Performance, Theming, Responsive e Implementation Integrity.
+## 🚀 7. Verificación del Sistema (v2.6.0)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en ~450ms.
+- **Linter Estático:** `npx oxlint` con 0 errores en los módulos integrados (`GymTracker`, `GymOnboardingModal`, `GymProfileCard`, `WeightCheckInModal`, `GymRestDayBanner`, `routineGenerator`, `App`).
+- **Prueba E2E Playwright (Chromium):** Flujo completo validado (Paso 1→4 Wizard, cálculo IMC 23.8→24.0, registro de peso, vista Rest Day, 0 errores en consola y 0 errores de página).
 - **Videos WebM Nativos a 30fps:** 4 videos cinemáticos generados en `public/videos/`:
   - `bench-press-technique.webm` (1.12 MB)
   - `squat-technique.webm` (1.16 MB)

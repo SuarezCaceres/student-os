@@ -21,6 +21,8 @@ import { OverviewBento } from './components/dashboard/OverviewBento';
 import { KanbanBoard } from './components/kanban/KanbanBoard';
 import { UniversityView } from './components/university/UniversityView';
 import { GymTracker } from './components/gym/GymTracker';
+import type { GymOnboardingCompletePayload } from './components/gym/GymOnboardingModal';
+import { calculateBmi } from './utils/routineGenerator';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
 import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
@@ -243,6 +245,48 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
+  const handleSaveGymPlan = useCallback((payload: GymOnboardingCompletePayload) => {
+    const today = new Date().toISOString().split('T')[0];
+    setState((prev) => {
+      const existingHistory = prev.weightHistory ?? [];
+      const updatedHistory = [
+        ...existingHistory.filter((entry) => entry.date !== today),
+        { date: today, weightKg: payload.profile.weightKg, bmi: payload.profile.bmi },
+      ];
+      return {
+        ...prev,
+        gymProfile: payload.profile,
+        weightHistory: updatedHistory,
+        gymRoutines: payload.replaceRoutines ? payload.generatedRoutines : prev.gymRoutines,
+      };
+    });
+  }, [setState]);
+
+  const handleLogBodyWeight = useCallback((newWeightKg: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    setState((prev) => {
+      const heightCm = prev.gymProfile?.heightCm ?? 174;
+      const bmiInfo = calculateBmi(newWeightKg, heightCm);
+      const existingHistory = prev.weightHistory ?? [];
+      const updatedHistory = [
+        ...existingHistory.filter((entry) => entry.date !== today),
+        { date: today, weightKg: newWeightKg, bmi: bmiInfo.bmi },
+      ];
+      return {
+        ...prev,
+        weightHistory: updatedHistory,
+        gymProfile: prev.gymProfile
+          ? {
+              ...prev.gymProfile,
+              weightKg: newWeightKg,
+              bmi: bmiInfo.bmi,
+              bmiCategory: bmiInfo.category,
+            }
+          : undefined,
+      };
+    });
+  }, [setState]);
+
   // Habits & Backup Handlers
   const handleHabitsChange = useCallback((dailyHabits: DailyHabits) => {
     setState((prev) => ({
@@ -396,6 +440,10 @@ export const App: React.FC = () => {
           {activeTab === 'gym' && (
             <GymTracker
               routines={state.gymRoutines}
+              gymProfile={state.gymProfile}
+              weightHistory={state.weightHistory}
+              onSaveGymPlan={handleSaveGymPlan}
+              onLogBodyWeight={handleLogBodyWeight}
               onToggleSet={handleToggleGymSet}
               onAddExercise={handleAddGymExercise}
               onDeleteExercise={handleDeleteGymExercise}

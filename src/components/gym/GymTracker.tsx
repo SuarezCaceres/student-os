@@ -1,17 +1,21 @@
 import React, { useState, useId } from 'react';
 import {
   Dumbbell,
-  Check,
   Plus,
-  Trash2,
   Trophy,
   Timer,
-  TrendingUp,
-  Video,
-  ArrowUpRight,
+  Settings2,
 } from 'lucide-react';
-import type { GymRoutine, GymExercise, DayOfWeek, ExerciseHistoryEntry } from '../../types';
+import type {
+  GymRoutine,
+  GymExercise,
+  DayOfWeek,
+  ExerciseHistoryEntry,
+  UserGymProfile,
+  WeightHistoryEntry,
+} from '../../types';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
+import { getRecommendedRestSeconds } from '../../utils/routineGenerator';
 import { SectionHeader } from '../common/SectionHeader';
 import { ModalShell } from '../common/ModalShell';
 import { RestTimerFloating } from './RestTimerFloating';
@@ -19,9 +23,17 @@ import { ExerciseProgressModal } from './ExerciseProgressModal';
 import { ExerciseVideoModal } from './ExerciseVideoModal';
 import { QuickWeightModal } from './QuickWeightModal';
 import { ExerciseCard } from './ExerciseCard';
+import { GymOnboardingModal, type GymOnboardingCompletePayload } from './GymOnboardingModal';
+import { GymProfileCard } from './GymProfileCard';
+import { WeightCheckInModal } from './WeightCheckInModal';
+import { GymRestDayBanner } from './GymRestDayBanner';
 
 export interface GymTrackerProps {
   routines: GymRoutine[];
+  gymProfile?: UserGymProfile;
+  weightHistory?: WeightHistoryEntry[];
+  onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
+  onLogBodyWeight?: (newWeightKg: number) => void;
   onToggleSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onAddExercise: (day: DayOfWeek, exercise: GymExercise) => void;
   onDeleteExercise: (routineId: string, exerciseId: string) => void;
@@ -55,6 +67,10 @@ function getTodayDayOfWeek(): DayOfWeek {
 
 export const GymTracker: React.FC<GymTrackerProps> = ({
   routines,
+  gymProfile,
+  weightHistory,
+  onSaveGymPlan,
+  onLogBodyWeight,
   onToggleSet,
   onAddExercise,
   onDeleteExercise,
@@ -63,9 +79,11 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 }) => {
   const formId = useId();
 
-  // Purity-safe lazy state initialization for today's day
+  // Purity-safe lazy state initialization for today's day & first-time onboarding
   const [todayDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !gymProfile);
+  const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
 
   // Rest Timer state
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -235,6 +253,27 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     triggerConfetti();
   };
 
+  const recommendedRestDuration = gymProfile
+    ? getRecommendedRestSeconds(gymProfile.goal)
+    : 90;
+
+  const isConfiguredRestDay =
+    Boolean(gymProfile) &&
+    !gymProfile?.selectedDays.includes(selectedDay) &&
+    currentRoutine.exercises.length === 0;
+
+  const nextTrainingDay: DayOfWeek | undefined = (() => {
+    if (!gymProfile || gymProfile.selectedDays.length === 0) return undefined;
+    const currentIndex = DAYS_LIST.indexOf(selectedDay);
+    for (let offset = 1; offset <= 7; offset++) {
+      const candidate = DAYS_LIST[(currentIndex + offset) % 7];
+      if (gymProfile.selectedDays.includes(candidate)) {
+        return candidate;
+      }
+    }
+    return gymProfile.selectedDays[0];
+  })();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -243,6 +282,15 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         subtitle="Marca tus series en un toque, controla tus descansos y supera tus marcas."
         actions={
           <>
+            <button
+              type="button"
+              onClick={() => setIsOnboardingOpen(true)}
+              className="t-btn t-btn-secondary"
+            >
+              <Settings2 className="w-4 h-4" aria-hidden="true" />
+              <span>{gymProfile ? 'Mi perfil gym' : 'Configurar gym'}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
@@ -254,7 +302,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                 isTimerOpen ? '!border-[var(--action)] !text-[var(--action)]' : ''
               }`}
             >
-              <Timer className="w-4 h-4" />
+              <Timer className="w-4 h-4" aria-hidden="true" />
               <span>Cronómetro</span>
             </button>
 
@@ -284,12 +332,40 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               onClick={() => setShowAddForm(true)}
               className="t-btn t-btn-primary"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4" aria-hidden="true" />
               <span>Agregar ejercicio</span>
             </button>
           </>
         }
       />
+
+      {/* Profile Summary & BMI Card (or first-time setup prompt) */}
+      {gymProfile ? (
+        <GymProfileCard
+          profile={gymProfile}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+          onOpenWeightCheckIn={() => setIsWeightCheckInOpen(true)}
+        />
+      ) : (
+        <div className="t-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[15px] font-medium text-[var(--ink)]">
+              Personaliza tu gimnasio, frecuencia semanal, objetivo e IMC
+            </p>
+            <p className="text-[14px] text-[var(--muted)] mt-0.5">
+              Configúralo una sola vez para generar rutinas adaptadas a tus días y sede.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsOnboardingOpen(true)}
+            className="t-btn t-btn-primary shrink-0"
+          >
+            <Settings2 className="w-4 h-4" aria-hidden="true" />
+            <span>Configurar mi plan</span>
+          </button>
+        </div>
+      )}
 
       {/* Tactile Day Selector (Lunes - Domingo, >=44px height) */}
       <div
@@ -300,6 +376,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         {DAYS_LIST.map((day) => {
           const isToday = day === todayDay;
           const isSelected = day === selectedDay;
+          const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : false;
 
           return (
             <button
@@ -314,6 +391,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                   : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
+              {isScheduledDay && (
+                <span
+                  aria-hidden="true"
+                  className="w-1.5 h-1.5 rounded-full bg-[var(--gym)] shrink-0"
+                />
+              )}
               <span className="sm:hidden">{day.slice(0, 3)}</span>
               <span className="hidden sm:inline">{day}</span>
               {isToday && (
@@ -332,7 +415,16 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         })}
       </div>
 
-      {/* Main Routine Card */}
+      {/* Main Routine Card OR Active Recovery Rest Day Banner */}
+      {isConfiguredRestDay ? (
+        <GymRestDayBanner
+          selectedDay={selectedDay}
+          nextTrainingDay={nextTrainingDay}
+          goal={gymProfile?.goal}
+          onSelectDay={(day) => setSelectedDay(day)}
+          onAddExtraExercise={() => setShowAddForm(true)}
+        />
+      ) : (
       <section className="t-card p-6">
         {/* Routine Header & Progress */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-[var(--line)]">
@@ -426,6 +518,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           </div>
         )}
       </section>
+      )}
 
       {/* Add Exercise Modal */}
       <ModalShell
@@ -545,11 +638,44 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
       {/* Floating Rest Timer */}
       <RestTimerFloating
-        key={timerKey}
+        key={`${timerKey}-${recommendedRestDuration}`}
         isOpen={isTimerOpen}
         onClose={() => setIsTimerOpen(false)}
-        defaultDuration={90}
+        defaultDuration={recommendedRestDuration}
         autoStart={timerAutoStart}
+      />
+
+      {/* Gym Onboarding & Profile Setup Wizard */}
+      <GymOnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        initialProfile={gymProfile}
+        hasExistingRoutines={routines.some((r) => r.exercises.length > 0)}
+        onComplete={(payload) => {
+          onSaveGymPlan?.(payload);
+          setIsOnboardingOpen(false);
+          triggerConfetti();
+          if (
+            payload.profile.selectedDays.length > 0 &&
+            !payload.profile.selectedDays.includes(selectedDay)
+          ) {
+            setSelectedDay(payload.profile.selectedDays[0]);
+          }
+        }}
+      />
+
+      {/* Body Weight Check-in & BMI History Modal */}
+      <WeightCheckInModal
+        isOpen={isWeightCheckInOpen}
+        onClose={() => setIsWeightCheckInOpen(false)}
+        currentWeightKg={gymProfile?.weightKg ?? 72}
+        heightCm={gymProfile?.heightCm ?? 174}
+        targetWeightKg={gymProfile?.targetWeightKg}
+        weightHistory={weightHistory}
+        onSaveWeight={(newWeight) => {
+          onLogBodyWeight?.(newWeight);
+          triggerConfetti();
+        }}
       />
 
       {/* Exercise Progress & 1RM Modal */}

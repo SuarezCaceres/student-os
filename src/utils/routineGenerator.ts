@@ -1,30 +1,23 @@
-import type { DayOfWeek, GymExercise, GymRoutine } from '../types';
+import type {
+  DayOfWeek,
+  GymExercise,
+  GymRoutine,
+  GymType,
+  FitnessGoal,
+  FitnessExperience,
+  BmiCategory,
+  WeightHistoryEntry,
+  UserGymProfile,
+} from '../types';
 
-export type GymType = 'smart_fit' | 'utp' | 'barrio' | 'casa' | 'otro';
-export type FitnessGoal = 'hipertrofia' | 'fuerza' | 'perdida_grasa' | 'salud';
-export type FitnessExperience = 'principiante' | 'intermedio' | 'avanzado';
-export type BmiCategory = 'bajo_peso' | 'normal' | 'sobrepeso' | 'obesidad';
-
-export interface WeightHistoryEntry {
-  date: string; // YYYY-MM-DD
-  weightKg: number;
-  bmi: number;
-}
-
-export interface UserGymProfile {
-  gymType: GymType;
-  customGymName?: string;
-  trainingDaysCount: number; // 2 | 3 | 4 | 5 | 6
-  selectedDays: DayOfWeek[];
-  goal: FitnessGoal;
-  experience: FitnessExperience;
-  heightCm: number;
-  weightKg: number;
-  targetWeightKg?: number;
-  bmi: number;
-  bmiCategory: BmiCategory;
-  configuredAt: string;
-}
+export type {
+  GymType,
+  FitnessGoal,
+  FitnessExperience,
+  BmiCategory,
+  WeightHistoryEntry,
+  UserGymProfile,
+};
 
 export interface GymCatalogOption {
   id: GymType;
