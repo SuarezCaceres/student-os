@@ -1305,6 +1305,16 @@ async function patchGoogleEventRecurrence(
   }
 }
 
+const JS_DAY_TO_WEEKDAY: DayOfWeek[] = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
+
 async function clearOrCutoffStudentOsEventsFromMonday(params: {
   accessToken: string;
   weekDates: Record<DayOfWeek, string>;
@@ -1316,6 +1326,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
   extraLinkedIds?: Iterable<string>;
   excludeIds?: Iterable<string>;
   entityLabel: 'gym' | 'turno laboral';
+  targetWeekday?: DayOfWeek;
 }): Promise<DeleteGoogleGymEventsResult> {
   const {
     accessToken,
@@ -1324,6 +1335,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
     extraLinkedIds = [],
     excludeIds = [],
     entityLabel,
+    targetWeekday,
   } = params;
 
   if (!accessToken.trim()) {
@@ -1433,6 +1445,10 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
       if (!matches) continue;
 
       const startMs = getGoogleEventStartMs(item.start);
+      if (targetWeekday && Number.isFinite(startMs)) {
+        const itemWeekday = JS_DAY_TO_WEEKDAY[new Date(startMs).getDay()];
+        if (itemWeekday !== targetWeekday) continue;
+      }
       const originalStartMs = getGoogleEventStartMs(item.originalStartTime);
 
       if (item.recurringEventId) {
@@ -1647,7 +1663,8 @@ export async function deleteStudentOsGymEventsFromMonday(
   accessToken: string,
   weekDates: Record<DayOfWeek, string>,
   extraLinkedIds: Iterable<string> = [],
-  excludeIds: Iterable<string> = []
+  excludeIds: Iterable<string> = [],
+  targetWeekday?: DayOfWeek
 ): Promise<DeleteGoogleGymEventsResult> {
   return clearOrCutoffStudentOsEventsFromMonday({
     accessToken,
@@ -1656,6 +1673,7 @@ export async function deleteStudentOsGymEventsFromMonday(
     extraLinkedIds,
     excludeIds,
     entityLabel: 'gym',
+    targetWeekday,
   });
 }
 

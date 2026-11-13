@@ -77,6 +77,7 @@ export interface GymOnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialProfile?: UserGymProfile;
+  initialStep?: 1 | 2 | 3 | 4 | 5;
   hasExistingRoutines?: boolean;
   calendarBlocks?: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
@@ -123,6 +124,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
   isOpen,
   onClose,
   initialProfile,
+  initialStep = 1,
   hasExistingRoutines = false,
   calendarBlocks = [],
   externalBusyByDate,
@@ -141,6 +143,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       initialProfile={initialProfile}
+      initialStep={initialStep}
       hasExistingRoutines={hasExistingRoutines}
       calendarBlocks={calendarBlocks}
       externalBusyByDate={externalBusyByDate}
@@ -159,6 +162,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   isOpen,
   onClose,
   initialProfile,
+  initialStep = 1,
   hasExistingRoutines = false,
   calendarBlocks = [],
   externalBusyByDate,
@@ -175,7 +179,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   const [defaultWeekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
   const effectiveWeekDates = weekDates ?? defaultWeekDates;
 
-  const [step, setStep] = useState<number>(1);
+  const [step, setStep] = useState<number>(initialStep);
   const [gymType, setGymType] = useState<GymType>(initialProfile?.gymType ?? 'smart_fit');
   const [customGymName, setCustomGymName] = useState<string>(initialProfile?.customGymName ?? '');
   const [trainingDaysCount, setTrainingDaysCount] = useState<number>(

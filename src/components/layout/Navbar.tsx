@@ -27,6 +27,7 @@ export interface NavbarProps {
   currentAcademicWeek?: number;
   isFreeWeek?: boolean;
   hasReflectionThisWeek?: boolean;
+  gymScheduleAlertCount?: number;
   onNavigateLanding?: () => void;
   userSession?: {
     name: string;
@@ -47,6 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentAcademicWeek = 5,
   isFreeWeek = false,
   hasReflectionThisWeek = false,
+  gymScheduleAlertCount = 0,
   onNavigateLanding,
   userSession,
   onLogout,
@@ -71,6 +73,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       id: 'gym',
       label: 'Gym',
       icon: <Dumbbell className="w-4 h-4" />,
+      badge: gymScheduleAlertCount > 0 ? gymScheduleAlertCount : undefined,
+      badgeTone: gymScheduleAlertCount > 0 ? 'warn' : undefined,
+      ariaLabel:
+        gymScheduleAlertCount > 0
+          ? `Gym: ${gymScheduleAlertCount} alerta${gymScheduleAlertCount > 1 ? 's' : ''} de horario`
+          : undefined,
     },
     {
       id: 'calendar',
@@ -256,7 +264,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           {mobileTabs.map((tab) => {
             const Icon = tab.Icon;
             const isActive = activeTab === tab.id;
-            const showDot = tab.id === 'learning' && (isFreeWeek || !hasReflectionThisWeek);
+            const hasLearningDot = tab.id === 'learning' && (isFreeWeek || !hasReflectionThisWeek);
+            const hasGymAlertDot = tab.id === 'gym' && gymScheduleAlertCount > 0;
+            const showDot = hasLearningDot || hasGymAlertDot;
 
             return (
               <button
@@ -264,6 +274,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 aria-current={isActive ? 'page' : undefined}
+                aria-label={
+                  hasGymAlertDot
+                    ? `${tab.label}: ${gymScheduleAlertCount} alerta${gymScheduleAlertCount > 1 ? 's' : ''} de horario`
+                    : undefined
+                }
                 className={`relative min-w-0 min-h-[56px] py-1.5 px-0.5 flex flex-col items-center justify-center gap-1 cursor-pointer select-none transition-colors duration-[150ms] focus-visible:outline-2 focus-visible:outline-[var(--action)] -outline-offset-2 ${
                   isActive
                     ? 'text-[var(--action)]'
@@ -281,8 +296,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {showDot && (
                     <span
                       aria-hidden="true"
-                      className={`absolute -top-0.5 -right-1.5 w-1.5 h-1.5 rounded-full ${
-                        isFreeWeek ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
+                      className={`absolute -top-0.5 -right-1.5 w-2 h-2 rounded-full ${
+                        hasGymAlertDot
+                          ? 'bg-[var(--warn)]'
+                          : isFreeWeek
+                            ? 'bg-[var(--ok)]'
+                            : 'bg-[var(--action)]'
                       }`}
                     />
                   )}

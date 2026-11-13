@@ -17,6 +17,8 @@ import type {
   GymAttendanceLog,
   MissReasonId,
   WorkShiftConfig,
+  UserGymProfile,
+  GymSessionDurationMinutes,
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -44,6 +46,13 @@ import {
   isStudentOsGymGoogleEvent,
   stripMatchingGymSources,
 } from './utils/gymScheduleFilter';
+import {
+  addIsoDays,
+  applyFixedGymDayRemoval,
+  applyFixedGymDaySwap,
+  findMissingScheduledGymDays,
+  toLocalIsoDateFromGoogleEvent,
+} from './utils/gymScheduleSync';
 import { calculateBmi, getGymDisplayName } from './utils/routineGenerator';
 import {
   applyRoutineReschedule,
@@ -119,10 +128,15 @@ export const App: React.FC = () => {
   const [isGoogleImpactModalOpen, setIsGoogleImpactModalOpen] = useState(false);
   const [isEvaluatingImpact, setIsEvaluatingImpact] = useState(false);
   const [applyingSolutionId, setApplyingSolutionId] = useState<string | null>(null);
+  const [hasGoogleWeekReady, setHasGoogleWeekReady] = useState(false);
+  const [deletedGymDatesThisSession, setDeletedGymDatesThisSession] = useState<string[]>([]);
+  const deletedGymMasterByDateRef = useRef<Record<string, string>>({});
   const [googleActionBanner, setGoogleActionBanner] = useState<{
     tone: 'warn' | 'error' | 'ok';
     text: string;
     showSyncButton?: boolean;
+    actionLabel?: string;
+    onAction?: () => void;
   } | null>(null);
 
   const pruneMirroredLocalGymBlocks = useCallback(
@@ -245,6 +259,7 @@ export const App: React.FC = () => {
         setGoogleEvents(events);
         setGoogleBusyByDate(busyByDate);
         setIsGoogleConnected(true);
+        setHasGoogleWeekReady(true);
         setGoogleActionBanner((prev) => (prev && prev.tone !== 'ok' ? null : prev));
 
         const dedupedBlocks = pruneMirroredLocalGymBlocks(calendarBlocksRef.current, events);
@@ -355,9 +370,12 @@ export const App: React.FC = () => {
     if (userSession?.provider === 'google' || isGoogleConnected) {
       disconnectGoogleCalendar();
       setIsGoogleConnected(false);
+      setHasGoogleWeekReady(false);
       setGoogleBusyByDate({});
       setGoogleEvents([]);
     }
+    setDeletedGymDatesThisSession([]);
+    deletedGymMasterByDateRef.current = {};
     clearGoogleEventsSnapshot();
     setGoogleImpactReport(null);
     setIsGoogleImpactModalOpen(false);
@@ -714,16 +732,36 @@ export const App: React.FC = () => {
           streakProtected: true,
         };
 
+        const nextDismissed = (prev.dismissedGymScheduleAlerts ?? []).filter(
+          (d) => d !== payload.fromDate && d !== result.rescheduledToDate
+        );
+
+        const cleanedLogs = existingLogs
+          .filter((l) => l.date !== payload.fromDate)
+          .map((l) =>
+            l.status === 'rescheduled' && l.rescheduledToDate === payload.fromDate
+              ? {
+                  ...l,
+                  rescheduledToDay: result.rescheduledToDay,
+                  rescheduledToDate: result.rescheduledToDate,
+                  rescheduledSlotStart: payload.selectedSlot?.startTime,
+                  rescheduledSlotEnd: payload.selectedSlot?.endTime,
+                }
+              : l
+          );
+
         return {
           ...prev,
           calendarBlocks: nextCalendarBlocks,
           gymRoutines: result.updatedRoutines,
+          dismissedGymScheduleAlerts: nextDismissed,
           gymAttendanceLogs: [
-            ...existingLogs.filter((l) => l.date !== payload.fromDate),
+            ...cleanedLogs,
             rescheduledLog,
           ],
         };
       });
+      setDeletedGymDatesThisSession((prev) => prev.filter((d) => d !== payload.fromDate));
 
       const hasGoogleLink =
         isGoogleConnected || getStoredGoogleMeta().connected || Boolean(getStoredAccessToken());
@@ -1127,10 +1165,13 @@ export const App: React.FC = () => {
           gymProfile: payload.profile,
           weightHistory: updatedHistory,
           gymAttendanceLogs: updatedAttendance,
+          dismissedGymScheduleAlerts: [],
           gymRoutines: payload.replaceRoutines ? payload.generatedRoutines : prev.gymRoutines,
           calendarBlocks: nextBlocks,
         };
       });
+      setDeletedGymDatesThisSession([]);
+      deletedGymMasterByDateRef.current = {};
 
       setIsFirstGymOnboardingOpen(false);
 
@@ -1363,12 +1404,41 @@ export const App: React.FC = () => {
   const handleDeleteCalendarBlock = useCallback(
     async (id: string) => {
       const targetBlock = calendarBlocksRef.current.find((b) => b.id === id);
+      const isGymBlock = Boolean(
+        targetBlock &&
+          (targetBlock.category === 'gym' ||
+            targetBlock.id.startsWith('cal-gym-') ||
+            targetBlock.title.toLowerCase().startsWith('gym:'))
+      );
+      const affectedGymDate = isGymBlock && targetBlock ? weekDates[targetBlock.day] : undefined;
+
       const nextLocalBlocks = calendarBlocksRef.current.filter((b) => b.id !== id);
       calendarBlocksRef.current = nextLocalBlocks;
       setState((prev) => ({
         ...prev,
         calendarBlocks: prev.calendarBlocks.filter((b) => b.id !== id),
+        dismissedGymScheduleAlerts: affectedGymDate
+          ? (prev.dismissedGymScheduleAlerts ?? []).filter((d) => d !== affectedGymDate)
+          : prev.dismissedGymScheduleAlerts,
       }));
+
+      if (isGymBlock && targetBlock && affectedGymDate) {
+        if (targetBlock.googleEventId) {
+          deletedGymMasterByDateRef.current[affectedGymDate] = targetBlock.googleEventId;
+        }
+        setDeletedGymDatesThisSession((prev) =>
+          prev.includes(affectedGymDate) ? prev : [...prev, affectedGymDate]
+        );
+        setGoogleActionBanner({
+          tone: 'warn',
+          text: `Quitaste tu entrenamiento del ${targetBlock.day} de tu horario. Ve a Gym para reprogramarlo o cambiar tu plan.`,
+          actionLabel: 'Ir a Gym',
+          onAction: () => {
+            setActiveTab('gym');
+            setGoogleActionBanner(null);
+          },
+        });
+      }
 
       if (!targetBlock?.googleEventId) return;
 
@@ -1409,7 +1479,7 @@ export const App: React.FC = () => {
         });
       }
     },
-    [isGoogleConnected, refreshGoogleCalendarWeek, setState]
+    [isGoogleConnected, refreshGoogleCalendarWeek, setState, weekDates]
   );
 
   const handleDeleteGoogleEvent = useCallback(
@@ -1428,6 +1498,17 @@ export const App: React.FC = () => {
         return;
       }
 
+      const linkedGymIds = new Set(
+        calendarBlocksRef.current
+          .filter((b) => (b.category === 'gym' || b.id.startsWith('cal-gym-')) && b.googleEventId)
+          .map((b) => b.googleEventId as string)
+      );
+      const isGymEvent = isStudentOsGymGoogleEvent(event, linkedGymIds);
+      const evDateIso = isGymEvent ? toLocalIsoDateFromGoogleEvent(event) : null;
+      const evWeekday = evDateIso
+        ? (Object.keys(weekDates) as DayOfWeek[]).find((d) => weekDates[d] === evDateIso)
+        : undefined;
+
       try {
         await deleteGoogleGymEvent(activeToken, event.id);
         const nextEvents = googleEventsRef.current.filter((ev) => ev.id !== event.id);
@@ -1436,19 +1517,42 @@ export const App: React.FC = () => {
         saveGoogleEventsSnapshot(nextEvents);
 
         const nextBlocks = calendarBlocksRef.current.filter((b) => b.googleEventId !== event.id);
-        if (nextBlocks.length !== calendarBlocksRef.current.length) {
+        if (nextBlocks.length !== calendarBlocksRef.current.length || evDateIso) {
           calendarBlocksRef.current = nextBlocks;
           setState((prev) => ({
             ...prev,
             calendarBlocks: prev.calendarBlocks.filter((b) => b.googleEventId !== event.id),
+            dismissedGymScheduleAlerts: evDateIso
+              ? (prev.dismissedGymScheduleAlerts ?? []).filter((d) => d !== evDateIso)
+              : prev.dismissedGymScheduleAlerts,
           }));
+        }
+
+        if (isGymEvent && evDateIso) {
+          deletedGymMasterByDateRef.current[evDateIso] = event.recurringEventId || event.id;
+          setDeletedGymDatesThisSession((prev) =>
+            prev.includes(evDateIso) ? prev : [...prev, evDateIso]
+          );
         }
 
         await refreshGoogleCalendarWeek({
           explicitToken: activeToken,
           source: 'internal_mutation',
         });
-        setGoogleActionBanner(null);
+
+        if (isGymEvent) {
+          setGoogleActionBanner({
+            tone: 'warn',
+            text: `Quitaste tu sesión de Gym${evWeekday ? ` del ${evWeekday}` : ''} esta semana. Ve a Gym para reprogramarla o ajustar tu horario fijo.`,
+            actionLabel: 'Ir a Gym',
+            onAction: () => {
+              setActiveTab('gym');
+              setGoogleActionBanner(null);
+            },
+          });
+        } else {
+          setGoogleActionBanner(null);
+        }
       } catch (err) {
         setGoogleActionBanner({
           tone: 'error',
@@ -1460,7 +1564,269 @@ export const App: React.FC = () => {
         });
       }
     },
-    [isGoogleConnected, refreshGoogleCalendarWeek, setState]
+    [isGoogleConnected, refreshGoogleCalendarWeek, setState, weekDates]
+  );
+
+  const clearSingleGymDaySeriesFromMonday = useCallback(
+    async (activeToken: string, targetDay: DayOfWeek, targetDateIso: string) => {
+      const excludeIds: string[] = [];
+      for (const ev of googleEventsRef.current) {
+        const evDate = toLocalIsoDateFromGoogleEvent(ev);
+        if (evDate === targetDateIso) continue;
+        excludeIds.push(ev.id);
+        if (ev.recurringEventId) {
+          excludeIds.push(ev.recurringEventId);
+        }
+      }
+      const deletedMasterId = deletedGymMasterByDateRef.current[targetDateIso];
+      const extraLinkedIds = deletedMasterId ? [deletedMasterId] : [];
+      const result = await deleteStudentOsGymEventsFromMonday(
+        activeToken,
+        weekDates,
+        extraLinkedIds,
+        excludeIds,
+        targetDay
+      );
+      if (result.status === 'ok' || result.status === 'partial') {
+        delete deletedGymMasterByDateRef.current[targetDateIso];
+      }
+      return result;
+    },
+    [weekDates]
+  );
+
+  const handleDismissMissingGymDay = useCallback(
+    (dateIso: string) => {
+      setDeletedGymDatesThisSession((prev) => prev.filter((d) => d !== dateIso));
+      setState((prev) => ({
+        ...prev,
+        dismissedGymScheduleAlerts: Array.from(
+          new Set([...(prev.dismissedGymScheduleAlerts ?? []), dateIso])
+        ),
+      }));
+    },
+    [setState]
+  );
+
+  const handleSwapFixedGymDay = useCallback(
+    async (payload: {
+      fromDay: DayOfWeek;
+      fromDate: string;
+      toDay: DayOfWeek;
+      slot: {
+        startTime: string;
+        endTime: string;
+        durationMinutes: GymSessionDurationMinutes;
+      };
+    }) => {
+      const currentProfile = state.gymProfile;
+      if (!currentProfile) return;
+
+      const { nextProfile: rawProfile, nextRoutines, movedRoutineName } = applyFixedGymDaySwap({
+        profile: currentProfile,
+        routines: state.gymRoutines,
+        fromDay: payload.fromDay,
+        toDay: payload.toDay,
+        slot: payload.slot,
+      });
+
+      const today = getLocalIsoDate();
+      const toDate = weekDates[payload.toDay];
+      const nextProfile: UserGymProfile =
+        toDate < today
+          ? { ...rawProfile, configuredAt: new Date().toISOString() }
+          : rawProfile;
+
+      const gymLocation = getGymDisplayName(nextProfile.gymType, nextProfile.customGymName);
+      const reminderMinutes = nextProfile.reminderMinutesBefore ?? [30];
+      const hasGoogleLink =
+        isGoogleConnected || getStoredGoogleMeta().connected || Boolean(getStoredAccessToken());
+
+      setDeletedGymDatesThisSession((prev) =>
+        prev.filter((d) => d !== payload.fromDate && d !== toDate)
+      );
+
+      const buildSwapBlock = (syncWithGoogle: boolean): CalendarBlock => ({
+        ...buildGymCalendarBlockPayload({
+          day: payload.toDay,
+          startTime: payload.slot.startTime,
+          endTime: payload.slot.endTime,
+          routineName: movedRoutineName,
+          gymLocation,
+        }),
+        id: `cal-gym-${payload.toDay.toLowerCase()}-${payload.slot.startTime.replace(':', '')}-${Date.now()}`,
+        reminderMinutes,
+        syncWithGoogle,
+      });
+
+      setState((prev) => {
+        const cleanedBlocks = prev.calendarBlocks.filter(
+          (b) => !(b.category === 'gym' && (b.day === payload.fromDay || b.day === payload.toDay))
+        );
+        const localBlocks = hasGoogleLink
+          ? cleanedBlocks
+          : [...cleanedBlocks, buildSwapBlock(false)];
+        calendarBlocksRef.current = localBlocks;
+        return {
+          ...prev,
+          gymProfile: nextProfile,
+          gymRoutines: nextRoutines,
+          calendarBlocks: localBlocks,
+          dismissedGymScheduleAlerts: (prev.dismissedGymScheduleAlerts ?? []).filter(
+            (d) => d !== payload.fromDate && d !== toDate
+          ),
+        };
+      });
+
+      if (!hasGoogleLink) return;
+
+      setIsSyncingGymToGoogle(true);
+      try {
+        const activeToken = getStoredAccessToken() || (await trySilentGoogleReconnect());
+        if (!activeToken) {
+          setState((prev) => {
+            const withoutDup = prev.calendarBlocks.filter(
+              (b) => !(b.category === 'gym' && b.day === payload.toDay)
+            );
+            const fallbackBlocks = [...withoutDup, buildSwapBlock(true)];
+            calendarBlocksRef.current = fallbackBlocks;
+            return { ...prev, calendarBlocks: fallbackBlocks };
+          });
+          setGoogleActionBanner({
+            tone: 'warn',
+            text: `Día fijo actualizado localmente (${payload.fromDay} → ${payload.toDay}), pero tu sesión de Google expiró.`,
+            showSyncButton: true,
+          });
+          return;
+        }
+
+        await clearSingleGymDaySeriesFromMonday(activeToken, payload.fromDay, payload.fromDate);
+        const startDateIso = toDate < today ? addIsoDays(toDate, 7) : toDate;
+        await upsertGoogleGymEvent(activeToken, {
+          title: `Gym: ${movedRoutineName}`,
+          dateIso: startDateIso,
+          startTime: payload.slot.startTime,
+          endTime: payload.slot.endTime,
+          location: gymLocation,
+          description: `Sesión semanal recurrente configurada en StudentOS (${payload.toDay}).`,
+          reminderMinutes,
+          studentOsCategory: 'gym',
+          recurrence: buildWeeklyRecurrenceRule([payload.toDay]),
+        });
+
+        await refreshGoogleCalendarWeek({
+          explicitToken: activeToken,
+          source: 'internal_mutation',
+        });
+        setGoogleActionBanner({
+          tone: 'ok',
+          text: `Horario fijo actualizado: ${payload.fromDay} cambiado a ${payload.toDay} (${payload.slot.startTime}–${payload.slot.endTime}) en Google Calendar.`,
+        });
+      } catch (err) {
+        setGoogleActionBanner({
+          tone: 'error',
+          text:
+            err instanceof Error
+              ? err.message
+              : 'Se cambió el día en Gym, pero falló la actualización en Google Calendar.',
+          showSyncButton: true,
+        });
+      } finally {
+        setIsSyncingGymToGoogle(false);
+      }
+    },
+    [
+      clearSingleGymDaySeriesFromMonday,
+      isGoogleConnected,
+      refreshGoogleCalendarWeek,
+      setState,
+      state.gymProfile,
+      state.gymRoutines,
+      weekDates,
+    ]
+  );
+
+  const handleRemoveFixedGymDay = useCallback(
+    async (payload: { dayOfWeek: DayOfWeek; dateIso: string }) => {
+      const currentProfile = state.gymProfile;
+      if (!currentProfile) return;
+
+      const updated = applyFixedGymDayRemoval({
+        profile: currentProfile,
+        routines: state.gymRoutines,
+        dayToRemove: payload.dayOfWeek,
+      });
+
+      if (!updated) {
+        setGoogleActionBanner({
+          tone: 'warn',
+          text: 'Tu plan requiere al menos 1 día activo. Usa "Editar horario completo" para reconfigurar tu rutina.',
+        });
+        return;
+      }
+
+      setDeletedGymDatesThisSession((prev) => prev.filter((d) => d !== payload.dateIso));
+      setState((prev) => {
+        const nextBlocks = prev.calendarBlocks.filter(
+          (b) => !(b.category === 'gym' && b.day === payload.dayOfWeek)
+        );
+        calendarBlocksRef.current = nextBlocks;
+        return {
+          ...prev,
+          gymProfile: updated.nextProfile,
+          gymRoutines: updated.nextRoutines,
+          calendarBlocks: nextBlocks,
+          dismissedGymScheduleAlerts: (prev.dismissedGymScheduleAlerts ?? []).filter(
+            (d) => d !== payload.dateIso
+          ),
+        };
+      });
+
+      const hasGoogleLink =
+        isGoogleConnected || getStoredGoogleMeta().connected || Boolean(getStoredAccessToken());
+      if (!hasGoogleLink) return;
+
+      setIsSyncingGymToGoogle(true);
+      try {
+        const activeToken = getStoredAccessToken() || (await trySilentGoogleReconnect());
+        if (!activeToken) {
+          setGoogleActionBanner({
+            tone: 'warn',
+            text: `Se quitó el ${payload.dayOfWeek} de tu plan en StudentOS, pero tu sesión de Google expiró para cortar la serie recurrente.`,
+            showSyncButton: true,
+          });
+          return;
+        }
+        await clearSingleGymDaySeriesFromMonday(activeToken, payload.dayOfWeek, payload.dateIso);
+        await refreshGoogleCalendarWeek({
+          explicitToken: activeToken,
+          source: 'internal_mutation',
+        });
+        setGoogleActionBanner({
+          tone: 'ok',
+          text: `Se quitó el ${payload.dayOfWeek} de tu plan (${updated.nextProfile.trainingDaysCount} días/sem) y se detuvo su repetición futura en Google Calendar.`,
+        });
+      } catch (err) {
+        setGoogleActionBanner({
+          tone: 'error',
+          text:
+            err instanceof Error
+              ? err.message
+              : 'Se quitó el día del plan local, pero falló el ajuste en Google Calendar.',
+          showSyncButton: true,
+        });
+      } finally {
+        setIsSyncingGymToGoogle(false);
+      }
+    },
+    [
+      clearSingleGymDaySeriesFromMonday,
+      isGoogleConnected,
+      refreshGoogleCalendarWeek,
+      setState,
+      state.gymProfile,
+      state.gymRoutines,
+    ]
   );
 
   const handleSaveWorkShift = useCallback(
@@ -1886,6 +2252,39 @@ export const App: React.FC = () => {
     [state.weeklyReflections, state.currentAcademicWeek]
   );
 
+  const missingScheduledGymDays = useMemo(
+    () =>
+      findMissingScheduledGymDays({
+        gymProfile: state.gymProfile,
+        routines: state.gymRoutines,
+        attendanceLogs: state.gymAttendanceLogs,
+        calendarBlocks: state.calendarBlocks,
+        googleEvents,
+        snapshotGoogleEvents: loadGoogleEventsSnapshot(),
+        isGoogleConnected,
+        isGoogleMetaConnected: getStoredGoogleMeta().connected,
+        hasGoogleWeekReady,
+        isGoogleSyncing,
+        weekDates,
+        todayIso: getLocalIsoDate(),
+        dismissedDates: state.dismissedGymScheduleAlerts,
+        deletedDatesThisSession: deletedGymDatesThisSession,
+      }),
+    [
+      state.gymProfile,
+      state.gymRoutines,
+      state.gymAttendanceLogs,
+      state.calendarBlocks,
+      googleEvents,
+      isGoogleConnected,
+      hasGoogleWeekReady,
+      isGoogleSyncing,
+      weekDates,
+      state.dismissedGymScheduleAlerts,
+      deletedGymDatesThisSession,
+    ]
+  );
+
   if (currentView === 'landing') {
     return (
       <LandingPage
@@ -1943,6 +2342,7 @@ export const App: React.FC = () => {
         currentAcademicWeek={state.currentAcademicWeek}
         isFreeWeek={isFreeWeek}
         hasReflectionThisWeek={hasReflectionThisWeek}
+        gymScheduleAlertCount={missingScheduledGymDays.length}
         onNavigateLanding={() => setCurrentView('landing')}
         userSession={userSession}
         onLogout={handleLogout}
@@ -1974,12 +2374,21 @@ export const App: React.FC = () => {
               />
               <span>{googleActionBanner.text}</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {googleActionBanner.actionLabel && googleActionBanner.onAction && (
+                <button
+                  type="button"
+                  onClick={googleActionBanner.onAction}
+                  className="t-btn t-btn-primary min-h-[44px] text-[13px] px-3.5"
+                >
+                  <span>{googleActionBanner.actionLabel}</span>
+                </button>
+              )}
               {googleActionBanner.showSyncButton && (
                 <button
                   type="button"
                   onClick={() => setIsGoogleSyncModalOpen(true)}
-                  className="t-btn t-btn-secondary min-h-[38px] text-[13px] px-3"
+                  className="t-btn t-btn-secondary min-h-[44px] text-[13px] px-3"
                 >
                   <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Abrir Google Sync</span>
@@ -1996,11 +2405,17 @@ export const App: React.FC = () => {
             </div>
           </div>
         )}
-        <GoogleChangeBanner
-          report={googleImpactReport}
-          onOpenEvaluator={() => setIsGoogleImpactModalOpen(true)}
-          onDismiss={() => setGoogleImpactReport(null)}
-        />
+        {!(
+          activeTab === 'gym' &&
+          googleImpactReport?.status === 'no_conflict' &&
+          missingScheduledGymDays.length > 0
+        ) && (
+          <GoogleChangeBanner
+            report={googleImpactReport}
+            onOpenEvaluator={() => setIsGoogleImpactModalOpen(true)}
+            onDismiss={() => setGoogleImpactReport(null)}
+          />
+        )}
         <div key={activeTab} className="view-enter">
           {activeTab === 'overview' && (
             <>
@@ -2071,6 +2486,10 @@ export const App: React.FC = () => {
               onDeleteExercise={handleDeleteGymExercise}
               onFinishWorkout={handleFinishWorkout}
               onUpdateExercise={handleUpdateGymExercise}
+              missingScheduledDays={missingScheduledGymDays}
+              onDismissMissingGymDay={handleDismissMissingGymDay}
+              onSwapFixedGymDay={handleSwapFixedGymDay}
+              onRemoveFixedGymDay={handleRemoveFixedGymDay}
             />
           )}
 
@@ -2132,6 +2551,7 @@ export const App: React.FC = () => {
           googleBusyByDateRef.current = busyMap;
           setGoogleEvents(events);
           setGoogleBusyByDate(busyMap);
+          setHasGoogleWeekReady(true);
           saveGoogleEventsSnapshot(events);
           setGoogleActionBanner(null);
           setState((prev) => {
@@ -2161,6 +2581,7 @@ export const App: React.FC = () => {
         onConnectionChange={(connected, token) => {
           setIsGoogleConnected(connected);
           if (!connected) {
+            setHasGoogleWeekReady(false);
             setGoogleBusyByDate({});
             setGoogleEvents([]);
             clearGoogleEventsSnapshot();

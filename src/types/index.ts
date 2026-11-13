@@ -236,6 +236,7 @@ export interface AppState {
   gymProfile?: UserGymProfile;
   weightHistory?: WeightHistoryEntry[];
   gymAttendanceLogs?: GymAttendanceLog[];
+  dismissedGymScheduleAlerts?: string[];
   weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];

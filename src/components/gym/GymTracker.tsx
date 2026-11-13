@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useState } from 'react';
 import {
   AlertCircle,
+  AlertTriangle,
   CalendarCheck2,
   CalendarClock,
   Check,
@@ -20,10 +21,13 @@ import type {
   GymAttendanceLog,
   GymExercise,
   GymRoutine,
+  GymSessionDurationMinutes,
   MissReasonId,
   UserGymProfile,
   WeightHistoryEntry,
 } from '../../types';
+import type { MissingScheduledGymDay } from '../../utils/gymScheduleSync';
+import { GymScheduleMismatchBanner } from './GymScheduleMismatchBanner';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import type {
   DeleteGoogleGymEventsResult,
@@ -113,6 +117,22 @@ export interface GymTrackerProps {
     durationMinutes?: number;
   }) => void;
   onUpdateExercise?: (day: DayOfWeek, updated: GymExercise) => void;
+  missingScheduledDays?: MissingScheduledGymDay[];
+  onDismissMissingGymDay?: (dateIso: string, dayOfWeek: DayOfWeek) => void;
+  onSwapFixedGymDay?: (payload: {
+    fromDay: DayOfWeek;
+    fromDate: string;
+    toDay: DayOfWeek;
+    slot: {
+      startTime: string;
+      endTime: string;
+      durationMinutes: GymSessionDurationMinutes;
+    };
+  }) => Promise<void> | void;
+  onRemoveFixedGymDay?: (payload: {
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+  }) => Promise<void> | void;
 }
 
 const DAYS_LIST: DayOfWeek[] = [
@@ -151,6 +171,10 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   onDeleteExercise,
   onFinishWorkout,
   onUpdateExercise,
+  missingScheduledDays = [],
+  onDismissMissingGymDay,
+  onSwapFixedGymDay,
+  onRemoveFixedGymDay,
 }) => {
   const formId = useId();
 
@@ -159,6 +183,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const [todayIso] = useState<string>(() => getLocalIsoDate());
   const [weekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [onboardingInitialStep, setOnboardingInitialStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [internalOnboardingOpen, setInternalOnboardingOpen] = useState<boolean>(
     () => autoOpenOnboarding ?? !gymProfile
   );
@@ -167,6 +192,10 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const setIsOnboardingOpen = (nextOpen: boolean) => {
     setInternalOnboardingOpen(nextOpen);
     onOnboardingOpenChange?.(nextOpen);
+  };
+  const openOnboardingAtStep = (targetStep: 1 | 2 | 3 | 4 | 5) => {
+    setOnboardingInitialStep(targetStep);
+    setIsOnboardingOpen(true);
   };
   const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
   const [fallbackLogs, setFallbackLogs] = useState<GymAttendanceLog[]>([]);
@@ -520,7 +549,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           <>
             <button
               type="button"
-              onClick={() => setIsOnboardingOpen(true)}
+              onClick={() => openOnboardingAtStep(1)}
               className="t-btn t-btn-secondary"
             >
               <Settings2 className="w-4 h-4" aria-hidden="true" />
@@ -598,11 +627,62 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         }
       />
 
+      {/* Automatic Calendar vs Gym Plan Mismatch Recovery Banner (Above-the-fold priority) */}
+      {!isGoogleSyncing && !isSyncingGymToGoogle && missingScheduledDays.length > 0 && (
+        <GymScheduleMismatchBanner
+          missingDays={missingScheduledDays}
+          selectedDay={selectedDay}
+          gymProfile={gymProfile}
+          routines={routines}
+          calendarBlocks={calendarBlocks}
+          externalBusyByDate={externalBusyByDate}
+          googleEvents={googleEvents}
+          weekDates={weekDates}
+          todayIso={todayIso}
+          isGoogleConnected={isGoogleConnected}
+          isSyncingAction={isGoogleSyncing || isSyncingGymToGoogle}
+          onSelectCalendarDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
+          onOpenFullScheduleEditor={() => openOnboardingAtStep(5)}
+          onOpenGoogleSync={onOpenGoogleSync}
+          onMoveThisWeek={async (payload) => {
+            await onRescheduleWorkout?.({
+              ...payload,
+              reminderMinutes: gymProfile?.reminderMinutesBefore,
+            });
+            setPinnedMissDay(null);
+            setSelectedDay(payload.toDay);
+            setStatusAnnouncement(
+              `Sesión del ${payload.fromDay} reprogramada al ${payload.toDay} para esta semana.`
+            );
+          }}
+          onSwapFixedDay={async (payload) => {
+            await onSwapFixedGymDay?.(payload);
+            setPinnedMissDay(null);
+            setSelectedDay(payload.toDay);
+            setStatusAnnouncement(
+              `Día fijo actualizado: ${payload.fromDay} cambiado a ${payload.toDay}.`
+            );
+          }}
+          onRemoveFixedDay={async (payload) => {
+            await onRemoveFixedGymDay?.(payload);
+            setPinnedMissDay(null);
+            setStatusAnnouncement(`${payload.dayOfWeek} eliminado de tu plan fijo semanal.`);
+          }}
+          onDismissDay={(dateIso, dayOfWeek) => {
+            onDismissMissingGymDay?.(dateIso, dayOfWeek);
+            setStatusAnnouncement(`Aviso del ${dayOfWeek} ignorado por esta semana.`);
+          }}
+        />
+      )}
+
       {/* Profile Summary & BMI Card (or first-time setup prompt) */}
       {gymProfile ? (
         <GymProfileCard
           profile={gymProfile}
-          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+          onOpenOnboarding={() => openOnboardingAtStep(1)}
           onOpenWeightCheckIn={() => setIsWeightCheckInOpen(true)}
         />
       ) : (
@@ -617,7 +697,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           </div>
           <button
             type="button"
-            onClick={() => setIsOnboardingOpen(true)}
+            onClick={() => openOnboardingAtStep(1)}
             className="t-btn t-btn-primary shrink-0"
           >
             <Settings2 className="w-4 h-4" aria-hidden="true" />
@@ -671,12 +751,18 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
             const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
             const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
             const isPendingMissTab = pendingMissedDays.some((p) => p.dayOfWeek === day);
+            const isMissingFromCalendarTab = missingScheduledDays.some((m) => m.dayOfWeek === day);
 
             let statusIcon: React.ReactNode = null;
             let dayStatusLabel = 'descanso';
             if (dayLog?.status === 'completed') {
               statusIcon = <Check className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />;
               dayStatusLabel = 'completada';
+            } else if (isMissingFromCalendarTab) {
+              statusIcon = (
+                <AlertTriangle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'sesión eliminada del calendario';
             } else if (isPendingMissTab) {
               statusIcon = (
                 <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
@@ -718,8 +804,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                 }}
                 className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                   isSelected
-                    ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
-                    : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
+                    ? isMissingFromCalendarTab
+                      ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--warn)] shadow-2xs'
+                      : 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
+                    : isMissingFromCalendarTab
+                      ? 'border border-[color-mix(in_oklab,var(--warn)_42%,transparent)] bg-[color-mix(in_oklab,var(--warn)_8%,transparent)] text-[var(--ink)]'
+                      : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
                 }`}
               >
                 {statusIcon}
@@ -1156,8 +1246,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
       {/* Gym Onboarding & Profile Setup Wizard */}
       <GymOnboardingModal
         isOpen={isOnboardingOpen}
-        onClose={() => setIsOnboardingOpen(false)}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          setOnboardingInitialStep(1);
+        }}
         initialProfile={gymProfile}
+        initialStep={onboardingInitialStep}
         hasExistingRoutines={routines.some((r) => r.exercises.length > 0)}
         calendarBlocks={calendarBlocks}
         externalBusyByDate={externalBusyByDate}
@@ -1171,6 +1265,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           onSaveGymPlan?.(payload);
           setPinnedMissDay(null);
           setIsOnboardingOpen(false);
+          setOnboardingInitialStep(1);
           triggerConfetti();
           if (
             payload.profile.selectedDays.length > 0 &&

@@ -6,6 +6,8 @@ export interface SegmentOption<T extends string> {
   shortLabel?: string;
   icon?: React.ReactNode;
   badge?: string | number;
+  badgeTone?: 'neutral' | 'warn' | 'danger';
+  ariaLabel?: string;
 }
 
 export interface SegmentedControlProps<T extends string> {
@@ -95,6 +97,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="tab"
             aria-selected={isActive}
+            aria-label={opt.ariaLabel}
             onClick={() => onChange(opt.id)}
             className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-[10px] font-medium whitespace-nowrap select-none cursor-pointer transition-colors duration-[150ms] focus-visible:outline-2 focus-visible:outline-[var(--action)] ${heightClass} ${
               fullWidth ? 'flex-1' : ''
@@ -120,7 +123,11 @@ export function SegmentedControl<T extends string>({
             {opt.badge !== undefined && (
               <span
                 className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none t-num ${
-                  isActive
+                  opt.badgeTone === 'warn'
+                    ? 'bg-[color-mix(in_oklab,var(--warn)_20%,var(--surface))] text-[var(--warn)] border border-[color-mix(in_oklab,var(--warn)_42%,transparent)] font-semibold'
+                    : opt.badgeTone === 'danger'
+                    ? 'bg-[color-mix(in_oklab,var(--danger)_18%,var(--surface))] text-[var(--danger)] border border-[color-mix(in_oklab,var(--danger)_40%,transparent)] font-semibold'
+                    : isActive
                     ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
                     : 'bg-[var(--surface)] text-[var(--muted)]'
                 }`}
