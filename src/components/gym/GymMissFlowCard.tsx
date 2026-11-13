@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,12 +8,18 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import type {
+  CalendarBlock,
   DayOfWeek,
   FitnessGoal,
   GymRoutine,
   GymType,
   MissReasonId,
 } from '../../types';
+import {
+  findFreeTwoHourSlots,
+  type BusyInterval,
+  type FreeTwoHourSlot,
+} from '../../utils/calendarSlotFinder';
 import {
   formatShortSpanishDate,
   getEncouragementFeedback,
@@ -22,6 +28,8 @@ import {
   type RescheduleMode,
   type RescheduleOption,
 } from '../../utils/gymAttendance';
+import { getGymDisplayName } from '../../utils/routineGenerator';
+import { SmartSlotReschedulePicker } from './SmartSlotReschedulePicker';
 
 export interface GymMissFlowCardProps {
   dayOfWeek: DayOfWeek;
@@ -35,6 +43,11 @@ export interface GymMissFlowCardProps {
   gymType?: GymType;
   customGymName?: string;
   rescheduleOptions: RescheduleOption[];
+  calendarBlocks?: CalendarBlock[];
+  externalBusyByDate?: Record<string, BusyInterval[]>;
+  isGoogleConnected?: boolean;
+  onOpenGoogleSync?: () => void;
+  weekDates?: Record<DayOfWeek, string>;
   onCancel?: () => void;
   onSubmitMissReason: (payload: {
     dayOfWeek: DayOfWeek;
@@ -49,6 +62,11 @@ export interface GymMissFlowCardProps {
     fromDate: string;
     toDay: DayOfWeek;
     mode: RescheduleMode;
+    selectedSlot?: {
+      dateIso: string;
+      startTime: string;
+      endTime: string;
+    };
   }) => void;
   onFinishWithoutReschedule: () => void;
 }
@@ -65,6 +83,11 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
   gymType,
   customGymName,
   rescheduleOptions,
+  calendarBlocks = [],
+  externalBusyByDate,
+  isGoogleConnected = false,
+  onOpenGoogleSync,
+  weekDates,
   onCancel,
   onSubmitMissReason,
   onReschedule,
@@ -78,12 +101,19 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
     const first = rescheduleOptions[0];
     return first ? `${first.targetDay}::${first.mode}` : '';
   });
+  const [selectedSlotId, setSelectedSlotId] = useState<string>('');
 
+  const stageOneHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const stageTwoHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const prevStageRef = useRef<'reason' | 'encouragement_reschedule'>(initialStage);
 
   useEffect(() => {
-    if (stage === 'encouragement_reschedule') {
+    const prevStage = prevStageRef.current;
+    prevStageRef.current = stage;
+    if (stage === 'encouragement_reschedule' && prevStage !== 'encouragement_reschedule') {
       stageTwoHeadingRef.current?.focus();
+    } else if (stage === 'reason' && prevStage === 'encouragement_reschedule') {
+      stageOneHeadingRef.current?.focus();
     }
   }, [stage]);
 
@@ -98,6 +128,25 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
   const selectedOption = rescheduleOptions.find(
     (opt) => `${opt.targetDay}::${opt.mode}` === selectedOptionKey
   );
+
+  const smartSlots = useMemo(() => {
+    if (!selectedOption) return [];
+    return findFreeTwoHourSlots({
+      daysCandidate: [selectedOption.targetDay],
+      calendarBlocks,
+      externalBusyByDate,
+      weekDates,
+      preferredDurationMinutes: 120,
+      bufferMinutes: 15,
+      limit: 4,
+      hasGoogleSync: isGoogleConnected,
+    });
+  }, [selectedOption, calendarBlocks, externalBusyByDate, weekDates, isGoogleConnected]);
+
+  const activeSlot: FreeTwoHourSlot | undefined =
+    smartSlots.find((slot) => slot.id === selectedSlotId) ?? smartSlots[0];
+
+  const resolvedGymLocation = gymType ? getGymDisplayName(gymType, customGymName) : undefined;
 
   const handleReasonFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,12 +176,51 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
       fromDate: dateIso,
       toDay: selectedOption.targetDay,
       mode: selectedOption.mode,
+      selectedSlot: activeSlot
+        ? {
+            dateIso: activeSlot.dateIso,
+            startTime: activeSlot.startTime,
+            endTime: activeSlot.endTime,
+          }
+        : undefined,
     });
   };
 
   return (
     <section className="t-card p-6 sm:p-8">
       <div className="max-w-2xl mx-auto">
+        <nav aria-label="Pasos del registro" className="mb-5 pb-4 border-b border-[var(--line)]">
+          <ol className="flex flex-wrap items-center gap-2 sm:gap-3 text-[13px]">
+            <li
+              aria-current={stage === 'reason' ? 'step' : undefined}
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded-[8px] border ${
+                stage === 'reason'
+                  ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] text-[var(--ink)] font-semibold'
+                  : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--ok)] font-medium'
+              }`}
+            >
+              {stage === 'encouragement_reschedule' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              ) : (
+                <span className="t-num font-semibold">1.</span>
+              )}
+              <span>Motivo</span>
+            </li>
+            <ArrowRight className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" aria-hidden="true" />
+            <li
+              aria-current={stage === 'encouragement_reschedule' ? 'step' : undefined}
+              className={`inline-flex items-center gap-2 px-3 py-1 rounded-[8px] border ${
+                stage === 'encouragement_reschedule'
+                  ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] text-[var(--ink)] font-semibold'
+                  : 'border-[var(--line)] bg-[var(--surface)] text-[var(--muted)]'
+              }`}
+            >
+              <span className="t-num font-semibold">2.</span>
+              <span>Aliento y reprogramación</span>
+            </li>
+          </ol>
+        </nav>
+
         {stage === 'reason' ? (
           <form onSubmit={handleReasonFormSubmit} className="space-y-6">
             <div>
@@ -155,13 +243,17 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                     onClick={onCancel}
                     className="t-btn t-btn-ghost min-h-[40px] px-3 text-[14px]"
                   >
-                    <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                    <ArrowLeft className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Volver</span>
                   </button>
                 )}
               </div>
 
-              <h2 className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)] leading-snug">
+              <h2
+                ref={stageOneHeadingRef}
+                tabIndex={-1}
+                className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)] leading-snug text-balance outline-none"
+              >
                 {isRetroactive
                   ? `¿Por qué no pudiste ir el ${dayOfWeek}?`
                   : '¿Por qué no puedes entrenar hoy?'}
@@ -205,7 +297,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                       />
                       <label
                         htmlFor={inputId}
-                        className={`block h-full min-h-[64px] p-3.5 rounded-[14px] border cursor-pointer select-none transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-[var(--action)] peer-focus-visible:outline-offset-2 ${
+                        className={`block h-full min-h-[64px] p-3.5 rounded-[14px] border cursor-pointer select-none transition-colors transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none peer-focus-visible:outline-2 peer-focus-visible:outline-[var(--action)] peer-focus-visible:outline-offset-2 ${
                           isChecked
                             ? 'bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] border-[var(--action)]'
                             : 'bg-[var(--surface-2)] border-[var(--line-strong)] hover:border-[color-mix(in_oklab,var(--ink)_34%,transparent)]'
@@ -237,18 +329,30 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
             </fieldset>
 
             <div>
-              <label htmlFor={`${baseId}-miss-note`} className="t-label">
-                Nota breve (opcional)
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <label htmlFor={`${baseId}-miss-note`} className="t-label !mb-0">
+                  Nota breve (opcional)
+                </label>
+                <span
+                  id={`${baseId}-miss-note-count`}
+                  className="text-[13px] text-[var(--muted)] t-num"
+                >
+                  {missNote.length}/140
+                </span>
+              </div>
               <input
                 id={`${baseId}-miss-note`}
                 type="text"
                 maxLength={140}
                 value={missNote}
                 onChange={(e) => setMissNote(e.target.value)}
+                aria-describedby={`${baseId}-miss-note-hint ${baseId}-miss-note-count`}
                 placeholder="Ej. Parcial de Algoritmos a las 7 pm o me dormí tarde"
                 className="t-input"
               />
+              <p id={`${baseId}-miss-note-hint`} className="text-[13px] text-[var(--muted)] mt-1.5">
+                Opcional: te ayuda a recordar por qué ajustaste la semana.
+              </p>
             </div>
 
             <div className="pt-2 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -272,14 +376,25 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
               aria-live="polite"
               className="p-5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line-strong)] space-y-3"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="t-badge t-badge-ok">
-                  <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
-                  Racha protegida si reprogramas
-                </span>
-                <span className="t-badge">
-                  {dayOfWeek} · {formatShortSpanishDate(dateIso)}
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="t-badge t-badge-ok">
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    Racha protegida si reprogramas
+                  </span>
+                  <span className="t-badge">
+                    {dayOfWeek} · {formatShortSpanishDate(dateIso)}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStage('reason')}
+                  className="t-btn t-btn-ghost min-h-[36px] px-3 text-[13px]"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                  <span>Cambiar motivo</span>
+                </button>
               </div>
 
               <div className="flex items-start gap-3">
@@ -290,7 +405,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                   <h2
                     ref={stageTwoHeadingRef}
                     tabIndex={-1}
-                    className="text-lg sm:text-xl font-semibold tracking-[-0.02em] text-[var(--ink)] outline-none"
+                    className="text-lg sm:text-xl font-semibold tracking-[-0.02em] text-[var(--ink)] text-balance outline-none"
                   >
                     {encouragement.headline}
                   </h2>
@@ -330,12 +445,15 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                             name={`${baseId}-reschedule-day`}
                             value={key}
                             checked={isChecked}
-                            onChange={() => setSelectedOptionKey(key)}
+                            onChange={() => {
+                              setSelectedOptionKey(key);
+                              setSelectedSlotId('');
+                            }}
                             className="sr-only peer"
                           />
                           <label
                             htmlFor={inputId}
-                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-[14px] border cursor-pointer select-none transition-colors peer-focus-visible:outline-2 peer-focus-visible:outline-[var(--action)] peer-focus-visible:outline-offset-2 ${
+                            className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3.5 rounded-[14px] border cursor-pointer select-none transition-colors transition-transform duration-150 active:scale-[0.99] motion-reduce:transition-none peer-focus-visible:outline-2 peer-focus-visible:outline-[var(--action)] peer-focus-visible:outline-offset-2 ${
                               isChecked
                                 ? 'bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] border-[var(--action)]'
                                 : 'bg-[var(--surface)] border-[var(--line-strong)] hover:bg-[var(--surface-2)]'
@@ -394,6 +512,22 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                 </div>
               )}
 
+              {rescheduleOptions.length > 0 && selectedOption && (
+                <div className="pt-4 border-t border-[var(--line)]">
+                  <SmartSlotReschedulePicker
+                    slots={smartSlots}
+                    selectedSlotId={activeSlot?.id ?? ''}
+                    onSelectSlot={(slot) => setSelectedSlotId(slot.id)}
+                    routineName={routine.name}
+                    gymLocation={resolvedGymLocation}
+                    isGoogleConnected={isGoogleConnected}
+                    onOpenGoogleSync={onOpenGoogleSync}
+                    legendText={`Horario libre de 2 horas para el ${selectedOption.targetDay}`}
+                    emptyMessage={`No encontramos un hueco libre de 2 horas el ${selectedOption.targetDay} entre 07:00 y 22:00. Igual puedes reprogramar la rutina en tu plan semanal.`}
+                  />
+                </div>
+              )}
+
               <div className="pt-2 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 {rescheduleOptions.length > 0 ? (
                   <>
@@ -410,7 +544,11 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                       className="t-btn t-btn-primary !whitespace-normal !py-2.5 text-center leading-snug w-full sm:w-auto"
                     >
                       <CalendarClock className="w-4 h-4 shrink-0" aria-hidden="true" />
-                      <span>Reprogramar rutina (~2h)</span>
+                      <span>
+                        {activeSlot
+                          ? `Reprogramar rutina (${activeSlot.startTime} – ${activeSlot.endTime})`
+                          : 'Reprogramar rutina (~2h)'}
+                      </span>
                     </button>
                   </>
                 ) : (

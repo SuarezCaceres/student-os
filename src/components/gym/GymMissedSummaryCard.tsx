@@ -37,24 +37,43 @@ export const GymMissedSummaryCard: React.FC<GymMissedSummaryCardProps> = ({
           </span>
           {log.streakProtected && (
             <span className="t-badge t-badge-ok">
-              <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
               Racha protegida
             </span>
           )}
         </div>
 
-        <div>
-          <h2 className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]">
-            {log.routineName}
-          </h2>
+        <h2 className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)] text-balance">
+          {log.routineName}
+        </h2>
+
+        {/* Hairline structured metadata list */}
+        <dl className="border-y border-[var(--line)] divide-y divide-[var(--line)] text-[14px]">
           {reasonObj && (
-            <p className="text-[14px] text-[var(--muted)] mt-1.5">
-              Motivo registrado:{' '}
-              <span className="font-medium text-[var(--ink)]">{reasonObj.label}</span>
-              {log.missNote ? ` — “${log.missNote}”` : ''}
-            </p>
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <dt className="text-[var(--muted)]">Motivo principal</dt>
+              <dd className="font-medium text-[var(--ink)]">{reasonObj.label}</dd>
+            </div>
           )}
-        </div>
+          {log.missNote && (
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <dt className="text-[var(--muted)]">Nota</dt>
+              <dd className="text-[var(--ink)] break-words">“{log.missNote}”</dd>
+            </div>
+          )}
+          {isRescheduled && log.rescheduledToDay && (
+            <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <dt className="text-[var(--muted)]">Nueva fecha asignada</dt>
+              <dd className="font-medium text-[var(--ok)] t-num">
+                {log.rescheduledToDay}
+                {log.rescheduledToDate ? ` · ${formatShortSpanishDate(log.rescheduledToDate)}` : ''}
+                {log.rescheduledSlotStart && log.rescheduledSlotEnd
+                  ? ` (${log.rescheduledSlotStart} – ${log.rescheduledSlotEnd})`
+                  : ''}
+              </dd>
+            </div>
+          )}
+        </dl>
 
         {log.encouragementMessage && (
           <div className="p-4 rounded-[14px] bg-[var(--surface-2)] border border-[var(--line)] flex items-start gap-3">
@@ -65,7 +84,7 @@ export const GymMissedSummaryCard: React.FC<GymMissedSummaryCardProps> = ({
           </div>
         )}
 
-        <div className="pt-2 border-t border-[var(--line)] flex flex-wrap items-center gap-3">
+        <div className="pt-1 flex flex-wrap items-center gap-3">
           {isRescheduled && log.rescheduledToDay && (
             <button
               type="button"

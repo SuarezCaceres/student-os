@@ -20,11 +20,15 @@ import { SectionHeader } from '../common/SectionHeader';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { ModalShell } from '../common/ModalShell';
 import { CalendarTimelineGrid } from './CalendarTimelineGrid';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
 
 export interface WeeklyCalendarProps {
   blocks: CalendarBlock[];
   onAddBlock: (block: CalendarBlock) => void;
   onDeleteBlock: (id: string) => void;
+  isGoogleConnected?: boolean;
+  googleBusyCount?: number;
+  onOpenGoogleSync?: () => void;
 }
 
 const DAYS_OF_WEEK: DayOfWeek[] = [
@@ -66,10 +70,22 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   blocks,
   onAddBlock,
   onDeleteBlock,
+  isGoogleConnected = false,
+  googleBusyCount = 0,
+  onOpenGoogleSync,
 }) => {
   const [todayDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
   const [viewMode, setViewMode] = useState<'grid' | 'columns'>('grid');
   const [mobileDay, setMobileDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
+  const [isFallbackSyncOpen, setIsFallbackSyncOpen] = useState(false);
+
+  const handleOpenGoogleSync = () => {
+    if (onOpenGoogleSync) {
+      onOpenGoogleSync();
+    } else {
+      setIsFallbackSyncOpen(true);
+    }
+  };
 
   // Add Block Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -212,6 +228,22 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
 
             <button
               type="button"
+              onClick={handleOpenGoogleSync}
+              className="t-btn t-btn-secondary"
+              title="Conectar cuenta Google Calendar (OAuth 2.0) para detectar bloques ocupados y sincronizar entrenamientos"
+            >
+              <Calendar className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span>Google Calendar</span>
+              {isGoogleConnected && (
+                <span
+                  aria-label="Conectado"
+                  className="w-2 h-2 rounded-full bg-[var(--ok)] shrink-0"
+                />
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={handleExportICS}
               className="t-btn t-btn-secondary"
               title="Descargar archivo .ics compatible con Google Calendar, Apple Calendar y Outlook"
@@ -233,23 +265,31 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       />
 
       {/* Category Legend */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="t-badge t-badge-accent">
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Universidad</span>
-        </span>
-        <span className="t-badge t-badge-ok">
-          <Briefcase className="w-3.5 h-3.5" />
-          <span>Trabajo</span>
-        </span>
-        <span className="t-badge t-badge-gym">
-          <Dumbbell className="w-3.5 h-3.5" />
-          <span>Gym</span>
-        </span>
-        <span className="t-badge text-[var(--ink)]">
-          <User className="w-3.5 h-3.5" />
-          <span>Personal</span>
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="t-badge t-badge-accent">
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Universidad</span>
+          </span>
+          <span className="t-badge t-badge-ok">
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Trabajo</span>
+          </span>
+          <span className="t-badge t-badge-gym">
+            <Dumbbell className="w-3.5 h-3.5" />
+            <span>Gym</span>
+          </span>
+          <span className="t-badge text-[var(--ink)]">
+            <User className="w-3.5 h-3.5" />
+            <span>Personal</span>
+          </span>
+        </div>
+
+        {(isGoogleConnected || googleBusyCount > 0) && (
+          <span className="t-badge t-badge-ok t-num">
+            Google Calendar conectado{googleBusyCount > 0 ? ` · ${googleBusyCount} eventos ocupados` : ''}
+          </span>
+        )}
       </div>
 
       {/* Main Content: Timeline Grid vs Day Columns */}
@@ -543,6 +583,14 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           </div>
         </form>
       </ModalShell>
+
+      {!onOpenGoogleSync && (
+        <GoogleCalendarSyncModal
+          isOpen={isFallbackSyncOpen}
+          onClose={() => setIsFallbackSyncOpen(false)}
+          calendarBlocks={blocks}
+        />
+      )}
     </section>
   );
 };

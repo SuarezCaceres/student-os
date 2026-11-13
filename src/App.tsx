@@ -24,14 +24,25 @@ import { KanbanBoard } from './components/kanban/KanbanBoard';
 import { UniversityView } from './components/university/UniversityView';
 import { GymTracker } from './components/gym/GymTracker';
 import type { GymOnboardingCompletePayload } from './components/gym/GymOnboardingModal';
-import { calculateBmi } from './utils/routineGenerator';
+import { calculateBmi, getGymDisplayName } from './utils/routineGenerator';
 import {
   applyRoutineReschedule,
   getCurrentWeekDateMap,
   getLocalIsoDate,
   type RescheduleMode,
 } from './utils/gymAttendance';
+import {
+  buildGymCalendarBlockPayload,
+  type BusyInterval,
+} from './utils/calendarSlotFinder';
+import {
+  deleteGoogleGymEvent,
+  getStoredAccessToken,
+  getStoredGoogleMeta,
+  upsertGoogleGymEvent,
+} from './services/googleCalendar';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
+import { GoogleCalendarSyncModal } from './components/calendar/GoogleCalendarSyncModal';
 import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
 import { LandingPage } from './components/landing/LandingPage';
@@ -42,6 +53,16 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
+  const [isGoogleSyncModalOpen, setIsGoogleSyncModalOpen] = useState(false);
+  const [googleBusyByDate, setGoogleBusyByDate] = useState<Record<string, BusyInterval[]>>({});
+  const [isGoogleConnected, setIsGoogleConnected] = useState<boolean>(() =>
+    Boolean(getStoredGoogleMeta().connected && getStoredAccessToken())
+  );
+  const [weekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
+  const googleBusyCount = useMemo(
+    () => Object.values(googleBusyByDate).reduce((sum, list) => sum + list.length, 0),
+    [googleBusyByDate]
+  );
 
   // User session & Landing vs App View Routing
   const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
@@ -344,37 +365,84 @@ export const App: React.FC = () => {
       fromDate: string;
       toDay: DayOfWeek;
       mode: RescheduleMode;
+      selectedSlot?: {
+        dateIso: string;
+        startTime: string;
+        endTime: string;
+      };
     }) => {
+      const currentWeekDates = getCurrentWeekDateMap();
+      const prevLogSnapshot = (state.gymAttendanceLogs ?? []).find(
+        (l) => l.date === payload.fromDate
+      );
+      const sourceRoutineSnapshot = state.gymRoutines.find(
+        (r) => r.dayOfWeek === payload.fromDay
+      );
+      const gymLocationSnapshot = state.gymProfile
+        ? getGymDisplayName(state.gymProfile.gymType, state.gymProfile.customGymName)
+        : undefined;
+      const generatedBlockId = payload.selectedSlot
+        ? `cal-gym-${payload.toDay.toLowerCase()}-${payload.selectedSlot.startTime.replace(':', '')}-${Date.now()}`
+        : undefined;
+
       setState((prev) => {
-        const weekDates = getCurrentWeekDateMap();
         const result = applyRoutineReschedule({
           fromDay: payload.fromDay,
           toDay: payload.toDay,
           mode: payload.mode,
           routines: prev.gymRoutines,
           gymProfile: prev.gymProfile,
-          weekDates,
+          weekDates: currentWeekDates,
         });
 
         const existingLogs = prev.gymAttendanceLogs ?? [];
         const prevLog = existingLogs.find((l) => l.date === payload.fromDate);
+        const resolvedRoutineName = prevLog?.routineName ?? result.movedRoutineName;
+        const resolvedLocation = prev.gymProfile
+          ? getGymDisplayName(prev.gymProfile.gymType, prev.gymProfile.customGymName)
+          : undefined;
+
+        let nextCalendarBlocks = prev.calendarBlocks;
+        if (payload.selectedSlot && generatedBlockId) {
+          const filteredBlocks = prevLog?.rescheduledCalendarBlockId
+            ? prev.calendarBlocks.filter((b) => b.id !== prevLog.rescheduledCalendarBlockId)
+            : prev.calendarBlocks;
+          const newBlock: CalendarBlock = {
+            ...buildGymCalendarBlockPayload({
+              day: result.rescheduledToDay,
+              startTime: payload.selectedSlot.startTime,
+              endTime: payload.selectedSlot.endTime,
+              routineName: resolvedRoutineName,
+              gymLocation: resolvedLocation,
+              googleEventId: prevLog?.googleEventId,
+            }),
+            id: generatedBlockId,
+          };
+          nextCalendarBlocks = [...filteredBlocks, newBlock];
+        }
+
         const rescheduledLog: GymAttendanceLog = {
           id: prevLog?.id ?? `att-${payload.fromDate}-${payload.fromDay}`,
           date: payload.fromDate,
           dayOfWeek: payload.fromDay,
           routineId: prevLog?.routineId ?? `gym-${payload.fromDay.toLowerCase()}`,
-          routineName: prevLog?.routineName ?? result.movedRoutineName,
+          routineName: resolvedRoutineName,
           status: 'rescheduled',
           missReason: prevLog?.missReason,
           missNote: prevLog?.missNote,
           encouragementMessage: prevLog?.encouragementMessage,
           rescheduledToDay: result.rescheduledToDay,
           rescheduledToDate: result.rescheduledToDate,
+          rescheduledSlotStart: payload.selectedSlot?.startTime,
+          rescheduledSlotEnd: payload.selectedSlot?.endTime,
+          rescheduledCalendarBlockId: generatedBlockId ?? prevLog?.rescheduledCalendarBlockId,
+          googleEventId: prevLog?.googleEventId,
           streakProtected: true,
         };
 
         return {
           ...prev,
+          calendarBlocks: nextCalendarBlocks,
           gymRoutines: result.updatedRoutines,
           gymAttendanceLogs: [
             ...existingLogs.filter((l) => l.date !== payload.fromDate),
@@ -382,8 +450,41 @@ export const App: React.FC = () => {
           ],
         };
       });
+
+      const activeToken = getStoredAccessToken();
+      if (payload.selectedSlot && generatedBlockId && activeToken) {
+        const routineTitle =
+          prevLogSnapshot?.routineName ?? sourceRoutineSnapshot?.name ?? 'Sesión de Gimnasio';
+        const blockTitle = /^(gym|gimnasio)\b/i.test(routineTitle)
+          ? routineTitle
+          : `Gym: ${routineTitle}`;
+
+        void upsertGoogleGymEvent(activeToken, {
+          eventId: prevLogSnapshot?.googleEventId,
+          title: blockTitle,
+          dateIso: payload.selectedSlot.dateIso,
+          startTime: payload.selectedSlot.startTime,
+          endTime: payload.selectedSlot.endTime,
+          location: gymLocationSnapshot,
+          description: `Entrenamiento reprogramado (${payload.fromDay} → ${payload.toDay}) desde StudentOS PRO MAX.`,
+        })
+          .then(({ eventId }) => {
+            setState((latest) => ({
+              ...latest,
+              calendarBlocks: latest.calendarBlocks.map((block) =>
+                block.id === generatedBlockId ? { ...block, googleEventId: eventId } : block
+              ),
+              gymAttendanceLogs: (latest.gymAttendanceLogs ?? []).map((log) =>
+                log.date === payload.fromDate ? { ...log, googleEventId: eventId } : log
+              ),
+            }));
+          })
+          .catch(() => {
+            // Keep local calendar block intact if Google sync fails or token expired
+          });
+      }
     },
-    [setState]
+    [state.gymAttendanceLogs, state.gymRoutines, state.gymProfile, setState]
   );
 
   const handleUpdateGymExercise = useCallback((day: DayOfWeek, updatedExercise: GymExercise) => {
@@ -469,11 +570,18 @@ export const App: React.FC = () => {
   }, [setState]);
 
   const handleDeleteCalendarBlock = useCallback((id: string) => {
+    const targetBlock = state.calendarBlocks.find((b) => b.id === id);
+    const activeToken = getStoredAccessToken();
     setState((prev) => ({
       ...prev,
       calendarBlocks: prev.calendarBlocks.filter((b) => b.id !== id),
     }));
-  }, [setState]);
+    if (targetBlock?.googleEventId && activeToken) {
+      void deleteGoogleGymEvent(activeToken, targetBlock.googleEventId).catch(() => {
+        // Ignore remote deletion error when offline or expired
+      });
+    }
+  }, [state.calendarBlocks, setState]);
 
   // Learning / Reflection Handlers
   const handleSaveReflection = useCallback((reflection: WeeklyReflection) => {
@@ -604,6 +712,10 @@ export const App: React.FC = () => {
               gymProfile={state.gymProfile}
               weightHistory={state.weightHistory}
               attendanceLogs={state.gymAttendanceLogs}
+              calendarBlocks={state.calendarBlocks}
+              externalBusyByDate={googleBusyByDate}
+              isGoogleConnected={isGoogleConnected}
+              onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
               onSaveGymPlan={handleSaveGymPlan}
               onLogBodyWeight={handleLogBodyWeight}
               onStartSession={handleStartGymSession}
@@ -622,6 +734,9 @@ export const App: React.FC = () => {
               blocks={state.calendarBlocks}
               onAddBlock={handleAddCalendarBlock}
               onDeleteBlock={handleDeleteCalendarBlock}
+              isGoogleConnected={isGoogleConnected}
+              googleBusyCount={googleBusyCount}
+              onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
             />
           )}
 
@@ -649,6 +764,21 @@ export const App: React.FC = () => {
         onAddKanbanItem={handleAddKanbanItem}
         onAddCalendarBlock={handleAddCalendarBlock}
         onAddLearningResource={handleAddLearningResource}
+      />
+
+      {/* Shared Google Calendar OAuth 2.0 Sync Modal */}
+      <GoogleCalendarSyncModal
+        isOpen={isGoogleSyncModalOpen}
+        onClose={() => setIsGoogleSyncModalOpen(false)}
+        calendarBlocks={state.calendarBlocks}
+        weekDates={weekDates}
+        onBusyIntervalsSynced={(busyMap) => setGoogleBusyByDate(busyMap)}
+        onConnectionChange={(connected) => {
+          setIsGoogleConnected(connected);
+          if (!connected) {
+            setGoogleBusyByDate({});
+          }
+        }}
       />
     </div>
   );

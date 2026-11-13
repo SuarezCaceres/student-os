@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  
-> **Versión actual:** `v2.7.0 (Asistencia Diaria Gym: Puerta Central "Iniciemos Hoy", Detección Retroactiva de Faltas, Mensaje Empático de Aliento, Protección de Racha y Reprogramación Semanal)`  
+> **Versión actual:** `v2.8.0 (Fase 1 Pulida + Fase 2 Calendario Inteligente 2h & Google Calendar OAuth 2.0)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -292,6 +292,8 @@ student-os/
 | `feat/ui-taste-foundation` | v2.5.1 | `10aff7a` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
 | `feat/ui-taste-foundation` | v2.4.1 | `20e2c85` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
 | `feat/ui-taste-foundation` | v2.3.1 | `2d709e3`, `373e555`, `5fef05f` | Pixel art interactivo en Hero, tipeo en vivo con partículas, sonido 8-bit Web Audio, diálogos y confeti |
+| `feat/ui-taste-foundation` | v2.8.0 | Actual | Pulido `/ui-ux-pro-max` Fase 1 (pasos 1/2, retorno a motivo, telemetría semanal, tabs no dependientes solo de color, cronómetro de 2h desacoplado, preview colapsable) + Fase 2 (`calendarSlotFinder.ts`, `googleCalendar.ts` OAuth 2.0 GIS/API v3, `GoogleCalendarSyncModal.tsx`, `SmartSlotReschedulePicker.tsx`) |
+| `feat/ui-taste-foundation` | v2.7.0 | `748c072` | Fase 1 Asistencia Diaria Gym: Start Gate (`Iniciemos con el entrenamiento de hoy`), faltas retroactivas, mensajes de aliento, racha protegida y reprogramación semanal |
 | `feat/ui-taste-foundation` | v2.3.0 | `9268ae7`, `95efa37`, `1c561fb`, `3723f3b` | Auditoría Impeccable 20/20: Focus Trap WAI-ARIA, prefers-reduced-motion, SectionHeader h1, memoización React |
 | `feat/audit-a11y-core-opt` | Fusionada | `9268ae7` | Trabajo del Agente 1 (Focus Trap, prefers-reduced-motion, SectionHeader h1, useCallback/useMemo) |
 | `feat/audit-landing-auth-polish` | Fusionada | `95efa37`, `1c561fb` | Trabajo del Agente 2 (AuthModal labels htmlFor, selección contrast, táctil 44px) |
@@ -306,10 +308,10 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.6.0)
-- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en ~450ms.
-- **Linter Estático:** `npx oxlint` con 0 errores en los módulos integrados (`GymTracker`, `GymOnboardingModal`, `GymProfileCard`, `WeightCheckInModal`, `GymRestDayBanner`, `routineGenerator`, `App`).
-- **Prueba E2E Playwright (Chromium):** Flujo completo validado (Paso 1→4 Wizard, cálculo IMC 23.8→24.0, registro de peso, vista Rest Day, 0 errores en consola y 0 errores de página).
+## 🚀 7. Verificación del Sistema (v2.8.0)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en ~460ms.
+- **Linter Estático:** `npx oxlint` con 0 advertencias y 0 errores sobre los 11 módulos modificados/nuevos de Fase 1 + Fase 2 (`App`, `types`, `calendarSlotFinder`, `googleCalendar`, `WeeklyCalendar`, `GoogleCalendarSyncModal`, `SmartSlotReschedulePicker`, `GymStartGateCard`, `GymMissFlowCard`, `GymMissedSummaryCard`, `GymTracker`).
+- **Prueba E2E Playwright (Chromium/Edge):** Flujo completo validado en escritorio (`1440x900`) y móvil (`390x844`, modo oscuro y claro): Start Gate con resumen rápido colapsable, cronómetro de sesión de 2h, registro retroactivo de inasistencia con retorno de paso, detección de huecos libres de 2 horas evitando colisiones con bloques del horario semanal (`19:00 – 21:00` libre frente a bloqueo ocupado `16:00 – 18:00`), persistencia en `GymMissedSummaryCard` y `WeeklyCalendar`, y modal `GoogleCalendarSyncModal` con cierre por tecla `Escape` (0 errores de consola y 0 errores de página).
 - **Videos WebM Nativos a 30fps:** 4 videos cinemáticos generados en `public/videos/`:
   - `bench-press-technique.webm` (1.12 MB)
   - `squat-technique.webm` (1.16 MB)

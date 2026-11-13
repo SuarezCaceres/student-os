@@ -1,5 +1,8 @@
 import React, { useEffect, useId, useState } from 'react';
 import {
+  AlertCircle,
+  CalendarClock,
+  Check,
   CheckCircle2,
   Clock,
   Dumbbell,
@@ -9,6 +12,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import type {
+  CalendarBlock,
   DayOfWeek,
   ExerciseHistoryEntry,
   GymAttendanceLog,
@@ -18,6 +22,7 @@ import type {
   UserGymProfile,
   WeightHistoryEntry,
 } from '../../types';
+import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
 import {
   buildSessionAttendanceLog,
@@ -51,6 +56,10 @@ export interface GymTrackerProps {
   gymProfile?: UserGymProfile;
   weightHistory?: WeightHistoryEntry[];
   attendanceLogs?: GymAttendanceLog[];
+  calendarBlocks?: CalendarBlock[];
+  externalBusyByDate?: Record<string, BusyInterval[]>;
+  isGoogleConnected?: boolean;
+  onOpenGoogleSync?: () => void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
   onLogBodyWeight?: (newWeightKg: number) => void;
   onStartSession?: (payload: {
@@ -73,6 +82,11 @@ export interface GymTrackerProps {
     fromDate: string;
     toDay: DayOfWeek;
     mode: RescheduleMode;
+    selectedSlot?: {
+      dateIso: string;
+      startTime: string;
+      endTime: string;
+    };
   }) => void;
   onToggleSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onAddExercise: (day: DayOfWeek, exercise: GymExercise) => void;
@@ -102,6 +116,10 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   gymProfile,
   weightHistory,
   attendanceLogs,
+  calendarBlocks = [],
+  externalBusyByDate,
+  isGoogleConnected = false,
+  onOpenGoogleSync,
   onSaveGymPlan,
   onLogBodyWeight,
   onStartSession,
@@ -124,6 +142,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
   const [fallbackLogs, setFallbackLogs] = useState<GymAttendanceLog[]>([]);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [statusAnnouncement, setStatusAnnouncement] = useState<string>('');
   const [pinnedMissDay, setPinnedMissDay] = useState<{
     dayOfWeek: DayOfWeek;
     dateIso: string;
@@ -368,6 +387,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
       status: 'in_progress',
     });
     setNowMs(startNow);
+    setStatusAnnouncement(`Sesión de ${todayDay} iniciada. Cronómetro de 2 horas en marcha.`);
     const payload = {
       dayOfWeek: todayDay,
       date: todayIso,
@@ -385,6 +405,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     const durationMinutes =
       elapsedSeconds > 0 ? Math.max(1, Math.round(elapsedSeconds / 60)) : undefined;
     triggerBigCelebration();
+    setStatusAnnouncement(`Entrenamiento del ${selectedDay} registrado como completado.`);
     const payload = {
       dayOfWeek: selectedDay,
       date: selectedDateIso,
@@ -439,8 +460,29 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
       ? getRescheduleOptions(selectedDay, routines, gymProfile, weekDates, todayIso)
       : [];
 
+  // Derived weekly adherence telemetry (avoid duplicating in state)
+  const weeklyPlannedCount = DAYS_LIST.reduce((acc, day) => {
+    const dayRoutine = routines.find((r) => r.dayOfWeek === day);
+    const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
+    const isScheduled = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
+    return acc + (isScheduled ? 1 : 0);
+  }, 0);
+
+  const weeklyCompletedCount = DAYS_LIST.reduce((acc, day) => {
+    const dayLog = effectiveLogs.find((l) => l.date === weekDates[day]);
+    return acc + (dayLog?.status === 'completed' ? 1 : 0);
+  }, 0);
+
+  const weeklyRescheduledCount = DAYS_LIST.reduce((acc, day) => {
+    const dayLog = effectiveLogs.find((l) => l.date === weekDates[day]);
+    return acc + (dayLog?.status === 'rescheduled' ? 1 : 0);
+  }, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
+      <p role="status" aria-atomic="true" className="sr-only">
+        {statusAnnouncement}
+      </p>
       {/* Header */}
       <SectionHeader
         title="Entrenamiento y gimnasio"
@@ -532,71 +574,120 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         </div>
       )}
 
-      {/* Tactile Day Selector (Lunes - Domingo, >=44px height) */}
-      <div
-        role="tablist"
-        aria-label="Seleccionar día de entrenamiento"
-        className="flex md:grid md:grid-cols-7 items-center gap-1.5 p-1.5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line)] overflow-x-auto no-scrollbar"
-      >
-        {DAYS_LIST.map((day) => {
-          const isToday = day === todayDay;
-          const isSelected = day === selectedDay;
-          const dayDateIso = weekDates[day];
-          const dayLog = effectiveLogs.find((l) => l.date === dayDateIso);
-          const dayRoutine = routines.find((r) => r.dayOfWeek === day);
-          const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
-          const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
-          const isPendingMissTab = pendingMissedDays.some((p) => p.dayOfWeek === day);
+      {/* Weekly Adherence Telemetry Strip + Tactile Day Selector */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[13px] text-[var(--muted)]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Asistencia esta semana:{' '}
+              <strong className="t-num font-semibold text-[var(--ink)]">
+                {weeklyCompletedCount}/{weeklyPlannedCount}
+              </strong>{' '}
+              completadas
+            </span>
+            {weeklyRescheduledCount > 0 && (
+              <span className="t-num">· {weeklyRescheduledCount} reprogramada{weeklyRescheduledCount > 1 ? 's' : ''}</span>
+            )}
+          </div>
 
-          let dotClass = '';
-          if (dayLog?.status === 'completed') {
-            dotClass = 'bg-[var(--ok)]';
-          } else if (isPendingMissTab || dayLog?.status === 'missed') {
-            dotClass = 'bg-[var(--warn)]';
-          } else if (dayLog?.status === 'rescheduled') {
-            dotClass = 'bg-[var(--muted)] opacity-60';
-          } else if (isScheduledDay || hasExercises) {
-            dotClass = 'bg-[var(--gym)]';
-          }
-
-          return (
+          {pendingMissedDays.length > 0 && selectedDay !== pendingMissedDays[0].dayOfWeek && (
             <button
-              key={day}
               type="button"
-              role="tab"
-              aria-selected={isSelected}
               onClick={() => {
                 setPinnedMissDay(null);
-                setSelectedDay(day);
+                setSelectedDay(pendingMissedDays[0].dayOfWeek);
               }}
-              className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
-                isSelected
-                  ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
-                  : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
-              }`}
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--warn)] hover:underline cursor-pointer"
             >
-              {dotClass && (
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Registrar falta pendiente ({pendingMissedDays[0].dayOfWeek})</span>
+            </button>
+          )}
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Seleccionar día de entrenamiento"
+          className="w-full max-w-full min-w-0 flex md:grid md:grid-cols-7 items-center gap-1.5 p-1.5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line)] overflow-x-auto no-scrollbar"
+        >
+          {DAYS_LIST.map((day) => {
+            const isToday = day === todayDay;
+            const isSelected = day === selectedDay;
+            const dayDateIso = weekDates[day];
+            const dayLog = effectiveLogs.find((l) => l.date === dayDateIso);
+            const dayRoutine = routines.find((r) => r.dayOfWeek === day);
+            const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
+            const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
+            const isPendingMissTab = pendingMissedDays.some((p) => p.dayOfWeek === day);
+
+            let statusIcon: React.ReactNode = null;
+            let dayStatusLabel = 'descanso';
+            if (dayLog?.status === 'completed') {
+              statusIcon = <Check className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />;
+              dayStatusLabel = 'completada';
+            } else if (isPendingMissTab) {
+              statusIcon = (
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'falta pendiente por registrar';
+            } else if (dayLog?.status === 'missed') {
+              statusIcon = (
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'falta registrada';
+            } else if (dayLog?.status === 'rescheduled') {
+              statusIcon = (
+                <CalendarClock className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'reprogramada';
+            } else if (dayLog?.status === 'in_progress') {
+              statusIcon = <Clock className="w-3.5 h-3.5 text-[var(--action)] shrink-0" aria-hidden="true" />;
+              dayStatusLabel = 'sesión en curso';
+            } else if (isScheduledDay || hasExercises) {
+              statusIcon = (
                 <span
                   aria-hidden="true"
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`}
+                  className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--gym)]"
                 />
-              )}
-              <span className="sm:hidden">{day.slice(0, 3)}</span>
-              <span className="hidden sm:inline">{day}</span>
-              {isToday && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none font-medium ${
-                    isSelected
-                      ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
-                      : 'bg-[var(--surface)] text-[var(--muted)] border border-[var(--line)]'
-                  }`}
-                >
-                  Hoy
-                </span>
-              )}
-            </button>
-          );
-        })}
+              );
+              dayStatusLabel = 'rutina programada';
+            }
+
+            return (
+              <button
+                key={day}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                aria-label={`${day}${isToday ? ' (Hoy)' : ''}: ${dayStatusLabel}`}
+                onClick={() => {
+                  setPinnedMissDay(null);
+                  setSelectedDay(day);
+                }}
+                className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
+                  isSelected
+                    ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
+                    : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
+                }`}
+              >
+                {statusIcon}
+                <span className="sm:hidden">{day.slice(0, 3)}</span>
+                <span className="hidden sm:inline">{day}</span>
+                {isToday && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none font-medium ${
+                      isSelected
+                        ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
+                        : 'bg-[var(--surface)] text-[var(--muted)] border border-[var(--line)]'
+                    }`}
+                  >
+                    Hoy
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Routine Gate / Missed Flow / Rest Day / Active Exercise Routine */}
@@ -620,8 +711,16 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
             weekDates,
             todayIso
           )}
+          calendarBlocks={calendarBlocks}
+          externalBusyByDate={externalBusyByDate}
+          isGoogleConnected={isGoogleConnected}
+          onOpenGoogleSync={onOpenGoogleSync}
+          weekDates={weekDates}
           onCancel={() => setPinnedMissDay(null)}
           onSubmitMissReason={(payload) => {
+            setStatusAnnouncement(
+              `Inasistencia del ${payload.dayOfWeek} registrada. Elige cómo reprogramar tu semana.`
+            );
             setPinnedMissDay({
               ...activeMissFlow,
               initialStage: 'encouragement_reschedule',
@@ -666,9 +765,16 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                 missReason: activeMissFlow.existingReason,
                 rescheduledToDay: payload.toDay,
                 rescheduledToDate: weekDates[payload.toDay],
+                rescheduledSlotStart: payload.selectedSlot?.startTime,
+                rescheduledSlotEnd: payload.selectedSlot?.endTime,
                 streakProtected: true,
               });
             }
+            setStatusAnnouncement(
+              payload.selectedSlot
+                ? `Rutina reprogramada del ${payload.fromDay} al ${payload.toDay} (${payload.selectedSlot.startTime} – ${payload.selectedSlot.endTime}).`
+                : `Rutina reprogramada del ${payload.fromDay} al ${payload.toDay}.`
+            );
             setPinnedMissDay(null);
             triggerConfetti();
           }}
@@ -716,6 +822,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           dayOfWeek={selectedDay}
           dateIso={selectedDateIso}
           gymDisplayName={gymDisplayName}
+          restSeconds={recommendedRestDuration}
           onStartSession={handleStartTodaySession}
           onReportMissed={() =>
             setPinnedMissDay({
@@ -730,51 +837,74 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
       ) : (
       <section className="t-card p-6">
         {/* Routine Header, Session Status & Progress */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-[var(--line)]">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
-              <span className="text-[13px] text-[var(--muted)]">
-                · {selectedDay} ({formatShortSpanishDate(selectedDateIso)})
-              </span>
-              {isSessionInProgress && (
-                <span className="t-badge t-badge-accent t-num" role="status" aria-live="off">
-                  <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-                  En curso · {formatElapsedSeconds(elapsedSeconds)} / 02:00:00 obj.
+        <div className="pb-5 border-b border-[var(--line)]">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
+                <span className="text-[13px] text-[var(--muted)]">
+                  · {selectedDay} ({formatShortSpanishDate(selectedDateIso)})
                 </span>
-              )}
-              {selectedDayLog?.status === 'completed' && (
-                <span className="t-badge t-badge-ok t-num">
-                  <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
-                  Completado
-                  {selectedDayLog.durationMinutes ? ` · ${selectedDayLog.durationMinutes} min` : ''}
-                </span>
-              )}
-              {selectedDateIso > todayIso && currentRoutine.exercises.length > 0 && (
-                <span className="t-badge">Próxima sesión · ~2h</span>
-              )}
+                {isSessionInProgress && (
+                  <span className="t-badge t-badge-accent">
+                    <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    <span>Sesión en curso</span>
+                  </span>
+                )}
+                {selectedDayLog?.status === 'completed' && (
+                  <span className="t-badge t-badge-ok t-num">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    Completado
+                    {selectedDayLog.durationMinutes ? ` · ${selectedDayLog.durationMinutes} min` : ''}
+                  </span>
+                )}
+                {selectedDateIso > todayIso && currentRoutine.exercises.length > 0 && (
+                  <span className="t-badge">Próxima sesión · ~2h</span>
+                )}
+              </div>
+              <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug text-balance">
+                {currentRoutine.name}
+              </h3>
             </div>
-            <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug">
-              {currentRoutine.name}
-            </h3>
+
+            <div className="w-full md:w-72 shrink-0">
+              <div className="flex items-center justify-between gap-2 text-[13px] mb-2">
+                <span className="text-[var(--muted)]">Progreso del día</span>
+                <span className="t-num font-medium text-[var(--ink)]">
+                  {completedSets}/{totalSets} series · {progressPercent}%
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    progressPercent === 100 ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
+                  }`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="w-full md:w-72 shrink-0">
-            <div className="flex items-center justify-between gap-2 text-[13px] mb-2">
-              <span className="text-[var(--muted)]">Progreso del día</span>
-              <span className="t-num font-medium text-[var(--ink)]">
-                {completedSets}/{totalSets} series · {progressPercent}%
-              </span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+          {isSessionInProgress && (
+            <div className="mt-4 pt-3.5 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+                <Clock className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+                <span>Cronómetro de sesión (~2h objetivo)</span>
+                <span className="t-num font-semibold text-[var(--ink)]">
+                  {formatElapsedSeconds(elapsedSeconds)} / 02:00:00
+                </span>
+              </div>
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  progressPercent === 100 ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
-                }`}
-                style={{ width: `${progressPercent}%` }}
-              />
+                className="w-full sm:w-56 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden"
+                aria-hidden="true"
+              >
+                <div
+                  className="h-full rounded-full bg-[var(--action)] transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.round((elapsedSeconds / 7200) * 100))}%` }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Exercises List (clean .t-row separation, zero triple nesting) */}

@@ -72,6 +72,7 @@ export interface CalendarBlock {
   title: string;
   category: Category;
   location?: string;
+  googleEventId?: string;
 }
 
 export type AssignmentType = 'tarea' | 'proyecto' | 'examen' | 'laboratorio';
@@ -182,6 +183,10 @@ export interface GymAttendanceLog {
   encouragementMessage?: string;
   rescheduledToDay?: DayOfWeek;
   rescheduledToDate?: string;
+  rescheduledSlotStart?: string;
+  rescheduledSlotEnd?: string;
+  rescheduledCalendarBlockId?: string;
+  googleEventId?: string;
   streakProtected?: boolean;
 }
 
