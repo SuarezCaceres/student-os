@@ -40,3 +40,4 @@ dist-ssr
 
 # Claude Code worktrees
 .claude/
+.playwright-mcp/
