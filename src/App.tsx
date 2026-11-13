@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { initialData } from './data/initialData';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import type { 
@@ -50,6 +50,17 @@ import {
 } from './utils/calendarSlotFinder';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
 import { GoogleCalendarSyncModal } from './components/calendar/GoogleCalendarSyncModal';
+import { GoogleChangeBanner } from './components/calendar/GoogleChangeBanner';
+import { GoogleImpactModal } from './components/calendar/GoogleImpactModal';
+import {
+  applyMobileMirrorAndEvaluateImpact,
+  clearGoogleEventsSnapshot,
+  evaluateScheduleConflicts,
+  loadGoogleEventsSnapshot,
+  saveGoogleEventsSnapshot,
+  type GoogleImpactReport,
+  type ScheduleSolutionOption,
+} from './utils/googleCalendarDiff';
 import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
 import { LandingPage } from './components/landing/LandingPage';
@@ -73,6 +84,28 @@ export const App: React.FC = () => {
     () => Object.values(googleBusyByDate).reduce((sum, list) => sum + list.length, 0),
     [googleBusyByDate]
   );
+  const [googleImpactReport, setGoogleImpactReport] = useState<GoogleImpactReport | null>(null);
+  const [isGoogleImpactModalOpen, setIsGoogleImpactModalOpen] = useState(false);
+  const [isEvaluatingImpact, setIsEvaluatingImpact] = useState(false);
+  const [applyingSolutionId, setApplyingSolutionId] = useState<string | null>(null);
+
+  const calendarBlocksRef = useRef<CalendarBlock[]>(state.calendarBlocks);
+  const googleEventsRef = useRef<GoogleCalendarEvent[]>(googleEvents);
+  const googleBusyByDateRef = useRef<Record<string, BusyInterval[]>>(googleBusyByDate);
+  const lastGoogleSyncAtRef = useRef<number>(0);
+  const googleSyncInFlightRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    calendarBlocksRef.current = state.calendarBlocks;
+  }, [state.calendarBlocks]);
+
+  useEffect(() => {
+    googleEventsRef.current = googleEvents;
+  }, [googleEvents]);
+
+  useEffect(() => {
+    googleBusyByDateRef.current = googleBusyByDate;
+  }, [googleBusyByDate]);
 
   // User session & Landing vs App View Routing
   const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
@@ -99,25 +132,76 @@ export const App: React.FC = () => {
   });
 
   const refreshGoogleCalendarWeek = useCallback(
-    async (explicitToken?: string) => {
-      const token = explicitToken || (await trySilentGoogleReconnect());
+    async (
+      options?:
+        | string
+        | {
+            explicitToken?: string;
+            source?: 'auto_poll' | 'manual_sync' | 'internal_mutation';
+          }
+    ) => {
+      const normalized =
+        typeof options === 'string'
+          ? { explicitToken: options, source: 'internal_mutation' as const }
+          : {
+              explicitToken: options?.explicitToken,
+              source: options?.source ?? ('internal_mutation' as const),
+            };
+
+      if (normalized.source === 'auto_poll' && googleSyncInFlightRef.current) {
+        return;
+      }
+
+      const token = normalized.explicitToken || (await trySilentGoogleReconnect());
       if (!token) return;
 
+      googleSyncInFlightRef.current = true;
       setIsGoogleSyncing(true);
       try {
         const { events, busyByDate } = await fetchGoogleEventsAndBusyForWeek(token, weekDates);
+        lastGoogleSyncAtRef.current = Date.now();
+        googleEventsRef.current = events;
+        googleBusyByDateRef.current = busyByDate;
         setGoogleEvents(events);
         setGoogleBusyByDate(busyByDate);
         setIsGoogleConnected(true);
+
+        const previousSnapshot = loadGoogleEventsSnapshot();
+        if (normalized.source === 'internal_mutation' || previousSnapshot === null) {
+          saveGoogleEventsSnapshot(events);
+          return;
+        }
+
+        const { mirroredBlocks, hasChanges, report } = applyMobileMirrorAndEvaluateImpact({
+          previousEvents: previousSnapshot,
+          nextEvents: events,
+          currentBlocks: calendarBlocksRef.current,
+          externalBusyByDate: busyByDate,
+          weekDates,
+        });
+
+        saveGoogleEventsSnapshot(events);
+
+        if (hasChanges) {
+          if (report.mirroredMovesCount > 0 || report.mirroredDeletesCount > 0) {
+            calendarBlocksRef.current = mirroredBlocks;
+            setState((prev) => ({
+              ...prev,
+              calendarBlocks: mirroredBlocks,
+            }));
+          }
+          setGoogleImpactReport(report);
+        }
       } catch {
         if (!getStoredAccessToken()) {
           setIsGoogleConnected(false);
         }
       } finally {
+        googleSyncInFlightRef.current = false;
         setIsGoogleSyncing(false);
       }
     },
-    [weekDates]
+    [weekDates, setState]
   );
 
   useEffect(() => {
@@ -128,23 +212,47 @@ export const App: React.FC = () => {
     void (async () => {
       const token = getStoredAccessToken() || (await trySilentGoogleReconnect());
       if (!token || cancelled) return;
-      try {
-        const { events, busyByDate } = await fetchGoogleEventsAndBusyForWeek(token, weekDates);
-        if (cancelled) return;
-        setGoogleEvents(events);
-        setGoogleBusyByDate(busyByDate);
-        setIsGoogleConnected(true);
-      } catch {
-        if (!cancelled && !getStoredAccessToken()) {
-          setIsGoogleConnected(false);
-        }
-      }
+      await refreshGoogleCalendarWeek({ explicitToken: token, source: 'auto_poll' });
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [currentView, weekDates]);
+  }, [currentView, refreshGoogleCalendarWeek]);
+
+  // Automatic zero-button Google Calendar background sync (focus, visibilitychange & 45s polling)
+  useEffect(() => {
+    if (currentView !== 'app' || !isGoogleConnected) return;
+
+    const MIN_TRIGGER_COOLDOWN_MS = 10_000;
+    const POLL_INTERVAL_MS = 45_000;
+
+    const triggerAutoPollIfEligible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastGoogleSyncAtRef.current < MIN_TRIGGER_COOLDOWN_MS) return;
+      void refreshGoogleCalendarWeek({ source: 'auto_poll' });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        triggerAutoPollIfEligible();
+      }
+    };
+
+    window.addEventListener('focus', triggerAutoPollIfEligible);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshGoogleCalendarWeek({ source: 'auto_poll' });
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => {
+      window.removeEventListener('focus', triggerAutoPollIfEligible);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.clearInterval(intervalId);
+    };
+  }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
   const handleLogout = () => {
     try {
@@ -158,6 +266,9 @@ export const App: React.FC = () => {
       setGoogleBusyByDate({});
       setGoogleEvents([]);
     }
+    clearGoogleEventsSnapshot();
+    setGoogleImpactReport(null);
+    setIsGoogleImpactModalOpen(false);
     setUserSession(null);
     setCurrentView('landing');
   };
@@ -801,7 +912,12 @@ export const App: React.FC = () => {
         calendarBlocks: prev.calendarBlocks.filter((b) => b.id !== id),
       }));
       if (targetBlock?.googleEventId) {
-        setGoogleEvents((prev) => prev.filter((ev) => ev.id !== targetBlock.googleEventId));
+        const nextEvents = googleEventsRef.current.filter(
+          (ev) => ev.id !== targetBlock.googleEventId
+        );
+        googleEventsRef.current = nextEvents;
+        setGoogleEvents(nextEvents);
+        saveGoogleEventsSnapshot(nextEvents);
         if (activeToken) {
           void deleteGoogleGymEvent(activeToken, targetBlock.googleEventId).catch(() => {
             // Ignore remote deletion error when offline or expired
@@ -810,6 +926,180 @@ export const App: React.FC = () => {
       }
     },
     [state.calendarBlocks, setState]
+  );
+
+  const handleReEvaluateGoogleImpact = useCallback(async () => {
+    setIsEvaluatingImpact(true);
+    try {
+      const token = getStoredAccessToken() || (await trySilentGoogleReconnect());
+      let latestEvents = googleEventsRef.current;
+      let latestBusyByDate = googleBusyByDateRef.current;
+
+      if (token) {
+        const synced = await fetchGoogleEventsAndBusyForWeek(token, weekDates);
+        lastGoogleSyncAtRef.current = Date.now();
+        latestEvents = synced.events;
+        latestBusyByDate = synced.busyByDate;
+        googleEventsRef.current = latestEvents;
+        googleBusyByDateRef.current = latestBusyByDate;
+        setGoogleEvents(latestEvents);
+        setGoogleBusyByDate(latestBusyByDate);
+        setIsGoogleConnected(true);
+
+        const prevSnapshot = loadGoogleEventsSnapshot();
+        if (prevSnapshot) {
+          const { mirroredBlocks, hasChanges, report } = applyMobileMirrorAndEvaluateImpact({
+            previousEvents: prevSnapshot,
+            nextEvents: latestEvents,
+            currentBlocks: calendarBlocksRef.current,
+            externalBusyByDate: latestBusyByDate,
+            weekDates,
+          });
+          saveGoogleEventsSnapshot(latestEvents);
+          if (hasChanges && (report.mirroredMovesCount > 0 || report.mirroredDeletesCount > 0)) {
+            calendarBlocksRef.current = mirroredBlocks;
+            setState((prev) => ({
+              ...prev,
+              calendarBlocks: mirroredBlocks,
+            }));
+          }
+          setGoogleImpactReport((currentReport) => ({
+            ...report,
+            changes: report.changes.length > 0 ? report.changes : currentReport?.changes ?? [],
+          }));
+          return;
+        }
+
+        saveGoogleEventsSnapshot(latestEvents);
+      }
+
+      const freshConflicts = evaluateScheduleConflicts({
+        blocks: calendarBlocksRef.current,
+        googleEvents: latestEvents,
+        externalBusyByDate: latestBusyByDate,
+        weekDates,
+      });
+
+      setGoogleImpactReport((prev) => ({
+        detectedAt: new Date().toISOString(),
+        changes: prev?.changes ?? [],
+        mirroredMovesCount: prev?.mirroredMovesCount ?? 0,
+        mirroredDeletesCount: prev?.mirroredDeletesCount ?? 0,
+        status: freshConflicts.length > 0 ? 'conflict' : 'no_conflict',
+        conflicts: freshConflicts,
+      }));
+    } catch {
+      const fallbackConflicts = evaluateScheduleConflicts({
+        blocks: calendarBlocksRef.current,
+        googleEvents: googleEventsRef.current,
+        externalBusyByDate: googleBusyByDateRef.current,
+        weekDates,
+      });
+      setGoogleImpactReport((prev) => ({
+        detectedAt: new Date().toISOString(),
+        changes: prev?.changes ?? [],
+        mirroredMovesCount: prev?.mirroredMovesCount ?? 0,
+        mirroredDeletesCount: prev?.mirroredDeletesCount ?? 0,
+        status: fallbackConflicts.length > 0 ? 'conflict' : 'no_conflict',
+        conflicts: fallbackConflicts,
+      }));
+    } finally {
+      setIsEvaluatingImpact(false);
+    }
+  }, [weekDates, setState]);
+
+  const handleApplyConflictSolution = useCallback(
+    async (solution: ScheduleSolutionOption) => {
+      const targetBlock = calendarBlocksRef.current.find((b) => b.id === solution.blockId);
+      if (!targetBlock) return;
+
+      setApplyingSolutionId(solution.id);
+      try {
+        let updatedBlocks = calendarBlocksRef.current.map((b) =>
+          b.id === solution.blockId
+            ? {
+                ...b,
+                day: solution.targetDay,
+                startTime: solution.startTime,
+                endTime: solution.endTime,
+              }
+            : b
+        );
+
+        calendarBlocksRef.current = updatedBlocks;
+        setState((prev) => ({
+          ...prev,
+          calendarBlocks: updatedBlocks,
+        }));
+
+        const shouldSyncToGoogle =
+          Boolean(targetBlock.googleEventId) || targetBlock.syncWithGoogle || isGoogleConnected;
+        const activeToken = shouldSyncToGoogle
+          ? getStoredAccessToken() || (await trySilentGoogleReconnect())
+          : null;
+
+        if (activeToken && shouldSyncToGoogle) {
+          try {
+            const { eventId, htmlLink } = await upsertGoogleCalendarEvent(activeToken, {
+              eventId: targetBlock.googleEventId,
+              title: targetBlock.title,
+              dateIso: solution.targetDateIso,
+              startTime: solution.startTime,
+              endTime: solution.endTime,
+              location: targetBlock.location,
+              description: `Bloque de ${targetBlock.category} reubicado desde StudentOS (${solution.targetDay}).`,
+              reminderMinutes: targetBlock.reminderMinutes ?? [30],
+            });
+
+            updatedBlocks = updatedBlocks.map((b) =>
+              b.id === targetBlock.id
+                ? {
+                    ...b,
+                    googleEventId: eventId,
+                    googleHtmlLink: htmlLink,
+                    syncWithGoogle: true,
+                  }
+                : b
+            );
+            calendarBlocksRef.current = updatedBlocks;
+            setState((prev) => ({
+              ...prev,
+              calendarBlocks: updatedBlocks,
+            }));
+
+            const synced = await fetchGoogleEventsAndBusyForWeek(activeToken, weekDates);
+            lastGoogleSyncAtRef.current = Date.now();
+            googleEventsRef.current = synced.events;
+            googleBusyByDateRef.current = synced.busyByDate;
+            setGoogleEvents(synced.events);
+            setGoogleBusyByDate(synced.busyByDate);
+            setIsGoogleConnected(true);
+            saveGoogleEventsSnapshot(synced.events);
+          } catch {
+            // Keep local relocation intact if Google update fails temporarily
+          }
+        }
+
+        const remainingConflicts = evaluateScheduleConflicts({
+          blocks: calendarBlocksRef.current,
+          googleEvents: googleEventsRef.current,
+          externalBusyByDate: googleBusyByDateRef.current,
+          weekDates,
+        });
+
+        setGoogleImpactReport((prev) => ({
+          detectedAt: new Date().toISOString(),
+          changes: prev?.changes ?? [],
+          mirroredMovesCount: prev?.mirroredMovesCount ?? 0,
+          mirroredDeletesCount: prev?.mirroredDeletesCount ?? 0,
+          status: remainingConflicts.length > 0 ? 'conflict' : 'no_conflict',
+          conflicts: remainingConflicts,
+        }));
+      } finally {
+        setApplyingSolutionId(null);
+      }
+    },
+    [isGoogleConnected, weekDates, setState]
   );
 
   // Learning / Reflection Handlers
@@ -879,7 +1169,10 @@ export const App: React.FC = () => {
             const activeToken = getStoredAccessToken();
             if (activeToken) {
               setIsGoogleConnected(true);
-              void refreshGoogleCalendarWeek(activeToken);
+              void refreshGoogleCalendarWeek({
+                explicitToken: activeToken,
+                source: 'internal_mutation',
+              });
             }
           }
           setCurrentView('app');
@@ -908,6 +1201,11 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-28 md:pb-12">
+        <GoogleChangeBanner
+          report={googleImpactReport}
+          onOpenEvaluator={() => setIsGoogleImpactModalOpen(true)}
+          onDismiss={() => setGoogleImpactReport(null)}
+        />
         <div key={activeTab} className="view-enter">
           {activeTab === 'overview' && (
             <>
@@ -984,7 +1282,7 @@ export const App: React.FC = () => {
               googleEvents={googleEvents}
               googleBusyCount={googleBusyCount}
               onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
-              onRefreshGoogleWeek={() => void refreshGoogleCalendarWeek()}
+              onRefreshGoogleWeek={() => void refreshGoogleCalendarWeek({ source: 'manual_sync' })}
             />
           )}
 
@@ -1023,8 +1321,12 @@ export const App: React.FC = () => {
         weekDates={weekDates}
         onBusyIntervalsSynced={(busyMap) => setGoogleBusyByDate(busyMap)}
         onWeekEventsSynced={(events, busyMap) => {
+          lastGoogleSyncAtRef.current = Date.now();
+          googleEventsRef.current = events;
+          googleBusyByDateRef.current = busyMap;
           setGoogleEvents(events);
           setGoogleBusyByDate(busyMap);
+          saveGoogleEventsSnapshot(events);
         }}
         onBlockGoogleSynced={(blockId, eventId, htmlLink) => {
           setState((prev) => ({
@@ -1039,10 +1341,27 @@ export const App: React.FC = () => {
           if (!connected) {
             setGoogleBusyByDate({});
             setGoogleEvents([]);
+            clearGoogleEventsSnapshot();
+            setGoogleImpactReport(null);
           } else if (token) {
-            void refreshGoogleCalendarWeek(token);
+            void refreshGoogleCalendarWeek({
+              explicitToken: token,
+              source: 'internal_mutation',
+            });
           }
         }}
+      />
+
+      {/* Google Calendar Change Impact Evaluator Modal */}
+      <GoogleImpactModal
+        isOpen={isGoogleImpactModalOpen}
+        onClose={() => setIsGoogleImpactModalOpen(false)}
+        report={googleImpactReport}
+        isGoogleConnected={isGoogleConnected}
+        isEvaluating={isEvaluatingImpact}
+        applyingSolutionId={applyingSolutionId}
+        onReEvaluate={() => void handleReEvaluateGoogleImpact()}
+        onApplySolution={handleApplyConflictSolution}
       />
     </div>
   );
