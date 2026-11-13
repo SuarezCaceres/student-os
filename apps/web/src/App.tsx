@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { initialData } from './data/initialData';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useSyncedAppState } from './hooks/useSyncedAppState';
+import { useAuthState } from './components/auth/useAuthState';
+import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
 import type { 
   AppState, 
   UniversityAssignment, 
@@ -106,7 +108,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import type { UserSession } from './components/auth/AuthModal';
 
 export const App: React.FC = () => {
-  const [state, setState, resetState] = useLocalStorage<AppState>('student_os_state_v1', initialData);
+  const [state, setState, resetState] = useSyncedAppState(initialData);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
@@ -191,6 +193,21 @@ export const App: React.FC = () => {
     }
     return null;
   });
+
+  // Sesion en la nube (Supabase). Sin variables de entorno de Supabase no hace nada.
+  const auth = useAuthState();
+  useEffect(() => {
+    // Al volver del redirect de Google, Supabase restaura la sesion: entrar a la app.
+    if (auth.userSession && !userSession) {
+      setUserSession(auth.userSession);
+      try {
+        localStorage.setItem('student_os_user_session', JSON.stringify(auth.userSession));
+      } catch {
+        // ignore
+      }
+      setCurrentView('app');
+    }
+  }, [auth.userSession, userSession]);
 
   const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(() => {
     try {
@@ -360,6 +377,7 @@ export const App: React.FC = () => {
   }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
   const handleLogout = () => {
+    void auth.signOut();
     try {
       localStorage.removeItem('student_os_user_session');
       localStorage.removeItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY);
@@ -2347,6 +2365,10 @@ export const App: React.FC = () => {
         userSession={userSession}
         onLogout={handleLogout}
       />
+      {/* Estado de sincronizacion: no pinta nada si la nube no esta configurada */}
+      <div className="empty:hidden flex justify-end px-4 pt-2 sm:px-6">
+        <SyncStatusBadge interactive />
+      </div>
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-28 md:pb-12">
