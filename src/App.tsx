@@ -12,7 +12,9 @@ import type {
   KanbanStatus,
   WeeklyReflection,
   LearningResource,
-  DailyHabits
+  DailyHabits,
+  GymAttendanceLog,
+  MissReasonId,
 } from './types';
 import { Navbar } from './components/layout/Navbar';
 import type { NavTab } from './components/layout/Navbar';
@@ -23,6 +25,12 @@ import { UniversityView } from './components/university/UniversityView';
 import { GymTracker } from './components/gym/GymTracker';
 import type { GymOnboardingCompletePayload } from './components/gym/GymOnboardingModal';
 import { calculateBmi } from './utils/routineGenerator';
+import {
+  applyRoutineReschedule,
+  getCurrentWeekDateMap,
+  getLocalIsoDate,
+  type RescheduleMode,
+} from './utils/gymAttendance';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
 import { LearningView } from './components/learning/LearningView';
 import { QuickAddModal } from './components/quick-add/QuickAddModal';
@@ -223,12 +231,160 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
-  const handleFinishWorkout = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      streak: prev.streak + 1,
-    }));
-  }, [setState]);
+  const handleStartGymSession = useCallback(
+    (payload: { dayOfWeek: DayOfWeek; date: string; routineId: string; routineName: string }) => {
+      const startedAt = new Date().toISOString();
+      setState((prev) => {
+        const existingLogs = prev.gymAttendanceLogs ?? [];
+        const prevLog = existingLogs.find((l) => l.date === payload.date);
+        const activeLog: GymAttendanceLog = {
+          id: prevLog?.id ?? `att-${payload.date}-${payload.routineId}`,
+          date: payload.date,
+          dayOfWeek: payload.dayOfWeek,
+          routineId: payload.routineId,
+          routineName: payload.routineName,
+          status: 'in_progress',
+          startedAt: prevLog?.startedAt ?? startedAt,
+          streakProtected: prevLog?.streakProtected,
+        };
+        return {
+          ...prev,
+          gymAttendanceLogs: [
+            ...existingLogs.filter((l) => l.date !== payload.date),
+            activeLog,
+          ],
+        };
+      });
+    },
+    [setState]
+  );
+
+  const handleFinishWorkout = useCallback(
+    (payload?: {
+      dayOfWeek: DayOfWeek;
+      date: string;
+      routineId: string;
+      routineName: string;
+      durationMinutes?: number;
+    }) => {
+      const targetDate = payload?.date ?? getLocalIsoDate();
+      const finishedAt = new Date().toISOString();
+      setState((prev) => {
+        const existingLogs = prev.gymAttendanceLogs ?? [];
+        const prevLog = existingLogs.find((l) => l.date === targetDate);
+        const alreadyCompleted = prevLog?.status === 'completed';
+
+        const updatedLog: GymAttendanceLog | null = payload
+          ? {
+              id: prevLog?.id ?? `att-${targetDate}-${payload.routineId}`,
+              date: targetDate,
+              dayOfWeek: payload.dayOfWeek,
+              routineId: payload.routineId,
+              routineName: payload.routineName,
+              status: 'completed',
+              startedAt: prevLog?.startedAt ?? finishedAt,
+              finishedAt,
+              durationMinutes: payload.durationMinutes ?? prevLog?.durationMinutes,
+              streakProtected: true,
+            }
+          : null;
+
+        return {
+          ...prev,
+          streak: alreadyCompleted ? prev.streak : prev.streak + 1,
+          gymAttendanceLogs: updatedLog
+            ? [...existingLogs.filter((l) => l.date !== targetDate), updatedLog]
+            : existingLogs,
+        };
+      });
+    },
+    [setState]
+  );
+
+  const handleLogMissedWorkout = useCallback(
+    (payload: {
+      dayOfWeek: DayOfWeek;
+      dateIso: string;
+      routineId: string;
+      routineName: string;
+      reason: MissReasonId;
+      note?: string;
+      encouragementMessage: string;
+    }) => {
+      setState((prev) => {
+        const existingLogs = prev.gymAttendanceLogs ?? [];
+        const prevLog = existingLogs.find((l) => l.date === payload.dateIso);
+        const missedLog: GymAttendanceLog = {
+          id: prevLog?.id ?? `att-${payload.dateIso}-${payload.routineId}`,
+          date: payload.dateIso,
+          dayOfWeek: payload.dayOfWeek,
+          routineId: payload.routineId,
+          routineName: payload.routineName,
+          status: 'missed',
+          missReason: payload.reason,
+          missNote: payload.note,
+          encouragementMessage: payload.encouragementMessage,
+          streakProtected: true,
+        };
+        return {
+          ...prev,
+          gymAttendanceLogs: [
+            ...existingLogs.filter((l) => l.date !== payload.dateIso),
+            missedLog,
+          ],
+        };
+      });
+    },
+    [setState]
+  );
+
+  const handleRescheduleGymWorkout = useCallback(
+    (payload: {
+      fromDay: DayOfWeek;
+      fromDate: string;
+      toDay: DayOfWeek;
+      mode: RescheduleMode;
+    }) => {
+      setState((prev) => {
+        const weekDates = getCurrentWeekDateMap();
+        const result = applyRoutineReschedule({
+          fromDay: payload.fromDay,
+          toDay: payload.toDay,
+          mode: payload.mode,
+          routines: prev.gymRoutines,
+          gymProfile: prev.gymProfile,
+          weekDates,
+        });
+
+        const existingLogs = prev.gymAttendanceLogs ?? [];
+        const prevLog = existingLogs.find((l) => l.date === payload.fromDate);
+        const rescheduledLog: GymAttendanceLog = {
+          id: prevLog?.id ?? `att-${payload.fromDate}-${payload.fromDay}`,
+          date: payload.fromDate,
+          dayOfWeek: payload.fromDay,
+          routineId: prevLog?.routineId ?? `gym-${payload.fromDay.toLowerCase()}`,
+          routineName: prevLog?.routineName ?? result.movedRoutineName,
+          status: 'rescheduled',
+          missReason: prevLog?.missReason,
+          missNote: prevLog?.missNote,
+          encouragementMessage: prevLog?.encouragementMessage,
+          rescheduledToDay: result.rescheduledToDay,
+          rescheduledToDate: result.rescheduledToDate,
+          streakProtected: true,
+        };
+
+        return {
+          ...prev,
+          gymRoutines: result.updatedRoutines,
+          gymAttendanceLogs: [
+            ...existingLogs.filter((l) => l.date !== payload.fromDate),
+            rescheduledLog,
+          ],
+        };
+      });
+    },
+    [setState]
+  );
 
   const handleUpdateGymExercise = useCallback((day: DayOfWeek, updatedExercise: GymExercise) => {
     setState((prev) => ({
@@ -246,24 +402,29 @@ export const App: React.FC = () => {
   }, [setState]);
 
   const handleSaveGymPlan = useCallback((payload: GymOnboardingCompletePayload) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalIsoDate();
+    const mondayIso = getCurrentWeekDateMap().Lunes;
     setState((prev) => {
       const existingHistory = prev.weightHistory ?? [];
       const updatedHistory = [
         ...existingHistory.filter((entry) => entry.date !== today),
         { date: today, weightKg: payload.profile.weightKg, bmi: payload.profile.bmi },
       ];
+      const updatedAttendance = payload.replaceRoutines
+        ? (prev.gymAttendanceLogs ?? []).filter((l) => l.date < mondayIso)
+        : prev.gymAttendanceLogs;
       return {
         ...prev,
         gymProfile: payload.profile,
         weightHistory: updatedHistory,
+        gymAttendanceLogs: updatedAttendance,
         gymRoutines: payload.replaceRoutines ? payload.generatedRoutines : prev.gymRoutines,
       };
     });
   }, [setState]);
 
   const handleLogBodyWeight = useCallback((newWeightKg: number) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalIsoDate();
     setState((prev) => {
       const heightCm = prev.gymProfile?.heightCm ?? 174;
       const bmiInfo = calculateBmi(newWeightKg, heightCm);
@@ -442,8 +603,12 @@ export const App: React.FC = () => {
               routines={state.gymRoutines}
               gymProfile={state.gymProfile}
               weightHistory={state.weightHistory}
+              attendanceLogs={state.gymAttendanceLogs}
               onSaveGymPlan={handleSaveGymPlan}
               onLogBodyWeight={handleLogBodyWeight}
+              onStartSession={handleStartGymSession}
+              onLogMissedWorkout={handleLogMissedWorkout}
+              onRescheduleWorkout={handleRescheduleGymWorkout}
               onToggleSet={handleToggleGymSet}
               onAddExercise={handleAddGymExercise}
               onDeleteExercise={handleDeleteGymExercise}

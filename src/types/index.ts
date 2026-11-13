@@ -152,6 +152,39 @@ export interface WeightHistoryEntry {
   bmi: number;
 }
 
+export type MissReasonId =
+  | 'estudios_examenes'
+  | 'cansancio_sueno'
+  | 'trabajo_horarios'
+  | 'salud_lesion'
+  | 'tiempo_transporte'
+  | 'otro';
+
+export type GymSessionStatus =
+  | 'idle'
+  | 'in_progress'
+  | 'completed'
+  | 'missed'
+  | 'rescheduled';
+
+export interface GymAttendanceLog {
+  id: string;
+  date: string; // Local wall-clock YYYY-MM-DD
+  dayOfWeek: DayOfWeek;
+  routineId: string;
+  routineName: string;
+  status: GymSessionStatus;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMinutes?: number;
+  missReason?: MissReasonId;
+  missNote?: string;
+  encouragementMessage?: string;
+  rescheduledToDay?: DayOfWeek;
+  rescheduledToDate?: string;
+  streakProtected?: boolean;
+}
+
 export interface UserGymProfile {
   gymType: GymType;
   customGymName?: string;
@@ -176,6 +209,7 @@ export interface AppState {
   dailyHabits?: DailyHabits;
   gymProfile?: UserGymProfile;
   weightHistory?: WeightHistoryEntry[];
+  gymAttendanceLogs?: GymAttendanceLog[];
   weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];

@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { DayOfWeek, GymRoutine } from '../../types';
 import { ModalShell } from '../common/ModalShell';
+import { getLocalIsoDate } from '../../utils/gymAttendance';
 import {
   GYM_CATALOG,
   GOAL_CATALOG,
@@ -218,7 +219,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       targetWeightKg: parsedTarget,
       bmi: bmiInfo.bmi,
       bmiCategory: bmiInfo.category,
-      configuredAt: new Date().toISOString().split('T')[0],
+      configuredAt: getLocalIsoDate(),
     };
 
     const generatedRoutines = generateAdaptiveRoutines(profile);

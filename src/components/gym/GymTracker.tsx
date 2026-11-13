@@ -1,21 +1,36 @@
-import React, { useState, useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import {
+  CheckCircle2,
+  Clock,
   Dumbbell,
   Plus,
-  Trophy,
-  Timer,
   Settings2,
+  Timer,
+  Trophy,
 } from 'lucide-react';
 import type {
-  GymRoutine,
-  GymExercise,
   DayOfWeek,
   ExerciseHistoryEntry,
+  GymAttendanceLog,
+  GymExercise,
+  GymRoutine,
+  MissReasonId,
   UserGymProfile,
   WeightHistoryEntry,
 } from '../../types';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
-import { getRecommendedRestSeconds } from '../../utils/routineGenerator';
+import {
+  buildSessionAttendanceLog,
+  findPendingMissedDays,
+  formatElapsedSeconds,
+  formatShortSpanishDate,
+  getCurrentWeekDateMap,
+  getLocalIsoDate,
+  getRescheduleOptions,
+  getTodayDayOfWeek,
+  type RescheduleMode,
+} from '../../utils/gymAttendance';
+import { getGymDisplayName, getRecommendedRestSeconds } from '../../utils/routineGenerator';
 import { SectionHeader } from '../common/SectionHeader';
 import { ModalShell } from '../common/ModalShell';
 import { RestTimerFloating } from './RestTimerFloating';
@@ -27,17 +42,48 @@ import { GymOnboardingModal, type GymOnboardingCompletePayload } from './GymOnbo
 import { GymProfileCard } from './GymProfileCard';
 import { WeightCheckInModal } from './WeightCheckInModal';
 import { GymRestDayBanner } from './GymRestDayBanner';
+import { GymStartGateCard } from './GymStartGateCard';
+import { GymMissFlowCard } from './GymMissFlowCard';
+import { GymMissedSummaryCard } from './GymMissedSummaryCard';
 
 export interface GymTrackerProps {
   routines: GymRoutine[];
   gymProfile?: UserGymProfile;
   weightHistory?: WeightHistoryEntry[];
+  attendanceLogs?: GymAttendanceLog[];
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
   onLogBodyWeight?: (newWeightKg: number) => void;
+  onStartSession?: (payload: {
+    dayOfWeek: DayOfWeek;
+    date: string;
+    routineId: string;
+    routineName: string;
+  }) => void;
+  onLogMissedWorkout?: (payload: {
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+    routineId: string;
+    routineName: string;
+    reason: MissReasonId;
+    note?: string;
+    encouragementMessage: string;
+  }) => void;
+  onRescheduleWorkout?: (payload: {
+    fromDay: DayOfWeek;
+    fromDate: string;
+    toDay: DayOfWeek;
+    mode: RescheduleMode;
+  }) => void;
   onToggleSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onAddExercise: (day: DayOfWeek, exercise: GymExercise) => void;
   onDeleteExercise: (routineId: string, exerciseId: string) => void;
-  onFinishWorkout: () => void;
+  onFinishWorkout: (payload?: {
+    dayOfWeek: DayOfWeek;
+    date: string;
+    routineId: string;
+    routineName: string;
+    durationMinutes?: number;
+  }) => void;
   onUpdateExercise?: (day: DayOfWeek, updated: GymExercise) => void;
 }
 
@@ -51,26 +97,16 @@ const DAYS_LIST: DayOfWeek[] = [
   'Domingo',
 ];
 
-const JS_DAYS_MAP: DayOfWeek[] = [
-  'Domingo',
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-];
-
-function getTodayDayOfWeek(): DayOfWeek {
-  return JS_DAYS_MAP[new Date().getDay()];
-}
-
 export const GymTracker: React.FC<GymTrackerProps> = ({
   routines,
   gymProfile,
   weightHistory,
+  attendanceLogs,
   onSaveGymPlan,
   onLogBodyWeight,
+  onStartSession,
+  onLogMissedWorkout,
+  onRescheduleWorkout,
   onToggleSet,
   onAddExercise,
   onDeleteExercise,
@@ -79,11 +115,23 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 }) => {
   const formId = useId();
 
-  // Purity-safe lazy state initialization for today's day & first-time onboarding
+  // Purity-safe lazy state initialization for today's day, local week dates & onboarding
   const [todayDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [todayIso] = useState<string>(() => getLocalIsoDate());
+  const [weekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !gymProfile);
   const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
+  const [fallbackLogs, setFallbackLogs] = useState<GymAttendanceLog[]>([]);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [pinnedMissDay, setPinnedMissDay] = useState<{
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+    routine: GymRoutine;
+    isRetroactive: boolean;
+    initialStage: 'reason' | 'encouragement_reschedule';
+    existingReason?: MissReasonId;
+  } | null>(null);
 
   // Rest Timer state
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -150,7 +198,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     const isNewPR = newWeight > currentPR;
 
     const newHistoryEntry: ExerciseHistoryEntry = {
-      date: new Date().toISOString().split('T')[0],
+      date: todayIso,
       weightKg: newWeight,
       reps: reps.trim(),
     };
@@ -253,6 +301,111 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     triggerConfetti();
   };
 
+  const effectiveLogs = attendanceLogs ?? fallbackLogs;
+  const selectedDateIso = weekDates[selectedDay];
+  const selectedDayLog = effectiveLogs.find((l) => l.date === selectedDateIso);
+  const isSessionInProgress = selectedDayLog?.status === 'in_progress';
+
+  useEffect(() => {
+    if (!isSessionInProgress) return;
+    const id = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [isSessionInProgress]);
+
+  const startedMs = selectedDayLog?.startedAt
+    ? new Date(selectedDayLog.startedAt).getTime()
+    : Number.NaN;
+  const elapsedSeconds =
+    isSessionInProgress && Number.isFinite(startedMs)
+      ? Math.max(0, Math.floor((nowMs - startedMs) / 1000))
+      : 0;
+
+  const pendingMissedDays = findPendingMissedDays(
+    gymProfile,
+    routines,
+    effectiveLogs,
+    weekDates,
+    todayIso
+  );
+
+  const pendingForSelected = pendingMissedDays.find((p) => p.dayOfWeek === selectedDay);
+  const autoPendingMiss =
+    selectedDay === todayDay ? pendingMissedDays[0] : pendingForSelected;
+
+  const activeMissFlow =
+    pinnedMissDay ??
+    (autoPendingMiss
+      ? {
+          dayOfWeek: autoPendingMiss.dayOfWeek,
+          dateIso: autoPendingMiss.date,
+          routine: autoPendingMiss.routine,
+          isRetroactive: true,
+          initialStage: 'reason' as const,
+          existingReason: undefined,
+        }
+      : null);
+
+  const hasAnyCompletedSet = currentRoutine.exercises.some((ex) =>
+    ex.completedSets.some(Boolean)
+  );
+
+  const gymDisplayName = gymProfile
+    ? getGymDisplayName(gymProfile.gymType, gymProfile.customGymName)
+    : undefined;
+
+  const upsertFallbackLog = (nextLog: GymAttendanceLog) => {
+    setFallbackLogs((prev) => [...prev.filter((l) => l.date !== nextLog.date), nextLog]);
+  };
+
+  const handleStartTodaySession = () => {
+    const { nowMs: startNow, log } = buildSessionAttendanceLog({
+      date: todayIso,
+      dayOfWeek: todayDay,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+      status: 'in_progress',
+    });
+    setNowMs(startNow);
+    const payload = {
+      dayOfWeek: todayDay,
+      date: todayIso,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+    };
+    if (onStartSession) {
+      onStartSession(payload);
+    } else {
+      upsertFallbackLog(log);
+    }
+  };
+
+  const handleCompleteTodayWorkout = () => {
+    const durationMinutes =
+      elapsedSeconds > 0 ? Math.max(1, Math.round(elapsedSeconds / 60)) : undefined;
+    triggerBigCelebration();
+    const payload = {
+      dayOfWeek: selectedDay,
+      date: selectedDateIso,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+      durationMinutes,
+    };
+    if (!onStartSession) {
+      const { log } = buildSessionAttendanceLog({
+        date: selectedDateIso,
+        dayOfWeek: selectedDay,
+        routineId: currentRoutine.id,
+        routineName: currentRoutine.name,
+        status: 'completed',
+        durationMinutes,
+      });
+      upsertFallbackLog(log);
+    }
+    onFinishWorkout(payload);
+  };
+
   const recommendedRestDuration = gymProfile
     ? getRecommendedRestSeconds(gymProfile.goal)
     : 90;
@@ -273,6 +426,18 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     }
     return gymProfile.selectedDays[0];
   })();
+
+  const shouldShowTodayStartGate =
+    selectedDay === todayDay &&
+    currentRoutine.exercises.length > 0 &&
+    selectedDayLog?.status !== 'in_progress' &&
+    selectedDayLog?.status !== 'completed' &&
+    !hasAnyCompletedSet;
+
+  const selectedMissRescheduleOptions =
+    selectedDayLog?.status === 'missed'
+      ? getRescheduleOptions(selectedDay, routines, gymProfile, weekDates, todayIso)
+      : [];
 
   return (
     <div className="space-y-6">
@@ -376,7 +541,23 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         {DAYS_LIST.map((day) => {
           const isToday = day === todayDay;
           const isSelected = day === selectedDay;
-          const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : false;
+          const dayDateIso = weekDates[day];
+          const dayLog = effectiveLogs.find((l) => l.date === dayDateIso);
+          const dayRoutine = routines.find((r) => r.dayOfWeek === day);
+          const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
+          const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
+          const isPendingMissTab = pendingMissedDays.some((p) => p.dayOfWeek === day);
+
+          let dotClass = '';
+          if (dayLog?.status === 'completed') {
+            dotClass = 'bg-[var(--ok)]';
+          } else if (isPendingMissTab || dayLog?.status === 'missed') {
+            dotClass = 'bg-[var(--warn)]';
+          } else if (dayLog?.status === 'rescheduled') {
+            dotClass = 'bg-[var(--muted)] opacity-60';
+          } else if (isScheduledDay || hasExercises) {
+            dotClass = 'bg-[var(--gym)]';
+          }
 
           return (
             <button
@@ -384,17 +565,20 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               type="button"
               role="tab"
               aria-selected={isSelected}
-              onClick={() => setSelectedDay(day)}
+              onClick={() => {
+                setPinnedMissDay(null);
+                setSelectedDay(day);
+              }}
               className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
                 isSelected
                   ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
                   : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
               }`}
             >
-              {isScheduledDay && (
+              {dotClass && (
                 <span
                   aria-hidden="true"
-                  className="w-1.5 h-1.5 rounded-full bg-[var(--gym)] shrink-0"
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotClass}`}
                 />
               )}
               <span className="sm:hidden">{day.slice(0, 3)}</span>
@@ -415,23 +599,160 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         })}
       </div>
 
-      {/* Main Routine Card OR Active Recovery Rest Day Banner */}
-      {isConfiguredRestDay ? (
+      {/* Main Routine Gate / Missed Flow / Rest Day / Active Exercise Routine */}
+      {activeMissFlow ? (
+        <GymMissFlowCard
+          key={activeMissFlow.dateIso}
+          dayOfWeek={activeMissFlow.dayOfWeek}
+          dateIso={activeMissFlow.dateIso}
+          routine={activeMissFlow.routine}
+          isRetroactive={activeMissFlow.isRetroactive}
+          pendingCount={pendingMissedDays.length}
+          initialStage={activeMissFlow.initialStage}
+          existingReason={activeMissFlow.existingReason}
+          goal={gymProfile?.goal}
+          gymType={gymProfile?.gymType}
+          customGymName={gymProfile?.customGymName}
+          rescheduleOptions={getRescheduleOptions(
+            activeMissFlow.dayOfWeek,
+            routines,
+            gymProfile,
+            weekDates,
+            todayIso
+          )}
+          onCancel={() => setPinnedMissDay(null)}
+          onSubmitMissReason={(payload) => {
+            setPinnedMissDay({
+              ...activeMissFlow,
+              initialStage: 'encouragement_reschedule',
+              existingReason: payload.reason,
+            });
+            if (onLogMissedWorkout) {
+              onLogMissedWorkout({
+                dayOfWeek: payload.dayOfWeek,
+                dateIso: payload.dateIso,
+                routineId: payload.routine.id,
+                routineName: payload.routine.name,
+                reason: payload.reason,
+                note: payload.note,
+                encouragementMessage: payload.encouragementMessage,
+              });
+            } else {
+              upsertFallbackLog({
+                id: `att-${payload.dateIso}-${payload.routine.id}`,
+                date: payload.dateIso,
+                dayOfWeek: payload.dayOfWeek,
+                routineId: payload.routine.id,
+                routineName: payload.routine.name,
+                status: 'missed',
+                missReason: payload.reason,
+                missNote: payload.note,
+                encouragementMessage: payload.encouragementMessage,
+                streakProtected: true,
+              });
+            }
+          }}
+          onReschedule={(payload) => {
+            if (onRescheduleWorkout) {
+              onRescheduleWorkout(payload);
+            } else {
+              upsertFallbackLog({
+                id: `att-${payload.fromDate}-${activeMissFlow.routine.id}`,
+                date: payload.fromDate,
+                dayOfWeek: payload.fromDay,
+                routineId: activeMissFlow.routine.id,
+                routineName: activeMissFlow.routine.name,
+                status: 'rescheduled',
+                missReason: activeMissFlow.existingReason,
+                rescheduledToDay: payload.toDay,
+                rescheduledToDate: weekDates[payload.toDay],
+                streakProtected: true,
+              });
+            }
+            setPinnedMissDay(null);
+            triggerConfetti();
+          }}
+          onFinishWithoutReschedule={() => setPinnedMissDay(null)}
+        />
+      ) : selectedDayLog?.status === 'missed' || selectedDayLog?.status === 'rescheduled' ? (
+        <GymMissedSummaryCard
+          log={selectedDayLog}
+          isToday={selectedDay === todayDay}
+          canReschedule={selectedMissRescheduleOptions.length > 0}
+          onGoToDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
+          onOpenReschedule={() =>
+            setPinnedMissDay({
+              dayOfWeek: selectedDay,
+              dateIso: selectedDateIso,
+              routine: currentRoutine,
+              isRetroactive: selectedDay !== todayDay,
+              initialStage: 'encouragement_reschedule',
+              existingReason: selectedDayLog.missReason,
+            })
+          }
+          onOverrideStartToday={
+            selectedDay === todayDay && currentRoutine.exercises.length > 0
+              ? handleStartTodaySession
+              : undefined
+          }
+        />
+      ) : isConfiguredRestDay ? (
         <GymRestDayBanner
           selectedDay={selectedDay}
           nextTrainingDay={nextTrainingDay}
           goal={gymProfile?.goal}
-          onSelectDay={(day) => setSelectedDay(day)}
+          onSelectDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
           onAddExtraExercise={() => setShowAddForm(true)}
+        />
+      ) : shouldShowTodayStartGate ? (
+        <GymStartGateCard
+          routine={currentRoutine}
+          dayOfWeek={selectedDay}
+          dateIso={selectedDateIso}
+          gymDisplayName={gymDisplayName}
+          onStartSession={handleStartTodaySession}
+          onReportMissed={() =>
+            setPinnedMissDay({
+              dayOfWeek: todayDay,
+              dateIso: todayIso,
+              routine: currentRoutine,
+              isRetroactive: false,
+              initialStage: 'reason',
+            })
+          }
         />
       ) : (
       <section className="t-card p-6">
-        {/* Routine Header & Progress */}
+        {/* Routine Header, Session Status & Progress */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-[var(--line)]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
-              <span className="text-[13px] text-[var(--muted)]">· {selectedDay}</span>
+              <span className="text-[13px] text-[var(--muted)]">
+                · {selectedDay} ({formatShortSpanishDate(selectedDateIso)})
+              </span>
+              {isSessionInProgress && (
+                <span className="t-badge t-badge-accent t-num" role="status" aria-live="off">
+                  <Clock className="w-3.5 h-3.5" aria-hidden="true" />
+                  En curso · {formatElapsedSeconds(elapsedSeconds)} / 02:00:00 obj.
+                </span>
+              )}
+              {selectedDayLog?.status === 'completed' && (
+                <span className="t-badge t-badge-ok t-num">
+                  <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Completado
+                  {selectedDayLog.durationMinutes ? ` · ${selectedDayLog.durationMinutes} min` : ''}
+                </span>
+              )}
+              {selectedDateIso > todayIso && currentRoutine.exercises.length > 0 && (
+                <span className="t-badge">Próxima sesión · ~2h</span>
+              )}
             </div>
             <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug">
               {currentRoutine.name}
@@ -500,20 +821,23 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         {currentRoutine.exercises.length > 0 && (
           <div className="mt-6 pt-5 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-[14px] text-[var(--muted)]">
-              {progressPercent === 100
+              {selectedDayLog?.status === 'completed'
+                ? 'Entrenamiento registrado en tu historial de esta semana.'
+                : progressPercent === 100
                 ? 'Completaste todas las series programadas para este día.'
                 : 'Registra tu entrenamiento al terminar para sumar un día más a tu racha.'}
             </p>
             <button
               type="button"
-              onClick={() => {
-                triggerBigCelebration();
-                onFinishWorkout();
-              }}
+              onClick={handleCompleteTodayWorkout}
               className="t-btn t-btn-primary w-full sm:w-auto"
             >
               <Trophy className="w-4 h-4" />
-              <span>Terminar rutina de hoy</span>
+              <span>
+                {selectedDayLog?.status === 'completed'
+                  ? 'Sesión completada'
+                  : 'Terminar rutina de hoy'}
+              </span>
             </button>
           </div>
         )}
@@ -653,6 +977,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         hasExistingRoutines={routines.some((r) => r.exercises.length > 0)}
         onComplete={(payload) => {
           onSaveGymPlan?.(payload);
+          setPinnedMissDay(null);
           setIsOnboardingOpen(false);
           triggerConfetti();
           if (

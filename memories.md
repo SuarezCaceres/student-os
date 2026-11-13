@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  
-> **Versión actual:** `v2.6.0 (Asistente de Onboarding Gym 4 Pasos, Perfil Físico con Medidor OMS de IMC, Generador Adaptativo de Rutinas por Sede y Frecuencia 2–6 Días, y Recuperación Activa)`  
+> **Versión actual:** `v2.7.0 (Asistencia Diaria Gym: Puerta Central "Iniciemos Hoy", Detección Retroactiva de Faltas, Mensaje Empático de Aliento, Protección de Racha y Reprogramación Semanal)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -286,7 +286,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.6.0)** | `044ffad`, `a296254` | Onboarding Gym 4 pasos, generador adaptativo 2–6 días, `GymProfileCard`, medidor IMC OMS, `WeightCheckInModal` y `GymRestDayBanner` |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.7.0)** | — | Fase 1 Asistencia Gym: `GymStartGateCard`, `GymMissFlowCard`, `GymMissedSummaryCard`, `gymAttendance.ts`, detección retroactiva de días pasados y reprogramación semanal |
+| `feat/ui-taste-foundation` | v2.6.0 | `fc1ddae`, `044ffad`, `a296254` | Onboarding Gym 4 pasos, generador adaptativo 2–6 días, `GymProfileCard`, medidor IMC OMS, `WeightCheckInModal` y `GymRestDayBanner` |
 | `feat/ui-taste-foundation` | v2.5.3 | `d5c6371` | Biblioteca completa de videos animados de movimiento por ejercicio (Press de banca, Sentadillas, Dominadas, Cardio a 30fps) |
 | `feat/ui-taste-foundation` | v2.5.1 | `10aff7a` | Tarjetas visuales multimedia por ejercicio con atleta entrenando, catálogo de posters biomecánicos y popup de video |
 | `feat/ui-taste-foundation` | v2.4.1 | `20e2c85` | Sobrecarga progresiva de cargas, modal rápido de peso (+1, +2.5, +5kg), video animado de técnica y guía biomecánica |
