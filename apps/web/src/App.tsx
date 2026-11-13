@@ -4,6 +4,8 @@ import { initialData } from './data/initialData';
 import { useSyncedAppState } from './hooks/useSyncedAppState';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
+import { LegalLinks } from './components/legal/LegalLinks';
+import { AccountPanel } from './components/account/AccountPanel';
 import type { 
   AppState, 
   UniversityAssignment, 
@@ -72,6 +74,7 @@ import {
   fetchGoogleEventsAndBusyForWeek,
   getStoredAccessToken,
   getStoredGoogleMeta,
+  refreshGoogleCloudConnection,
   trySilentGoogleReconnect,
   upsertGoogleCalendarEvent,
   upsertGoogleGymEvent,
@@ -208,6 +211,23 @@ export const App: React.FC = () => {
       setCurrentView('app');
     }
   }, [auth.userSession, userSession]);
+
+  // Con sesion en la nube, restaura la conexion persistente de Google Calendar guardada en el servidor
+  // (p. ej. en un dispositivo nuevo). Sin nube configurada devuelve null y no hace nada.
+  useEffect(() => {
+    if (!auth.userSession) return;
+    let cancelled = false;
+    refreshGoogleCloudConnection({ force: false })
+      .then((result) => {
+        if (!cancelled && result?.meta.connected && !result.needsReauth) setIsGoogleConnected(true);
+      })
+      .catch(() => {
+        // Sin conexion o API dormida: el modal de Google Sync vuelve a consultar al abrirse.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.userSession]);
 
   const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(() => {
     try {
@@ -2555,6 +2575,14 @@ export const App: React.FC = () => {
           )}
         </div>
       </main>
+
+      {/* Pie: legal (requisito de Google) y cuenta en la nube (solo se muestra con la nube configurada) */}
+      <footer className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 lg:px-8">
+        <div className="flex flex-col gap-4 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <LegalLinks />
+          <AccountPanel onAccountDeleted={handleLogout} onClearLocalData={resetState} />
+        </div>
+      </footer>
 
       {/* Quick Add Modal */}
       <QuickAddModal

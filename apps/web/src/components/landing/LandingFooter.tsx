@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowUp } from 'lucide-react';
+import { LegalLinks } from '../legal/LegalLinks';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -130,6 +131,9 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
           </div>
 
         </div>
+
+        {/* Enlaces legales (Google exige la politica de privacidad visible en la pagina de inicio) */}
+        <LegalLinks className="mt-6" />
 
         {/* Bottom Bar */}
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono">
