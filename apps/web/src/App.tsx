@@ -227,7 +227,9 @@ export const App: React.FC = () => {
     let shiftDone = false;
     try {
       cleanedDone = localStorage.getItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY) === '1';
-      shiftDone = localStorage.getItem(WORK_SHIFT_INIT_FLAG_KEY) === '1';
+      // Con sesion en la nube NO se siembra el turno por defecto: el turno real llega con el primer
+      // pull; sembrarlo aqui lo subiria y podria pisar el que el usuario ya tiene en la nube.
+      shiftDone = localStorage.getItem(WORK_SHIFT_INIT_FLAG_KEY) === '1' || Boolean(auth.userSession);
       if (cleanedDone && shiftDone) return;
       localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
       localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
@@ -240,7 +242,7 @@ export const App: React.FC = () => {
       calendarBlocksRef.current = withWorkShift.calendarBlocks;
       return withWorkShift;
     });
-  }, [currentView, userSession, setState]);
+  }, [currentView, userSession, auth.userSession, setState]);
 
   const refreshGoogleCalendarWeek = useCallback(
     async (
