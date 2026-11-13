@@ -1,13 +1,18 @@
-name: CI Build & Typecheck
+name: CI Build, Lint & Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'integration/**' ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, 'integration/**' ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  web:
+    name: Web (build, lint, test)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,8 +24,69 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install dependencies (monorepo root)
         run: npm ci
 
       - name: Build and typecheck
-        run: npm run build
+        run: npm run build -w apps/web
+
+      - name: Lint
+        run: npm run lint -w apps/web
+
+      - name: Test
+        run: npm run test -w apps/web
+
+  # api y shared: `npm run -w <ruta>` falla con "No workspaces found" si la carpeta
+  # aun no existe, y --if-present solo cubre el script ausente. Por eso se guarda
+  # con un test de existencia; cuando el workspace exista, se ejecuta de verdad.
+  api:
+    name: API (build, lint, test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (monorepo root)
+        run: npm ci
+
+      - name: Build, lint and test (si apps/api existe)
+        run: |
+          if [ -f apps/api/package.json ]; then
+            npm run build -w apps/api --if-present
+            npm run lint -w apps/api --if-present
+            npm run test -w apps/api --if-present
+          else
+            echo "apps/api no existe todavia; se omite."
+          fi
+
+  shared:
+    name: Shared (build, lint, test)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies (monorepo root)
+        run: npm ci
+
+      - name: Build, lint and test (si packages/shared existe)
+        run: |
+          if [ -f packages/shared/package.json ]; then
+            npm run build -w packages/shared --if-present
+            npm run lint -w packages/shared --if-present
+            npm run test -w packages/shared --if-present
+          else
+            echo "packages/shared no existe todavia; se omite."
+          fi
