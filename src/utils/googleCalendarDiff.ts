@@ -9,6 +9,7 @@ import {
 import { getCurrentWeekDateMap } from './gymAttendance';
 import { ORDERED_DAYS } from './routineGenerator';
 import { expandCalendarBlocksToSegments, isOvernightTimeRange } from './workSchedule';
+import { isStudentOsGymGoogleEvent } from './gymScheduleFilter';
 
 export const GOOGLE_SNAPSHOT_STORAGE_KEY = 'student_os_gcal_snapshot_v1';
 
@@ -164,7 +165,9 @@ export function diffGoogleEvents(
 
   for (const [key, prev] of prevByKey.entries()) {
     const next = nextByKey.get(key);
-    const isLinked = Boolean(linkedGoogleEventIds?.has(prev.id));
+    const isLinked = Boolean(
+      linkedGoogleEventIds?.has(prev.id) || isStudentOsGymGoogleEvent(prev, linkedGoogleEventIds)
+    );
 
     if (!next) {
       unmatchedDeleted.set(key, prev);
@@ -193,7 +196,8 @@ export function diffGoogleEvents(
         previousDateIso: prev.dateIso,
         previousStartTime: prev.startTime,
         previousEndTime: prev.endTime,
-        isStudentOsBlock: isLinked,
+        isStudentOsBlock:
+          isLinked || isStudentOsGymGoogleEvent(next, linkedGoogleEventIds),
         isAllDay: next.isAllDay,
       });
     }
@@ -221,7 +225,9 @@ export function diffGoogleEvents(
       previousDateIso: prev.dateIso,
       previousStartTime: prev.startTime,
       previousEndTime: prev.endTime,
-      isStudentOsBlock: Boolean(linkedGoogleEventIds?.has(next.id)),
+      isStudentOsBlock: Boolean(
+        linkedGoogleEventIds?.has(next.id) || isStudentOsGymGoogleEvent(next, linkedGoogleEventIds)
+      ),
       isAllDay: next.isAllDay,
     });
   }
@@ -236,7 +242,10 @@ export function diffGoogleEvents(
       dateIso: added.dateIso,
       startTime: added.startTime,
       endTime: added.endTime,
-      isStudentOsBlock: Boolean(linkedGoogleEventIds?.has(added.id)),
+      isStudentOsBlock: Boolean(
+        linkedGoogleEventIds?.has(added.id) ||
+          isStudentOsGymGoogleEvent(added, linkedGoogleEventIds)
+      ),
       isAllDay: added.isAllDay,
     });
   }
@@ -251,7 +260,10 @@ export function diffGoogleEvents(
       dateIso: deleted.dateIso,
       startTime: deleted.startTime,
       endTime: deleted.endTime,
-      isStudentOsBlock: Boolean(linkedGoogleEventIds?.has(deleted.id)),
+      isStudentOsBlock: Boolean(
+        linkedGoogleEventIds?.has(deleted.id) ||
+          isStudentOsGymGoogleEvent(deleted, linkedGoogleEventIds)
+      ),
       isAllDay: deleted.isAllDay,
     });
   }
@@ -324,9 +336,30 @@ export function evaluateScheduleConflicts(params: {
     blocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
   );
 
-  // Build external timed busy intervals excluding all-day chips and mirrored StudentOS blocks
-  const expandedSegments = expandCalendarBlocksToSegments(blocks);
-  const externalTimedByDay = new Map<DayOfWeek, Array<{ start: number; end: number; title: string }>>();
+  // Include Google-direct StudentOS Gym events so collisions with phone edits are detected
+  // even when zero duplicate local gym blocks exist.
+  const virtualGoogleGymBlocks: CalendarBlock[] = googleEvents
+    .filter((ev) => !ev.isAllDay && !mirroredEventIds.has(ev.id) && isStudentOsGymGoogleEvent(ev))
+    .map((ev) => ({
+      id: `gcal-gym-${ev.id}`,
+      day: ev.day,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+      title: ev.title,
+      category: 'gym' as const,
+      location: ev.location,
+      googleEventId: ev.id,
+      googleHtmlLink: ev.htmlLink,
+      reminderMinutes: ev.reminderMinutes,
+      syncWithGoogle: true,
+    }));
+
+  const evaluatedBlocks = [...blocks, ...virtualGoogleGymBlocks];
+  const expandedSegments = expandCalendarBlocksToSegments(evaluatedBlocks);
+  const externalTimedByDay = new Map<
+    DayOfWeek,
+    Array<{ id: string; start: number; end: number; title: string }>
+  >();
   const filteredBusyForSolver: Record<string, BusyInterval[]> = {};
 
   for (const [dateIso, list] of Object.entries(externalBusyByDate)) {
@@ -350,7 +383,7 @@ export function evaluateScheduleConflicts(params: {
     if (end <= start) continue;
 
     const list = externalTimedByDay.get(ev.day) ?? [];
-    list.push({ start, end, title: ev.title });
+    list.push({ id: ev.id, start, end, title: ev.title });
     externalTimedByDay.set(ev.day, list);
   }
 
@@ -362,11 +395,15 @@ export function evaluateScheduleConflicts(params: {
     if (bEnd <= bStart) continue;
 
     const externalMatches = (externalTimedByDay.get(seg.day) ?? []).filter(
-      (ext) => bStart < ext.end && ext.start < bEnd
+      (ext) => ext.id !== seg.block.googleEventId && bStart < ext.end && ext.start < bEnd
     );
 
     const siblingMatches = expandedSegments.filter((sib) => {
       if (sib.block.id === seg.block.id || sib.day !== seg.day) return false;
+      // Avoid duplicate reversed pairs when one is a virtual Google gym block already caught via externalMatches
+      if (seg.block.id.startsWith('gcal-gym-') && !sib.block.id.startsWith('gcal-gym-')) {
+        return false;
+      }
       const sStart = timeStringToMinutes(sib.startTime);
       const sEnd = timeStringToMinutes(sib.endTime);
       return bStart < sEnd && sStart < bEnd;
@@ -386,7 +423,7 @@ export function evaluateScheduleConflicts(params: {
     const overlapStart = minutesToTimeString(Math.max(bStart, conflictStartMin));
     const overlapEnd = minutesToTimeString(Math.min(bEnd, conflictEndMin));
 
-    const otherBlocks = blocks.filter((b) => b.id !== seg.block.id);
+    const otherBlocks = evaluatedBlocks.filter((b) => b.id !== seg.block.id);
     const solutions = buildSolutionOptionsForBlock({
       block: seg.block,
       otherBlocks,

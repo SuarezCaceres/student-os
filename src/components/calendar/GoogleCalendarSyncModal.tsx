@@ -197,9 +197,23 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
           location: block.location,
           description: `Bloque de ${block.category} exportado desde StudentOS (${block.day}).`,
           reminderMinutes: block.reminderMinutes ?? pushReminderMinutes,
+          studentOsCategory: block.category,
         });
         onBlockGoogleSynced?.(block.id, saved.eventId, saved.htmlLink);
         exportedCount += 1;
+      }
+
+      if (resolvedWeekDates && (onWeekEventsSynced || onBusyIntervalsSynced)) {
+        try {
+          const { events, busyByDate } = await fetchGoogleEventsAndBusyForWeek(
+            token,
+            resolvedWeekDates
+          );
+          onBusyIntervalsSynced?.(busyByDate);
+          onWeekEventsSynced?.(events, busyByDate);
+        } catch {
+          // Non-fatal: events were still pushed to Google Calendar
+        }
       }
 
       setStatus({

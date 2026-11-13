@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import { isStudentOsGymGoogleEvent } from '../../utils/gymScheduleFilter';
 import { formatReminderSummary } from '../../utils/reminderPresets';
 import {
   expandCalendarBlocksToSegments,
@@ -29,6 +30,7 @@ import {
 export interface CalendarTimelineGridProps {
   blocks: CalendarBlock[];
   onDeleteBlock: (id: string) => void;
+  onDeleteGoogleEvent?: (event: GoogleCalendarEvent) => Promise<void> | void;
   googleEvents?: GoogleCalendarEvent[];
   showGoogleEvents?: boolean;
   selectedMobileDay?: DayOfWeek;
@@ -92,6 +94,7 @@ function readCurrentTimeSnapshot(): { todayDay: DayOfWeek; currentMinutes: numbe
 export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
   blocks,
   onDeleteBlock,
+  onDeleteGoogleEvent,
   googleEvents = [],
   showGoogleEvents = true,
   selectedMobileDay,
@@ -198,22 +201,11 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
     })),
   ];
 
-  // Detect any conflicting segments across the 24h week (even when madrugada is folded)
-  const conflictingSegments = expandedLocalSegments.filter((seg) =>
-    allTimedIntervals.some((other) =>
-      checkIntervalCollision(
-        {
-          id: seg.segmentId,
-          parentId: seg.block.id,
-          day: seg.day,
-          startTime: seg.startTime,
-          endTime: seg.endTime,
-        },
-        other
-      )
-    )
+  // Detect any conflicting intervals across the 24h week (local or Google-direct, even when madrugada is folded)
+  const conflictingEntries = allTimedIntervals.filter((entry) =>
+    allTimedIntervals.some((other) => checkIntervalCollision(entry, other))
   );
-  const conflictingDays = Array.from(new Set(conflictingSegments.map((s) => s.day)));
+  const conflictingDays = Array.from(new Set(conflictingEntries.map((s) => s.day)));
 
   const earlyMorningCount =
     expandedLocalSegments.filter((seg) => parseTimeToMinutes(seg.startTime) < 6 * 60).length +
@@ -301,7 +293,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
       )}
 
       {/* Schedule Conflict Notice */}
-      {conflictingSegments.length > 0 && (
+      {conflictingEntries.length > 0 && (
         <div
           role="status"
           className="rounded-[14px] border border-[color-mix(in_oklab,var(--danger)_36%,var(--line))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--surface))] px-4 py-3 flex items-start gap-3"
@@ -316,9 +308,9 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
             </span>
             <span>
               Tienes{' '}
-              {conflictingSegments.length === 1
+              {conflictingEntries.length === 1
                 ? '1 bloque que se cruza'
-                : `${conflictingSegments.length} bloques que se cruzan`}{' '}
+                : `${conflictingEntries.length} bloques que se cruzan`}{' '}
               en <span className="font-medium">{conflictingDays.join(', ')}</span>. Revisa los bloques
               resaltados en rojo.
             </span>
@@ -611,10 +603,24 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
 
                   if (item.kind === 'google') {
                     const ev = item.event;
+                    const isGoogleGym = isStudentOsGymGoogleEvent(ev);
                     const hasAlarm = Boolean(ev.reminderMinutes && ev.reminderMinutes.length > 0);
+                    const cardToneClass = hasConflict
+                      ? 'border-solid bg-[color-mix(in_oklab,var(--danger)_12%,var(--surface))] border-[var(--danger)]'
+                      : isGoogleGym
+                      ? 'border-solid bg-[color-mix(in_oklab,var(--gym)_10%,var(--surface))] border-[color-mix(in_oklab,var(--gym)_45%,var(--line-strong))]'
+                      : 'border-dashed bg-[color-mix(in_oklab,var(--ok)_10%,var(--surface))] border-[color-mix(in_oklab,var(--ok)_58%,var(--line-strong))]';
+                    const accentColorClass = hasConflict
+                      ? 'text-[var(--danger)]'
+                      : isGoogleGym
+                      ? 'text-[var(--gym)]'
+                      : 'text-[var(--ok)]';
+                    const GoogleCardIcon = isGoogleGym ? Dumbbell : CalendarCheck2;
+
                     return (
                       <div
                         key={item.id}
+                        data-google-gym-card={isGoogleGym ? 'true' : undefined}
                         style={{
                           top: `${topPx + 1}px`,
                           height: `${heightPx}px`,
@@ -622,42 +628,52 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                           width: `calc(${widthPercent}% - 6px)`,
                           zIndex: 11 + laneIndex,
                         }}
-                        className={`group absolute rounded-[12px] border border-dashed ${
+                        className={`group absolute rounded-[12px] border ${
                           laneCount > 1 ? 'px-1.5' : 'px-2'
-                        } py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 flex flex-col justify-between overflow-hidden ${
-                          hasConflict
-                            ? 'bg-[color-mix(in_oklab,var(--danger)_12%,var(--surface))] border-[var(--danger)]'
-                            : 'bg-[color-mix(in_oklab,var(--ok)_10%,var(--surface))] border-[color-mix(in_oklab,var(--ok)_58%,var(--line-strong))]'
-                        }`}
+                        } py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 flex flex-col justify-between overflow-hidden ${cardToneClass}`}
                       >
                         <div className="min-w-0">
                           <div className="flex items-center justify-between gap-1 min-w-0">
                             <div className="flex items-center gap-1 min-w-0">
-                              <CalendarCheck2
-                                className={`w-3.5 h-3.5 shrink-0 ${
-                                  hasConflict ? 'text-[var(--danger)]' : 'text-[var(--ok)]'
-                                }`}
+                              <GoogleCardIcon
+                                className={`w-3.5 h-3.5 shrink-0 ${accentColorClass}`}
                                 aria-hidden="true"
                               />
-                              <span className="t-num text-[13px] font-medium text-[var(--ok)] truncate">
+                              <span className={`t-num text-[13px] font-medium ${accentColorClass} truncate`}>
                                 {heightPx < 52 || laneCount > 1
                                   ? ev.startTime
                                   : `${ev.startTime}–${ev.endTime}`}
                               </span>
                             </div>
 
-                            {ev.htmlLink && (
-                              <a
-                                href={ev.htmlLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                aria-label={`Abrir en Google Calendar: ${ev.title}`}
-                                title="Abrir en Google Calendar"
-                                className="p-0.5 rounded-[6px] text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-                              </a>
-                            )}
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {ev.htmlLink && (
+                                <a
+                                  href={ev.htmlLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Abrir en Google Calendar: ${ev.title}`}
+                                  title="Abrir en Google Calendar"
+                                  className="p-0.5 rounded-[6px] text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                                </a>
+                              )}
+                              {onDeleteGoogleEvent && isGoogleGym && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void onDeleteGoogleEvent(ev);
+                                  }}
+                                  aria-label={`Eliminar de Google Calendar: ${ev.title}`}
+                                  title="Eliminar de Google Calendar"
+                                  className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex p-0.5 rounded-[6px] text-[var(--muted)] hover:text-[var(--danger)] shrink-0 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              )}
+                            </div>
                           </div>
 
                           <h4 className="text-[13px] font-medium text-[var(--ink)] leading-snug line-clamp-2 mt-0.5">
@@ -671,7 +687,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                           </span>
                           {hasAlarm && (
                             <span
-                              className="inline-flex items-center gap-0.5 shrink-0 text-[var(--ok)]"
+                              className={`inline-flex items-center gap-0.5 shrink-0 ${accentColorClass}`}
                               title={formatReminderSummary(ev.reminderMinutes)}
                             >
                               <Bell className="w-3 h-3 shrink-0" aria-hidden="true" />

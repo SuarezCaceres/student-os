@@ -7,6 +7,59 @@ function normalizeEventTitle(title?: string): string {
 }
 
 /**
+ * Pure metadata classifier identifying whether a Google Calendar event represents a
+ * StudentOS Gym session (supporting both tagged events and legacy "Gym: ..." events).
+ * Explicitly avoids matching work shifts, university classes, or manual personal events.
+ */
+export function isStudentOsGymMetadata(params: {
+  title?: string;
+  description?: string;
+  privateProps?: Record<string, string>;
+}): boolean {
+  const { title, description, privateProps } = params;
+  if (privateProps?.studentOsSource === 'student-os') {
+    return privateProps.studentOsCategory === 'gym';
+  }
+
+  const normalizedTitle = (title ?? '').trim();
+  const normalizedDesc = (description ?? '').toLowerCase();
+
+  // StudentOS formats generated/synced workouts as "Gym: <rutina>"
+  if (/^(gym|gimnasio)\s*:/i.test(normalizedTitle)) {
+    return true;
+  }
+
+  if (normalizedDesc.includes('studentos')) {
+    return (
+      /\b(gym|gimnasio|entrenamiento)\b/i.test(normalizedTitle) ||
+      /sesi[oó]n (semanal )?(de )?(gym|gimnasio|entrenamiento)/i.test(normalizedDesc) ||
+      /bloque de gym/i.test(normalizedDesc)
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Determines whether an already-parsed `GoogleCalendarEvent` corresponds to a StudentOS Gym session.
+ */
+export function isStudentOsGymGoogleEvent(
+  event: GoogleCalendarEvent,
+  linkedGymGoogleIds?: ReadonlySet<string>
+): boolean {
+  if (linkedGymGoogleIds?.has(event.id)) {
+    return true;
+  }
+  if (event.isStudentOsGym !== undefined) {
+    return event.isStudentOsGym;
+  }
+  return isStudentOsGymMetadata({
+    title: event.title,
+    description: event.description,
+  });
+}
+
+/**
  * Checks whether a synced Google Calendar event mirrors one of the StudentOS calendar blocks
  * (either by persisted `googleEventId` or by matching day/date, exact time window, and title).
  */
@@ -32,24 +85,30 @@ export function doesGoogleEventMirrorBlock(
 }
 
 /**
- * Excludes any `googleEvents` and `externalBusyByDate` entries that mirror `gymBlocks`.
- * Used both when previewing an overwrite in Step 5 of Gym onboarding and when deleting
- * old/orphaned Gym blocks so removed sessions never trigger phantom collisions.
+ * Excludes any `googleEvents` and `externalBusyByDate` entries that mirror `gymBlocks`
+ * or represent prior StudentOS Gym events in Google Calendar (including orphaned ones).
  */
 export function stripMatchingGymSources(params: {
   gymBlocks: CalendarBlock[];
   googleEvents?: GoogleCalendarEvent[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
   weekDates?: Partial<Record<DayOfWeek, string>>;
+  includeOrphanGoogleGymEvents?: boolean;
 }): {
   filteredGoogleEvents: GoogleCalendarEvent[];
   removedGoogleEvents: GoogleCalendarEvent[];
   removedGoogleEventIds: string[];
   filteredBusyByDate: Record<string, BusyInterval[]>;
 } {
-  const { gymBlocks, googleEvents = [], externalBusyByDate = {}, weekDates } = params;
+  const {
+    gymBlocks,
+    googleEvents = [],
+    externalBusyByDate = {},
+    weekDates,
+    includeOrphanGoogleGymEvents = false,
+  } = params;
 
-  if (gymBlocks.length === 0) {
+  if (gymBlocks.length === 0 && !includeOrphanGoogleGymEvents) {
     return {
       filteredGoogleEvents: googleEvents,
       removedGoogleEvents: [],
@@ -72,8 +131,10 @@ export function stripMatchingGymSources(params: {
     const matchesBlock =
       removedIdSet.has(ev.id) ||
       gymBlocks.some((block) => doesGoogleEventMirrorBlock(ev, block, weekDates));
+    const matchesOrphanGym =
+      includeOrphanGoogleGymEvents && isStudentOsGymGoogleEvent(ev, removedIdSet);
 
-    if (matchesBlock) {
+    if (matchesBlock || matchesOrphanGym) {
       removedGoogleEvents.push(ev);
       removedIdSet.add(ev.id);
     } else {

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import { isStudentOsGymGoogleEvent } from '../../utils/gymScheduleFilter';
 import { triggerConfetti } from '../../utils/confetti';
 import { exportCalendarToICS } from '../../utils/icsExport';
 import { SectionHeader } from '../common/SectionHeader';
@@ -45,6 +46,7 @@ export interface WeeklyCalendarProps {
   blocks: CalendarBlock[];
   onAddBlock: (block: CalendarBlock) => void;
   onDeleteBlock: (id: string) => void;
+  onDeleteGoogleEvent?: (event: GoogleCalendarEvent) => Promise<void> | void;
   isGoogleConnected?: boolean;
   isGoogleSyncing?: boolean;
   googleEvents?: GoogleCalendarEvent[];
@@ -84,6 +86,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   blocks,
   onAddBlock,
   onDeleteBlock,
+  onDeleteGoogleEvent,
   isGoogleConnected = false,
   isGoogleSyncing = false,
   googleEvents = [],
@@ -388,6 +391,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
         <CalendarTimelineGrid
           blocks={blocks}
           onDeleteBlock={onDeleteBlock}
+          onDeleteGoogleEvent={onDeleteGoogleEvent}
           googleEvents={googleEvents}
           showGoogleEvents={showGoogleEvents}
           selectedMobileDay={mobileDay}
@@ -531,56 +535,88 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         );
                       })}
 
-                      {dayGoogle.map((ev) => (
-                        <div
-                          key={`gcol-${ev.id}-${ev.dateIso}`}
-                          className="t-row flex items-start justify-between gap-2.5"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <CalendarCheck2
-                                className="w-3.5 h-3.5 text-[var(--ok)] shrink-0"
-                                aria-hidden="true"
-                              />
-                              <span className="t-num text-[13px] font-medium text-[var(--ok)]">
-                                {ev.isAllDay ? 'Todo el día' : `${ev.startTime} – ${ev.endTime}`}
-                              </span>
-                              <span className="t-badge t-badge-ok">Google</span>
+                      {dayGoogle.map((ev) => {
+                        const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                        return (
+                          <div
+                            key={`gcol-${ev.id}-${ev.dateIso}`}
+                            className="t-row group flex items-start justify-between gap-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isGoogleGym ? (
+                                  <Dumbbell
+                                    className="w-3.5 h-3.5 text-[var(--gym)] shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <CalendarCheck2
+                                    className="w-3.5 h-3.5 text-[var(--ok)] shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <span
+                                  className={`t-num text-[13px] font-medium ${
+                                    isGoogleGym ? 'text-[var(--gym)]' : 'text-[var(--ok)]'
+                                  }`}
+                                >
+                                  {ev.isAllDay ? 'Todo el día' : `${ev.startTime} – ${ev.endTime}`}
+                                </span>
+                                {isGoogleGym && <span className="t-badge t-badge-gym">Gym</span>}
+                                <span className="t-badge t-badge-ok">Google</span>
+                              </div>
+
+                              <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">
+                                {ev.title}
+                              </h4>
+
+                              {ev.reminderMinutes && ev.reminderMinutes.length > 0 && (
+                                <p
+                                  className={`flex items-center gap-1.5 text-[13px] mt-1 ${
+                                    isGoogleGym ? 'text-[var(--gym)]' : 'text-[var(--ok)]'
+                                  }`}
+                                >
+                                  <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span>{formatReminderSummary(ev.reminderMinutes)}</span>
+                                </p>
+                              )}
+
+                              {ev.location && (
+                                <p className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] mt-1 truncate">
+                                  <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span className="truncate">{ev.location}</span>
+                                </p>
+                              )}
                             </div>
 
-                            <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">
-                              {ev.title}
-                            </h4>
-
-                            {ev.reminderMinutes && ev.reminderMinutes.length > 0 && (
-                              <p className="flex items-center gap-1.5 text-[13px] text-[var(--ok)] mt-1">
-                                <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                                <span>{formatReminderSummary(ev.reminderMinutes)}</span>
-                              </p>
-                            )}
-
-                            {ev.location && (
-                              <p className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] mt-1 truncate">
-                                <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                                <span className="truncate">{ev.location}</span>
-                              </p>
-                            )}
+                            <div className="flex items-center gap-0.5 shrink-0 -mr-1.5">
+                              {ev.htmlLink && (
+                                <a
+                                  href={ev.htmlLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="t-btn t-btn-ghost t-btn-icon text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
+                                  aria-label={`Abrir en Google Calendar: ${ev.title}`}
+                                  title="Abrir en Google Calendar"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
+                              {onDeleteGoogleEvent && isGoogleGym && (
+                                <button
+                                  type="button"
+                                  onClick={() => void onDeleteGoogleEvent(ev)}
+                                  className="t-btn t-btn-ghost t-btn-icon text-[var(--muted)] hover:text-[var(--danger)] sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 shrink-0"
+                                  aria-label={`Eliminar de Google Calendar: ${ev.title}`}
+                                  title="Eliminar de Google Calendar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
-
-                          {ev.htmlLink && (
-                            <a
-                              href={ev.htmlLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="t-btn t-btn-ghost t-btn-icon -mr-1.5 text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
-                              aria-label={`Abrir en Google Calendar: ${ev.title}`}
-                              title="Abrir en Google Calendar"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

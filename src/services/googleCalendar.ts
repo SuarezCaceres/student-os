@@ -1,7 +1,8 @@
-import type { DayOfWeek } from '../types';
+import type { Category, DayOfWeek } from '../types';
 import type { BusyInterval } from '../utils/calendarSlotFinder';
 import { ORDERED_DAYS } from '../utils/routineGenerator';
 import { isOvernightTimeRange, shiftIsoDate } from '../utils/workSchedule';
+import { isStudentOsGymMetadata } from '../utils/gymScheduleFilter';
 
 export const GOOGLE_CLIENT_ID_STORAGE_KEY = 'student_os_gcal_client_id';
 export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
@@ -45,8 +46,10 @@ export interface GoogleCalendarEvent {
   endTime: string; // HH:mm
   isAllDay?: boolean;
   location?: string;
+  description?: string;
   htmlLink?: string;
   reminderMinutes?: number[];
+  isStudentOsGym?: boolean;
 }
 
 export interface UpsertGoogleGymEventParams {
@@ -59,11 +62,20 @@ export interface UpsertGoogleGymEventParams {
   description?: string;
   timeZone?: string;
   reminderMinutes?: number[];
+  studentOsCategory?: Category;
 }
 
 export interface UpsertGoogleGymEventResult {
   eventId: string;
   htmlLink?: string;
+}
+
+export interface DeleteGoogleGymEventsResult {
+  status: 'ok' | 'partial' | 'auth_missing' | 'error';
+  deletedCount: number;
+  failedCount: number;
+  deletedIds: string[];
+  message: string;
 }
 
 interface StoredTokenPayload {
@@ -700,9 +712,13 @@ export async function fetchGoogleEventsAndBusyForWeek(
       id?: string;
       status?: string;
       summary?: string;
+      description?: string;
       location?: string;
       htmlLink?: string;
       transparency?: string;
+      extendedProperties?: {
+        private?: Record<string, string>;
+      };
       start?: { dateTime?: string; date?: string };
       end?: { dateTime?: string; date?: string };
       reminders?: {
@@ -727,6 +743,12 @@ export async function fetchGoogleEventsAndBusyForWeek(
     if (!item.id || item.status === 'cancelled') continue;
 
     const title = item.summary?.trim() || 'Evento de Google Calendar';
+    const description = item.description?.trim() || undefined;
+    const isStudentOsGym = isStudentOsGymMetadata({
+      title,
+      description,
+      privateProps: item.extendedProperties?.private,
+    });
     const overrideMinutes = (item.reminders?.overrides ?? [])
       .filter((r) => typeof r.minutes === 'number')
       .map((r) => Math.round(r.minutes as number));
@@ -751,8 +773,10 @@ export async function fetchGoogleEventsAndBusyForWeek(
             endTime: '08:00',
             isAllDay: true,
             location: item.location?.trim() || undefined,
+            description,
             htmlLink: item.htmlLink,
             reminderMinutes,
+            isStudentOsGym,
           });
         }
       }
@@ -793,8 +817,10 @@ export async function fetchGoogleEventsAndBusyForWeek(
             endTime,
             isAllDay: false,
             location: item.location?.trim() || undefined,
+            description,
             htmlLink: item.htmlLink,
             reminderMinutes,
+            isStudentOsGym,
           });
 
           if (blocksAvailability) {
@@ -985,6 +1011,12 @@ export async function upsertGoogleGymEvent(
     description: string;
     start: { dateTime: string; timeZone: string };
     end: { dateTime: string; timeZone: string };
+    extendedProperties?: {
+      private: {
+        studentOsSource: string;
+        studentOsCategory: Category;
+      };
+    };
     reminders?: {
       useDefault: boolean;
       overrides: Array<{ method: 'popup'; minutes: number }>;
@@ -1001,6 +1033,16 @@ export async function upsertGoogleGymEvent(
       dateTime: toLocalRfc3339(resolvedEndDateIso, params.endTime),
       timeZone,
     },
+    ...(params.studentOsCategory
+      ? {
+          extendedProperties: {
+            private: {
+              studentOsSource: 'student-os',
+              studentOsCategory: params.studentOsCategory,
+            },
+          },
+        }
+      : {}),
   };
 
   if (params.reminderMinutes !== undefined) {
@@ -1094,4 +1136,180 @@ export async function deleteGoogleGymEvent(accessToken: string, eventId: string)
     errText,
     'No se pudo eliminar el evento en Google Calendar'
   );
+}
+
+/**
+ * Queries Google Calendar from Monday of the current week through +8 weeks ahead and
+ * deletes every StudentOS Gym event (both explicitly linked IDs and legacy/orphaned "Gym:" events).
+ * Never swallows expired-session or API errors silently so callers can show honest UI feedback.
+ */
+export async function deleteStudentOsGymEventsFromMonday(
+  accessToken: string,
+  weekDates: Record<DayOfWeek, string>,
+  extraLinkedIds: Iterable<string> = [],
+  excludeIds: Iterable<string> = []
+): Promise<DeleteGoogleGymEventsResult> {
+  if (!accessToken.trim()) {
+    return {
+      status: 'auth_missing',
+      deletedCount: 0,
+      failedCount: 0,
+      deletedIds: [],
+      message:
+        'Tu sesión de Google Calendar expiró o no está activa. Reconecta manualmente en Google Sync para borrar eventos en Google.',
+    };
+  }
+
+  const mondayIso = weekDates.Lunes || Object.values(weekDates).sort()[0];
+  if (!mondayIso) {
+    return {
+      status: 'ok',
+      deletedCount: 0,
+      failedCount: 0,
+      deletedIds: [],
+      message: 'No se pudo determinar el lunes de la semana actual.',
+    };
+  }
+
+  const { year, month, day } = parseLocalDateParts(mondayIso);
+  const windowStartLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const windowEndLocal = new Date(year, month - 1, day + 57, 0, 0, 0, 0); // Monday -> +8 semanas
+
+  const query = new URLSearchParams({
+    timeMin: windowStartLocal.toISOString(),
+    timeMax: windowEndLocal.toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    timeZone: getBrowserTimeZone(),
+    maxResults: '500',
+  });
+
+  const excludeSet = new Set<string>();
+  for (const id of excludeIds) {
+    if (id.trim()) excludeSet.add(id.trim());
+  }
+
+  const targetIds = new Set<string>();
+  for (const id of extraLinkedIds) {
+    const trimmed = id.trim();
+    if (trimmed && !excludeSet.has(trimmed)) targetIds.add(trimmed);
+  }
+
+  try {
+    const listResp = await fetch(
+      `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events?${query.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!listResp.ok) {
+      const errText = await listResp.text().catch(() => '');
+      const parsedErr = buildErrorFromGoogleResponse(
+        listResp.status,
+        errText,
+        'No se pudieron consultar los eventos de Google Calendar'
+      );
+      return {
+        status: listResp.status === 401 ? 'auth_missing' : 'error',
+        deletedCount: 0,
+        failedCount: targetIds.size,
+        deletedIds: [],
+        message: parsedErr.message,
+      };
+    }
+
+    const listData = (await listResp.json()) as {
+      items?: Array<{
+        id?: string;
+        status?: string;
+        summary?: string;
+        description?: string;
+        extendedProperties?: {
+          private?: Record<string, string>;
+        };
+      }>;
+    };
+
+    for (const item of listData.items ?? []) {
+      if (!item.id || item.status === 'cancelled' || excludeSet.has(item.id)) continue;
+      if (
+        targetIds.has(item.id) ||
+        isStudentOsGymMetadata({
+          title: item.summary,
+          description: item.description,
+          privateProps: item.extendedProperties?.private,
+        })
+      ) {
+        targetIds.add(item.id);
+      }
+    }
+  } catch (err) {
+    return {
+      status: 'error',
+      deletedCount: 0,
+      failedCount: targetIds.size,
+      deletedIds: [],
+      message:
+        err instanceof Error
+          ? err.message
+          : 'Error de red al buscar eventos anteriores en Google Calendar.',
+    };
+  }
+
+  if (targetIds.size === 0) {
+    return {
+      status: 'ok',
+      deletedCount: 0,
+      failedCount: 0,
+      deletedIds: [],
+      message:
+        'No quedaban eventos anteriores de gym en Google Calendar (desde esta semana hasta +8 semanas).',
+    };
+  }
+
+  const deletedIds: string[] = [];
+  let failedCount = 0;
+  let lastErrorMessage = '';
+
+  for (const eventId of targetIds) {
+    try {
+      await deleteGoogleGymEvent(accessToken, eventId);
+      deletedIds.push(eventId);
+    } catch (err) {
+      failedCount += 1;
+      lastErrorMessage = err instanceof Error ? err.message : 'Error al eliminar evento en Google.';
+      if (lastErrorMessage.includes('expiró')) {
+        return {
+          status: 'auth_missing',
+          deletedCount: deletedIds.length,
+          failedCount: targetIds.size - deletedIds.length,
+          deletedIds,
+          message:
+            lastErrorMessage ||
+            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+        };
+      }
+    }
+  }
+
+  if (failedCount > 0) {
+    return {
+      status: deletedIds.length > 0 ? 'partial' : 'error',
+      deletedCount: deletedIds.length,
+      failedCount,
+      deletedIds,
+      message: `Se borraron ${deletedIds.length} evento(s) en Google Calendar, pero fallaron ${failedCount}: ${lastErrorMessage}`,
+    };
+  }
+
+  return {
+    status: 'ok',
+    deletedCount: deletedIds.length,
+    failedCount: 0,
+    deletedIds,
+    message: `Se eliminaron ${deletedIds.length} evento(s) de gym en Google Calendar (desde esta semana hasta +8 semanas).`,
+  };
 }

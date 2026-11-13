@@ -14,7 +14,10 @@ import {
   Wand2,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek } from '../../types';
-import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import type {
+  DeleteGoogleGymEventsResult,
+  GoogleCalendarEvent,
+} from '../../services/googleCalendar';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import {
   getDayFreeSuggestions,
@@ -24,6 +27,14 @@ import {
   type ScheduledGymSlotDraft,
 } from '../../utils/gymSchedulePlanner';
 import { minutesToTimeString, timeStringToMinutes } from '../../utils/calendarSlotFinder';
+
+export interface PreviousGymDisplayItem {
+  id: string;
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  source: 'google' | 'local';
+}
 
 export interface GymScheduleStepContentProps {
   selectedDays: DayOfWeek[];
@@ -42,11 +53,13 @@ export interface GymScheduleStepContentProps {
   weekDates: Record<DayOfWeek, string>;
   isGoogleConnected?: boolean;
   isGoogleSyncing?: boolean;
-  previousGymBlocks?: CalendarBlock[];
+  previousGymItems?: PreviousGymDisplayItem[];
   replacePreviousGymSchedule?: boolean;
   onToggleReplacePreviousGymSchedule?: (nextValue: boolean) => void;
   onClearPreviousGymBlocks?: () => Promise<void> | void;
+  onOpenGoogleSync?: () => void;
   isClearingPreviousGym?: boolean;
+  clearPreviousResult?: DeleteGoogleGymEventsResult | null;
   didClearPreviousGym?: boolean;
   showSubmitSummaryError?: boolean;
   summaryErrorRef?: React.RefObject<HTMLDivElement | null>;
@@ -77,11 +90,13 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
   weekDates,
   isGoogleConnected = false,
   isGoogleSyncing = false,
-  previousGymBlocks = [],
+  previousGymItems = [],
   replacePreviousGymSchedule = true,
   onToggleReplacePreviousGymSchedule,
   onClearPreviousGymBlocks,
+  onOpenGoogleSync,
   isClearingPreviousGym = false,
+  clearPreviousResult = null,
   didClearPreviousGym = false,
   showSubmitSummaryError = false,
   summaryErrorRef,
@@ -96,6 +111,34 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
       el.focus();
     }
   };
+
+  const clearErrorBanner =
+    clearPreviousResult &&
+    (clearPreviousResult.status === 'auth_missing' ||
+      clearPreviousResult.status === 'error' ||
+      clearPreviousResult.status === 'partial') ? (
+      <div
+        role="alert"
+        className="rounded-[12px] border border-[var(--danger)] bg-[color-mix(in_oklab,var(--danger)_10%,var(--surface))] px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5 text-[13px] text-[var(--ink)]"
+      >
+        <div className="flex items-start gap-2 min-w-0 flex-1">
+          <AlertTriangle
+            className="w-4 h-4 text-[var(--danger)] shrink-0 mt-0.5"
+            aria-hidden="true"
+          />
+          <span>{clearPreviousResult.message}</span>
+        </div>
+        {onOpenGoogleSync && (
+          <button
+            type="button"
+            onClick={onOpenGoogleSync}
+            className="min-h-[40px] px-3 py-1.5 rounded-[10px] border border-[var(--line-strong)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--ink)] hover:border-[var(--action)] transition-colors shrink-0"
+          >
+            Abrir Google Sync
+          </button>
+        )}
+      </div>
+    ) : null;
 
   return (
     <div className="space-y-5">
@@ -182,8 +225,8 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
         </div>
       </div>
 
-      {/* Gestión de horario anterior de gimnasio (sobrescribir o borrar) */}
-      {previousGymBlocks.length > 0 && (
+      {/* Gestión de horario anterior de gimnasio (Google Calendar + copias locales) */}
+      {previousGymItems.length > 0 && (
         <div
           className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3"
           data-testid="previous-gym-schedule-panel"
@@ -192,8 +235,8 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
             <div className="flex flex-wrap items-center gap-2">
               <CalendarSync className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
               <span className="text-[13px] font-bold text-[var(--ink)]">
-                Horario anterior de gimnasio ({previousGymBlocks.length}{' '}
-                {previousGymBlocks.length === 1 ? 'sesión' : 'sesiones'})
+                Horario anterior de gimnasio ({previousGymItems.length}{' '}
+                {previousGymItems.length === 1 ? 'sesión' : 'sesiones'})
               </span>
               <span
                 className={`t-badge ${replacePreviousGymSchedule ? 't-badge-ok' : 't-badge-accent'}`}
@@ -212,25 +255,34 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
               >
                 <Trash2 className="w-4 h-4 shrink-0" aria-hidden="true" />
                 <span>
-                  {isClearingPreviousGym ? 'Borrando horario...' : 'Borrar horario anterior'}
+                  {isClearingPreviousGym ? 'Borrando en Google...' : 'Borrar horario anterior'}
                 </span>
               </button>
             )}
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            {previousGymBlocks.map((block) => (
+            {previousGymItems.map((item) => (
               <span
-                key={block.id}
-                className="inline-flex items-center gap-1 rounded-[8px] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[13px] font-medium text-[var(--ink)] t-num"
+                key={item.id}
+                className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--line)] bg-[var(--surface)] px-2.5 py-1 text-[13px] font-medium text-[var(--ink)] t-num"
               >
-                <span>{block.day}</span>
+                <span>{item.day}</span>
                 <span className="text-[var(--muted)]">
-                  {block.startTime}–{block.endTime}
+                  {item.startTime}–{item.endTime}
+                </span>
+                <span
+                  className={`text-[12px] font-semibold ${
+                    item.source === 'google' ? 'text-[var(--action)]' : 'text-[var(--warn)]'
+                  }`}
+                >
+                  {item.source === 'google' ? 'Google' : 'Local'}
                 </span>
               </span>
             ))}
           </div>
+
+          {clearErrorBanner}
 
           {onToggleReplacePreviousGymSchedule && (
             <label
@@ -246,29 +298,33 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
               />
               <span className="text-[13px] leading-snug text-[var(--muted)]">
                 <strong className="font-semibold text-[var(--ink)] block">
-                  Sobrescribir / reemplazar horario anterior de gimnasio al guardar
+                  Sobrescribir / reemplazar horario anterior de gimnasio y Google Calendar al guardar
                 </strong>
                 {replacePreviousGymSchedule
-                  ? 'Tus sesiones anteriores de gym no causan auto-cruces (p. ej. cambiar de 07:00–09:00 a 06:00–08:00). Trabajo nocturno, Universidad y Google Calendar se validan por cada día.'
-                  : 'Modo comparación activo: si eliges una hora que choca con tu horario anterior de gym, aparecerá alerta de cruce por cada día.'}
+                  ? 'Tus sesiones anteriores de gym (en Google Calendar o locales) no causan auto-cruces al cambiar p. ej. de 07:00–09:00 a 06:00–08:00. Trabajo nocturno, Universidad y otros eventos de Google siguen validándose por día.'
+                  : 'Modo comparación activo: si eliges una hora que choca con tus sesiones anteriores de gym, aparecerá alerta de cruce por cada día.'}
               </span>
             </label>
           )}
         </div>
       )}
 
-      {didClearPreviousGym && previousGymBlocks.length === 0 && (
-        <div
-          role="status"
-          className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 flex items-center gap-2.5 text-[13px] text-[var(--ink)]"
-        >
-          <CheckCircle2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
-          <span>
-            Horario anterior de gimnasio borrado de StudentOS y Google Calendar. Configura tus
-            nuevos horarios por cada día sin auto-cruces.
-          </span>
-        </div>
-      )}
+      {previousGymItems.length === 0 && clearErrorBanner}
+
+      {didClearPreviousGym &&
+        previousGymItems.length === 0 &&
+        (!clearPreviousResult || clearPreviousResult.status === 'ok') && (
+          <div
+            role="status"
+            className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-3 flex items-center gap-2.5 text-[13px] text-[var(--ink)]"
+          >
+            <CheckCircle2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+            <span>
+              {clearPreviousResult?.message ||
+                'Horario anterior de gimnasio limpiado. Ya puedes asignar cada día desde las 06:00 sin auto-cruces.'}
+            </span>
+          </div>
+        )}
 
       {/* Focusable Error Summary si intenta guardar con algún cruce activo */}
       {showSubmitSummaryError && conflictedDrafts.length > 0 && (

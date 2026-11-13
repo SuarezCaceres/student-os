@@ -25,7 +25,10 @@ import type {
   WeightHistoryEntry,
 } from '../../types';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
-import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import type {
+  DeleteGoogleGymEventsResult,
+  GoogleCalendarEvent,
+} from '../../services/googleCalendar';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
 import {
   buildSessionAttendanceLog,
@@ -70,7 +73,7 @@ export interface GymTrackerProps {
   onOpenGoogleSync?: () => void;
   onSyncGymWeekToGoogle?: () => Promise<void> | void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
-  onClearPreviousGymBlocks?: () => Promise<void> | void;
+  onClearPreviousGymBlocks?: () => Promise<DeleteGoogleGymEventsResult | void> | void;
   onLogBodyWeight?: (newWeightKg: number) => void;
   onStartSession?: (payload: {
     dayOfWeek: DayOfWeek;
@@ -1162,6 +1165,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         isGoogleConnected={isGoogleConnected}
         isGoogleSyncing={isGoogleSyncing || isSyncingGymToGoogle}
         onClearPreviousGymBlocks={onClearPreviousGymBlocks}
+        onOpenGoogleSync={onOpenGoogleSync}
         onComplete={(payload) => {
           onSaveGymPlan?.(payload);
           setPinnedMissDay(null);
