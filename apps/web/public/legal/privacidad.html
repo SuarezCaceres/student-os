@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Política de privacidad · StudentOS</title>
+    <meta
+      name="description"
+      content="Qué datos guarda StudentOS, para qué los usa, con quién los comparte y cómo puedes descargarlos o borrarlos."
+    />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <style>
+      :root {
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --surface-2: #f1f3f6;
+        --ink: #111318;
+        --muted: #5d6470;
+        --action: #1a4be0;
+        --line: rgba(17, 19, 24, 0.12);
+        --mark-bg: #fff3c4;
+        --mark-ink: #4a3500;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0a0d14;
+          --surface: #131824;
+          --surface-2: #192030;
+          --ink: #e9edf3;
+          --muted: #8891a1;
+          --action: #5ab9fc;
+          --line: rgba(233, 237, 243, 0.14);
+          --mark-bg: #4a3a08;
+          --mark-ink: #ffe9a3;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: 'Schibsted Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        font-size: 1.0625rem;
+        line-height: 1.65;
+      }
+      a {
+        color: var(--action);
+        text-underline-offset: 3px;
+      }
+      a:focus-visible {
+        outline: 2px solid var(--action);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+      header.site {
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 4px 16px;
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 6px 16px;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 44px;
+        color: var(--ink);
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .brand img {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+      }
+      nav.pages {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 20px;
+      }
+      nav.pages a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        font-size: 0.9375rem;
+        color: var(--muted);
+      }
+      nav.pages a[aria-current='page'] {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      main {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 32px 16px 56px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: clamp(1.75rem, 5vw, 2.25rem);
+        line-height: 1.2;
+        letter-spacing: -0.02em;
+        font-weight: 600;
+      }
+      h2 {
+        margin: 40px 0 8px;
+        font-size: 1.375rem;
+        line-height: 1.3;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p,
+      ul {
+        margin: 0 0 14px;
+      }
+      ul {
+        padding-left: 1.25rem;
+      }
+      li {
+        margin-bottom: 6px;
+      }
+      .meta {
+        color: var(--muted);
+        font-size: 0.9375rem;
+      }
+      .lead {
+        font-size: 1.1875rem;
+        color: var(--ink);
+      }
+      .summary {
+        margin: 24px 0 8px;
+        padding: 16px 18px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+      .summary h2 {
+        margin-top: 0;
+        font-size: 1.125rem;
+      }
+      .summary ul {
+        margin-bottom: 0;
+      }
+      .table-wrap {
+        overflow-x: auto;
+        margin: 0 0 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      table {
+        width: 100%;
+        min-width: 32rem;
+        border-collapse: collapse;
+        font-size: 0.9375rem;
+      }
+      th,
+      td {
+        padding: 10px 14px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        font-weight: 600;
+        background: var(--surface-2);
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      code {
+        font-family: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+        font-size: 0.875em;
+        background: var(--surface-2);
+        padding: 1px 6px;
+        border-radius: 6px;
+        overflow-wrap: anywhere;
+      }
+      mark.pendiente {
+        background: var(--mark-bg);
+        color: var(--mark-ink);
+        padding: 1px 6px;
+        border-radius: 6px;
+        font-weight: 600;
+      }
+      footer.site {
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.9375rem;
+      }
+      footer.site .bar {
+        padding-block: 12px;
+      }
+      footer.site a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="bar">
+        <a class="brand" href="/"><img src="/logo.png" alt="" width="28" height="28" /><span>StudentOS</span></a>
+        <nav class="pages" aria-label="Información legal">
+          <a href="/legal/privacidad.html" aria-current="page">Privacidad</a>
+          <a href="/legal/terminos.html">Términos de uso</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <h1>Política de privacidad</h1>
+      <p class="meta">Última actualización: 13 de noviembre de 2026</p>
+      <p class="lead">
+        StudentOS te ayuda a organizar tus entregas, tu horario y tus entrenamientos. Aquí explicamos, sin letra
+        pequeña, qué datos guardamos, para qué, con quién los compartimos y cómo puedes llevártelos o borrarlos.
+      </p>
+
+      <div class="summary">
+        <h2>En resumen</h2>
+        <ul>
+          <li>Puedes usar StudentOS sin cuenta: en ese caso todo se queda en tu navegador y no lo recibimos.</li>
+          <li>Si inicias sesión con Google, tus datos se sincronizan con nuestra nube para que los tengas en todos tus dispositivos.</li>
+          <li>No vendemos tus datos, no mostramos publicidad y no usamos herramientas de seguimiento.</li>
+          <li>Puedes descargar una copia de todo o borrar tu cuenta desde la propia app.</li>
+        </ul>
+      </div>
+
+      <h2>1. Quién es responsable</h2>
+      <p>
+        StudentOS es un proyecto independiente. Responsable del tratamiento: <mark class="pendiente">[NOMBRE DEL RESPONSABLE]</mark>.
+        Para cualquier duda o solicitud sobre tus datos escribe a <mark class="pendiente">[CORREO DE CONTACTO]</mark>.
+      </p>
+
+      <h2>2. Qué datos guardamos</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Dato</th>
+              <th scope="col">Dónde queda</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Tareas del tablero, entregas y calificaciones, reflexiones semanales</td>
+              <td>En tu navegador. Si inicias sesión, también en nuestra nube.</td>
+            </tr>
+            <tr>
+              <td>Rutinas de gym, pesos, series, asistencia y racha</td>
+              <td>En tu navegador. Si inicias sesión, también en nuestra nube.</td>
+            </tr>
+            <tr>
+              <td>Horario: bloques del calendario, turno laboral y hábitos diarios</td>
+              <td>En tu navegador. Si inicias sesión, también en nuestra nube.</td>
+            </tr>
+            <tr>
+              <td>Perfil: nombre, carrera, semana académica, tema (claro u oscuro)</td>
+              <td>En tu navegador. Si inicias sesión, también en nuestra nube.</td>
+            </tr>
+            <tr>
+              <td>Datos de acceso: correo, nombre y foto de tu cuenta de Google</td>
+              <td>Solo si inicias sesión. Los guarda nuestro proveedor de autenticación (Supabase) a partir de lo que Google comparte al iniciar sesión.</td>
+            </tr>
+            <tr>
+              <td>Conexión con Google Calendar</td>
+              <td>Solo si la activas. Ver el apartado 3.</td>
+            </tr>
+            <tr>
+              <td>Datos técnicos de las peticiones (por ejemplo, tu dirección IP)</td>
+              <td>Los registran temporalmente los servicios de alojamiento para que la app funcione y sea segura. No los usamos para perfilarte.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Usamos el almacenamiento de tu navegador (<code>localStorage</code> e IndexedDB) para guardar tus datos y tu
+        sesión. No usamos cookies de publicidad ni de seguimiento.
+      </p>
+
+      <h2>3. Google Calendar</h2>
+      <p>Conectar Google Calendar es opcional. Si lo haces, StudentOS pide estos permisos a Google:</p>
+      <ul>
+        <li>
+          <strong>Datos básicos de la cuenta</strong> (<code>openid</code>, <code>email</code>, <code>profile</code>): para
+          saber quién eres y mostrarte tu nombre.
+        </li>
+        <li>
+          <strong>Eventos de tu calendario</strong> (<code>calendar.events</code> y <code>calendar.readonly</code>): para
+          leer tus eventos y encontrar huecos libres, y para crear, modificar o eliminar los eventos de tus sesiones de
+          gym cuando tú lo pides.
+        </li>
+      </ul>
+      <p>Qué hacemos y qué no hacemos con esa información:</p>
+      <ul>
+        <li>Leemos tus eventos en el momento para mostrártelos; no guardamos copias de tu calendario en nuestra base de datos.</li>
+        <li>
+          Solo creamos, cambiamos o borramos eventos cuando lo ordenas en la app (por ejemplo, al programar una sesión de gym).
+        </li>
+        <li>
+          Para mantener la conexión sin pedirte permiso cada día, guardamos en nuestro servidor un token de renovación de
+          Google <strong>cifrado</strong>. Ese token nunca llega a tu navegador.
+        </li>
+        <li>No usamos tus datos de Google para publicidad ni los vendemos o transferimos a terceros.</li>
+      </ul>
+      <p>
+        El uso y la transferencia a cualquier otra aplicación de la información recibida de las API de Google se
+        ajustará a la
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Política de datos de usuario de los servicios de API de Google</a>,
+        incluidos los requisitos de uso limitado.
+      </p>
+      <p>
+        Puedes desconectar Google Calendar cuando quieras desde la app. Al hacerlo revocamos el permiso y borramos el
+        token guardado. También puedes retirar el acceso desde
+        <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">los permisos de tu cuenta de Google</a>.
+      </p>
+
+      <h2>4. Para qué usamos tus datos</h2>
+      <ul>
+        <li>Mostrarte y sincronizar tus tareas, horario y entrenamientos entre tus dispositivos.</li>
+        <li>Mantener tu sesión iniciada y proteger la cuenta frente a abusos (por ejemplo, limitando peticiones excesivas).</li>
+        <li>Responder a tus solicitudes de descarga, corrección o borrado.</li>
+      </ul>
+      <p>No tomamos decisiones automáticas sobre ti ni te mostramos publicidad.</p>
+
+      <h2>5. Con quién los compartimos</h2>
+      <p>No vendemos tus datos. Para que la app funcione usamos estos proveedores, que tratan datos por cuenta nuestra:</p>
+      <ul>
+        <li><strong>Google</strong>: inicio de sesión y, si lo activas, Google Calendar.</li>
+        <li><strong>Supabase</strong>: autenticación y base de datos donde se guardan tus datos sincronizados.</li>
+        <li><strong>Render</strong>: aloja el servidor (API) por el que pasan tus datos al sincronizar.</li>
+        <li><strong>Vercel</strong>: aloja las páginas de la aplicación.</li>
+        <li>
+          <strong>Google Fonts</strong>: las tipografías se cargan desde servidores de Google al abrir la página, por lo
+          que Google recibe tu dirección IP como en cualquier sitio web que use fuentes externas.
+        </li>
+      </ul>
+      <p>
+        Estos proveedores pueden procesar datos en servidores fuera de tu país. Solo compartimos información fuera de
+        esos proveedores si una ley nos obliga.
+      </p>
+
+      <h2>6. Cuánto tiempo los guardamos</h2>
+      <ul>
+        <li>Mientras tengas cuenta, conservamos los datos que sincronizas.</li>
+        <li>Si borras tu cuenta, eliminamos tus datos de la nube y desconectamos Google Calendar.</li>
+        <li>
+          Es posible que copias de seguridad técnicas de nuestros proveedores conserven datos durante un tiempo limitado
+          después del borrado.
+        </li>
+        <li>Lo que está solo en tu navegador lo controlas tú: se borra al limpiar los datos del sitio.</li>
+      </ul>
+
+      <h2>7. Tus derechos</h2>
+      <ul>
+        <li><strong>Acceder y llevarte tus datos:</strong> en la app, sección de cuenta, “Descargar mis datos” (archivo JSON).</li>
+        <li><strong>Corregir:</strong> edita tus datos directamente en la app; se sincronizan solos.</li>
+        <li><strong>Borrar:</strong> en la app, sección de cuenta, “Borrar mi cuenta”. Pide una confirmación escrita y no se puede deshacer.</li>
+        <li><strong>Retirar el permiso de Google Calendar:</strong> desde la app o desde tu cuenta de Google.</li>
+      </ul>
+      <p>
+        Al borrar tu cuenta eliminamos los datos de la aplicación. El registro de tu inicio de sesión (correo) puede
+        permanecer en nuestro proveedor de autenticación; si quieres que también se elimine, escríbenos a
+        <mark class="pendiente">[CORREO DE CONTACTO]</mark> y lo borramos manualmente.
+      </p>
+
+      <h2>8. Seguridad</h2>
+      <ul>
+        <li>La comunicación con la app y la API va cifrada (HTTPS).</li>
+        <li>El token de Google Calendar se guarda cifrado en el servidor y nunca se envía a tu navegador.</li>
+        <li>Cada petición se comprueba con tu sesión: un usuario solo puede acceder a sus propios datos.</li>
+        <li>Limitamos la frecuencia de ciertas acciones (como exportar o borrar) para evitar abusos.</li>
+      </ul>
+      <p>Ningún sistema es perfecto. Si detectas un problema de seguridad, avísanos por correo.</p>
+
+      <h2>9. Menores de edad</h2>
+      <p>StudentOS está pensada para estudiantes universitarios y no está dirigida a menores de 13 años.</p>
+
+      <h2>10. Cambios en esta política</h2>
+      <p>
+        Si cambiamos algo importante, actualizaremos la fecha de arriba y, cuando sea relevante, te lo avisaremos en la
+        app.
+      </p>
+
+      <h2>11. Contacto</h2>
+      <p>
+        Escríbenos a <mark class="pendiente">[CORREO DE CONTACTO]</mark> para ejercer tus derechos o resolver cualquier
+        duda sobre privacidad.
+      </p>
+    </main>
+
+    <footer class="site">
+      <div class="bar">
+        <a href="/">Volver a StudentOS</a>
+        <a href="/legal/terminos.html">Términos de uso</a>
+      </div>
+    </footer>
+  </body>
+</html>
