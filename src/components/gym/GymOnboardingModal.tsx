@@ -1,4 +1,4 @@
-import React, { useState, useId } from 'react';
+import React, { useState, useId, useMemo, useRef } from 'react';
 import {
   Dumbbell,
   Building2,
@@ -12,9 +12,20 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
-import type { DayOfWeek, GymRoutine } from '../../types';
+import type { CalendarBlock, DayOfWeek, GymRoutine } from '../../types';
+import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import type { BusyInterval } from '../../utils/calendarSlotFinder';
+import { getCurrentWeekDateMap, getLocalIsoDate } from '../../utils/gymAttendance';
+import {
+  GYM_SESSION_DURATION_MINUTES,
+  recommendWeeklyGymSlots,
+  validateGymSlotAgainstCalendar,
+  type PreferredTrainingPeriod,
+  type ScheduledGymSlotDraft,
+} from '../../utils/gymSchedulePlanner';
+import { minutesToTimeString, timeStringToMinutes } from '../../utils/calendarSlotFinder';
+import { GymScheduleStepContent } from './GymScheduleStepContent';
 import { ModalShell } from '../common/ModalShell';
-import { getLocalIsoDate } from '../../utils/gymAttendance';
 import { ReminderPresetPicker } from '../calendar/ReminderPresetPicker';
 import { DEFAULT_GYM_REMINDER_MINUTES } from '../../utils/reminderPresets';
 import {
@@ -39,6 +50,13 @@ export interface GymOnboardingCompletePayload {
   profile: UserGymProfile;
   generatedRoutines: GymRoutine[];
   replaceRoutines: boolean;
+  preferredPeriod?: PreferredTrainingPeriod;
+  scheduledGymSlots?: Array<{
+    day: DayOfWeek;
+    dateIso: string;
+    startTime: string;
+    endTime: string;
+  }>;
 }
 
 export interface GymOnboardingModalProps {
@@ -46,16 +64,23 @@ export interface GymOnboardingModalProps {
   onClose: () => void;
   initialProfile?: UserGymProfile;
   hasExistingRoutines?: boolean;
+  calendarBlocks?: CalendarBlock[];
+  externalBusyByDate?: Record<string, BusyInterval[]>;
+  googleEvents?: GoogleCalendarEvent[];
+  weekDates?: Record<DayOfWeek, string>;
+  isGoogleConnected?: boolean;
+  isGoogleSyncing?: boolean;
   onComplete: (payload: GymOnboardingCompletePayload) => void;
 }
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 const STEP_LABELS: Record<number, string> = {
   1: 'Tu gimnasio',
   2: 'Frecuencia y días',
   3: 'Objetivo y nivel',
   4: 'Perfil físico e IMC',
+  5: 'Horario diario',
 };
 
 const FREQUENCY_OPTIONS = [2, 3, 4, 5, 6] as const;
@@ -83,6 +108,12 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
   onClose,
   initialProfile,
   hasExistingRoutines = false,
+  calendarBlocks = [],
+  externalBusyByDate,
+  googleEvents,
+  weekDates,
+  isGoogleConnected = false,
+  isGoogleSyncing = false,
   onComplete,
 }) => {
   if (!isOpen) return null;
@@ -93,6 +124,12 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
       onClose={onClose}
       initialProfile={initialProfile}
       hasExistingRoutines={hasExistingRoutines}
+      calendarBlocks={calendarBlocks}
+      externalBusyByDate={externalBusyByDate}
+      googleEvents={googleEvents}
+      weekDates={weekDates}
+      isGoogleConnected={isGoogleConnected}
+      isGoogleSyncing={isGoogleSyncing}
       onComplete={onComplete}
     />
   );
@@ -103,9 +140,18 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   onClose,
   initialProfile,
   hasExistingRoutines = false,
+  calendarBlocks = [],
+  externalBusyByDate,
+  googleEvents,
+  weekDates,
+  isGoogleConnected = false,
+  isGoogleSyncing = false,
   onComplete,
 }) => {
   const formId = useId();
+  const scheduleSummaryErrorRef = useRef<HTMLDivElement | null>(null);
+  const [defaultWeekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
+  const effectiveWeekDates = weekDates ?? defaultWeekDates;
 
   const [step, setStep] = useState<number>(1);
   const [gymType, setGymType] = useState<GymType>(initialProfile?.gymType ?? 'smart_fit');
@@ -133,6 +179,10 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     initialProfile?.reminderMinutesBefore ?? DEFAULT_GYM_REMINDER_MINUTES
   );
   const [replaceRoutines, setReplaceRoutines] = useState<boolean>(!initialProfile);
+  const [preferredPeriod, setPreferredPeriod] = useState<PreferredTrainingPeriod>('auto');
+  const [slotOverridesByDay, setSlotOverridesByDay] = useState<
+    Partial<Record<DayOfWeek, { startTime: string; source: 'recommended' | 'custom' }>>
+  >({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const parsedHeight = Number(heightCm);
@@ -165,6 +215,80 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     });
   };
 
+  const slotDrafts: ScheduledGymSlotDraft[] = useMemo(() => {
+    const recommendedDrafts = recommendWeeklyGymSlots({
+      selectedDays,
+      preferredPeriod,
+      calendarBlocks,
+      externalBusyByDate,
+      googleEvents,
+      weekDates: effectiveWeekDates,
+    });
+
+    return recommendedDrafts.map((recDraft) => {
+      const override = slotOverridesByDay[recDraft.day];
+      if (!override) return recDraft;
+
+      const endTime = minutesToTimeString(
+        timeStringToMinutes(override.startTime) + GYM_SESSION_DURATION_MINUTES
+      );
+      const conflict = validateGymSlotAgainstCalendar({
+        day: recDraft.day,
+        dateIso: recDraft.dateIso,
+        startTime: override.startTime,
+        calendarBlocks,
+        externalBusyByDate,
+        googleEvents,
+      });
+
+      return {
+        day: recDraft.day,
+        dateIso: recDraft.dateIso,
+        startTime: override.startTime,
+        endTime,
+        source: override.source,
+        hasConflict: conflict.hasConflict,
+        conflictTitle: conflict.conflictTitle,
+        conflictSource: conflict.conflictSource,
+        conflictStart: conflict.conflictStart,
+        conflictEnd: conflict.conflictEnd,
+      };
+    });
+  }, [
+    selectedDays,
+    preferredPeriod,
+    calendarBlocks,
+    externalBusyByDate,
+    googleEvents,
+    effectiveWeekDates,
+    slotOverridesByDay,
+  ]);
+
+  const hasScheduleConflict = slotDrafts.some((draft) => draft.hasConflict);
+
+  const handleSelectSlotStart = (
+    day: DayOfWeek,
+    startTime: string,
+    source: 'recommended' | 'custom'
+  ) => {
+    setErrorMsg(null);
+    setSlotOverridesByDay((prev) => ({
+      ...prev,
+      [day]: { startTime, source },
+    }));
+  };
+
+  const handleChangePreferredPeriod = (nextPeriod: PreferredTrainingPeriod) => {
+    setErrorMsg(null);
+    setPreferredPeriod(nextPeriod);
+    setSlotOverridesByDay({});
+  };
+
+  const handleRecommendAllSlots = () => {
+    setErrorMsg(null);
+    setSlotOverridesByDay({});
+  };
+
   const handleNextStep = () => {
     setErrorMsg(null);
 
@@ -179,6 +303,11 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
           selectedDays.length === 1 ? 'día' : 'días'
         }. Elige exactamente ${trainingDaysCount} días o cambia tu frecuencia semanal.`
       );
+      return;
+    }
+
+    if (step === 4 && !isValidMetrics) {
+      setErrorMsg('Ingresa una altura válida (110–240 cm) y un peso válido (30–250 kg).');
       return;
     }
 
@@ -201,7 +330,13 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     setErrorMsg(null);
 
     if (!isValidMetrics) {
+      setStep(4);
       setErrorMsg('Ingresa una altura válida (110–240 cm) y un peso válido (30–250 kg).');
+      return;
+    }
+
+    if (hasScheduleConflict) {
+      scheduleSummaryErrorRef.current?.focus();
       return;
     }
 
@@ -234,6 +369,13 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       profile,
       generatedRoutines,
       replaceRoutines: !hasExistingRoutines || replaceRoutines,
+      preferredPeriod,
+      scheduledGymSlots: slotDrafts.map(({ day, dateIso, startTime, endTime }) => ({
+        day,
+        dateIso,
+        startTime,
+        endTime,
+      })),
     });
   };
 
@@ -284,10 +426,11 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
               key="wizard-submit-btn"
               type="submit"
               form={`${formId}-onboarding-form`}
+              disabled={hasScheduleConflict}
               className="t-btn t-btn-primary"
             >
               <Check className="w-4 h-4" aria-hidden="true" />
-              <span>Guardar perfil y rutina</span>
+              <span>Guardar plan y horarios</span>
             </button>
           )}
         </>
@@ -779,6 +922,26 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* STEP 5: ANTI-CONFLICT VISUAL SCHEDULE PICKER */}
+        {step === 5 && (
+          <GymScheduleStepContent
+            selectedDays={selectedDays}
+            preferredPeriod={preferredPeriod}
+            onChangePreferredPeriod={handleChangePreferredPeriod}
+            slotDrafts={slotDrafts}
+            onSelectSlotStart={handleSelectSlotStart}
+            onRecommendAll={handleRecommendAllSlots}
+            calendarBlocks={calendarBlocks}
+            externalBusyByDate={externalBusyByDate}
+            googleEvents={googleEvents}
+            weekDates={effectiveWeekDates}
+            isGoogleConnected={isGoogleConnected}
+            isGoogleSyncing={isGoogleSyncing}
+            showSubmitSummaryError={hasScheduleConflict}
+            summaryErrorRef={scheduleSummaryErrorRef}
+          />
         )}
       </form>
     </ModalShell>

@@ -25,6 +25,7 @@ import type {
   WeightHistoryEntry,
 } from '../../types';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
+import type { GoogleCalendarEvent } from '../../services/googleCalendar';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
 import {
   buildSessionAttendanceLog,
@@ -60,8 +61,12 @@ export interface GymTrackerProps {
   attendanceLogs?: GymAttendanceLog[];
   calendarBlocks?: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
+  googleEvents?: GoogleCalendarEvent[];
   isGoogleConnected?: boolean;
+  isGoogleSyncing?: boolean;
   isSyncingGymToGoogle?: boolean;
+  autoOpenOnboarding?: boolean;
+  onOnboardingOpenChange?: (isOpen: boolean) => void;
   onOpenGoogleSync?: () => void;
   onSyncGymWeekToGoogle?: () => Promise<void> | void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
@@ -123,8 +128,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   attendanceLogs,
   calendarBlocks = [],
   externalBusyByDate,
+  googleEvents,
   isGoogleConnected = false,
+  isGoogleSyncing = false,
   isSyncingGymToGoogle = false,
+  autoOpenOnboarding,
+  onOnboardingOpenChange,
   onOpenGoogleSync,
   onSyncGymWeekToGoogle,
   onSaveGymPlan,
@@ -145,7 +154,15 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const [todayIso] = useState<string>(() => getLocalIsoDate());
   const [weekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
-  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => !gymProfile);
+  const [internalOnboardingOpen, setInternalOnboardingOpen] = useState<boolean>(
+    () => autoOpenOnboarding ?? !gymProfile
+  );
+  const isOnboardingOpen =
+    autoOpenOnboarding !== undefined ? autoOpenOnboarding : internalOnboardingOpen;
+  const setIsOnboardingOpen = (nextOpen: boolean) => {
+    setInternalOnboardingOpen(nextOpen);
+    onOnboardingOpenChange?.(nextOpen);
+  };
   const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
   const [fallbackLogs, setFallbackLogs] = useState<GymAttendanceLog[]>([]);
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
@@ -1136,6 +1153,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         onClose={() => setIsOnboardingOpen(false)}
         initialProfile={gymProfile}
         hasExistingRoutines={routines.some((r) => r.exercises.length > 0)}
+        calendarBlocks={calendarBlocks}
+        externalBusyByDate={externalBusyByDate}
+        googleEvents={googleEvents}
+        weekDates={weekDates}
+        isGoogleConnected={isGoogleConnected}
+        isGoogleSyncing={isGoogleSyncing || isSyncingGymToGoogle}
         onComplete={(payload) => {
           onSaveGymPlan?.(payload);
           setPinnedMissDay(null);
