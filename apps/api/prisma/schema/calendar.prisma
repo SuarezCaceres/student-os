@@ -1,0 +1,3 @@
+// Agente CALENDAR rellena este archivo (modelos de calendar). No editar base.prisma ni otros .prisma.
+// Convencion: columna plana `userId String @db.Uuid` + @@index([userId, ...]); SIN @relation hacia Profile
+// (una relacion obligaria a editar base.prisma). Mapea con @@map("snake_case"). No generes migraciones.
