@@ -52,11 +52,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, aut
 --       profiles         (base.prisma)   - perfil minimo del usuario
 --       sync_records     (sync.prisma)   - datos de la app por usuario (jsonb)
 --       user_sync_state  (sync.prisma)   - cursor y ultima sincronizacion
+--       google_connections  (google.prisma) - refresh token CIFRADO AES-256-GCM, correo, scopes
+--       google_oauth_states (google.prisma) - state/PKCE verifier temporales del flujo de autorizacion
 --     Si una tabla aun no existe en el esquema (migracion no aplicada) se omite sin error.
 DO $$
 DECLARE
   target_schema text := 'public';
-  expected text[] := ARRAY['profiles', 'sync_records', 'user_sync_state'];
+  expected text[] := ARRAY['profiles', 'sync_records', 'user_sync_state', 'google_connections', 'google_oauth_states'];
   t text;
   oid_ regclass;
   missing text[] := ARRAY[]::text[];
@@ -75,25 +77,9 @@ BEGIN
 END
 $$;
 
--- 2c) GOOGLE (Ola 3): tablas con secretos. DESCOMENTAR y ajustar los nombres a los que defina google.prisma
---     cuando se fusione. No requieren politicas: el bucle del paso 1 ya las deja en "denegar todo" para
---     anon/authenticated y la API (rol con BYPASSRLS) es la unica que las lee. Nunca se exponen por la Data API.
---       google_connections  (refresh token CIFRADO AES-256-GCM, correo de la cuenta, scopes, fecha de conexion)
---       google_oauth_states (state/PKCE verifier temporales del flujo de autorizacion)
---
--- DO $$
--- DECLARE
---   t text;
--- BEGIN
---   FOREACH t IN ARRAY ARRAY['google_connections', 'google_oauth_states'] LOOP
---     IF to_regclass(format('public.%I', t)) IS NOT NULL THEN
---       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
---       EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', t);
---       EXECUTE format('REVOKE ALL ON TABLE public.%I FROM anon, authenticated', t);
---     END IF;
---   END LOOP;
--- END
--- $$;
+-- 2c) Las tablas de GOOGLE (secretos) ya estan cubiertas por el paso 1 y comprobadas en 2b: no necesitan
+--     politicas, quedan en "denegar todo" para anon/authenticated y solo la API (rol con BYPASSRLS) las lee.
+--     Nunca se exponen por la Data API.
 
 -- 3) Verificacion: debe devolver 0 filas (ninguna tabla de la app sin RLS).
 --    SELECT schemaname, tablename FROM pg_tables

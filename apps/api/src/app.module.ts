@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
+import { serializeRequest } from './common/log-serializers';
 import { AuthModule } from './auth/auth.module';
 import { SupabaseJwtGuard } from './auth/supabase-jwt.guard';
 import { CalendarModule } from './calendar/calendar.module';
@@ -42,6 +43,8 @@ import { UniversityModule } from './university/university.module';
               paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
               remove: true,
             },
+            // Sin query string: el callback de Google trae ?code=&state= que nunca debe quedar en los logs.
+            serializers: { req: serializeRequest },
             autoLogging: { ignore: (req) => req.url === '/health' },
           },
         };

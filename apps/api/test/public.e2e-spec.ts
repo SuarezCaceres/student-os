@@ -19,6 +19,9 @@ import type { PrismaService } from '../src/prisma/prisma.service';
  */
 jest.setTimeout(180_000);
 
+// Tablas de la app (orden alfabetico, como las devuelve la consulta). Las de Google guardan secretos cifrados.
+const APP_TABLES = ['google_connections', 'google_oauth_states', 'profiles', 'sync_records', 'user_sync_state'];
+
 describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
   let pg: PublicPg;
   let jwks: JwksServer;
@@ -183,7 +186,10 @@ describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
       expect(res.headers['cache-control']).toBe('no-store');
       expect(res.body).toEqual({
         deleted: true,
-        modules: [{ name: 'modulo-externo', ok: true }],
+        modules: expect.arrayContaining([
+          { name: 'modulo-externo', ok: true },
+          { name: 'google', ok: true }, // gancho real de GoogleModule (revoca y borra su conexion)
+        ]),
         syncRecordsDeleted: 3,
         profileDeleted: true,
         authUser: 'not_deleted',
@@ -321,7 +327,7 @@ describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
       END $$`);
     });
 
-    it('activa y fuerza RLS en profiles, sync_records y user_sync_state, y quita privilegios a anon/authenticated (idempotente)', async () => {
+    it('activa y fuerza RLS en las tablas de la app (incluidas las de secretos de Google), y quita privilegios a anon/authenticated (idempotente)', async () => {
       await applyBaseline();
       await applyBaseline(); // se puede reejecutar sin error
 
@@ -329,10 +335,10 @@ describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
         SELECT t.tablename, t.rowsecurity, c.relforcerowsecurity AS forced
         FROM pg_tables t JOIN pg_class c ON c.oid = format('%I.%I', t.schemaname, t.tablename)::regclass
         WHERE t.schemaname = 'dev_public' AND t.tablename <> '_prisma_migrations' ORDER BY t.tablename`;
-      expect(rows.map((r) => r.tablename)).toEqual(['profiles', 'sync_records', 'user_sync_state']);
+      expect(rows.map((r) => r.tablename)).toEqual(APP_TABLES);
       expect(rows.every((r) => r.rowsecurity && r.forced)).toBe(true);
 
-      for (const table of ['profiles', 'sync_records', 'user_sync_state']) {
+      for (const table of APP_TABLES) {
         for (const role of ['anon', 'authenticated']) {
           const [{ allowed }] = await prisma.$queryRawUnsafe<{ allowed: boolean }[]>(
             `SELECT has_table_privilege('${role}', 'dev_public.${table}', 'SELECT,INSERT,UPDATE,DELETE') AS allowed`,
