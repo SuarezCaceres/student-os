@@ -51,7 +51,7 @@ const PERIOD_OPTIONS: Array<{
   hint: string;
   Icon: React.FC<{ className?: string }>;
 }> = [
-  { id: 'auto', label: 'Automático', hint: 'Mejor hueco libre', Icon: Sparkles },
+  { id: 'auto', label: 'Automático', hint: 'Mejor horario', Icon: Sparkles },
   { id: 'manana', label: 'Mañana', hint: '07:00–12:00', Icon: Sun },
   { id: 'tarde', label: 'Tarde', hint: '14:00–18:00', Icon: Sunset },
   { id: 'noche', label: 'Noche', hint: '18:00–22:00', Icon: Moon },

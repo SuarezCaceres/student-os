@@ -3,7 +3,7 @@
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  
-> **Versión actual:** `v2.9.0 (Google Sign-In Unificado, Google Calendar Nativo Bidireccional y Alarmas reminders.overrides)`  
+> **Versión actual:** `v2.10.0 (Limpieza Real de Demo, Onboarding Gym 5 Pasos Anti-Cruces y Auto-Sync Inteligente Google)`  
 > **Rama activa:** `feat/ui-taste-foundation`  
 > **Última actualización:** Noviembre 2026
 
@@ -286,7 +286,8 @@ student-os/
 
 | Rama | Estado | Commits Clave | Contenido |
 | :--- | :--- | :--- | :--- |
-| **`feat/ui-taste-foundation`** | **ACTIVA (v2.9.0)** | — | Google Sign-In Unificado (`openid profile email` + Calendar scopes en 1 paso desde `AuthModal`), vista nativa de eventos Google Calendar dentro de `WeeklyCalendar` / `CalendarTimelineGrid` (sin duplicados por `googleEventId` y con carriles laterales en colisiones), avisos reales `reminders.overrides` vía `ReminderPresetPicker` en `Agendar bloque`, `QuickAddModal`, `GymOnboardingModal`, `GymMissFlowCard` y `GoogleCalendarSyncModal`, además de ajuste responsive en `Navbar` |
+| **`feat/ui-taste-foundation`** | **ACTIVA (v2.10.0)** | `0666490`, `e5f0042` | Limpieza selectiva de bloques de calendario mock `cb-1`..`cb-14` para cuentas reales (`accountDataCleanup.ts`), Onboarding Gym ampliado a **5 pasos** con selector visual anti-cruces contra Google Calendar y bloques locales (`gymSchedulePlanner.ts`, `GymScheduleStepContent.tsx`), auto-sincronización sin botón (`focus` / `visibilitychange` / 45s) con espejo inteligente de ediciones desde móvil, banner no invasivo (`GoogleChangeBanner.tsx`) y modal evaluador con soluciones en 1 clic (`GoogleImpactModal.tsx`, `googleCalendarDiff.ts`) |
+| `feat/ui-taste-foundation` | v2.9.0 | `6770a06`+ | Google Sign-In Unificado (`openid profile email` + Calendar scopes en 1 paso desde `AuthModal`), vista nativa de eventos Google Calendar dentro de `WeeklyCalendar` / `CalendarTimelineGrid` (sin duplicados por `googleEventId` y con carriles laterales en colisiones), avisos reales `reminders.overrides` vía `ReminderPresetPicker` en `Agendar bloque`, `QuickAddModal`, `GymOnboardingModal`, `GymMissFlowCard` y `GoogleCalendarSyncModal`, además de ajuste responsive en `Navbar` |
 | `feat/ui-taste-foundation` | v2.8.0 | `6770a06` | Pulido `/ui-ux-pro-max` Fase 1 + Fase 2 (`calendarSlotFinder.ts`, `googleCalendar.ts` OAuth 2.0 GIS/API v3, `GoogleCalendarSyncModal.tsx`, `SmartSlotReschedulePicker.tsx`) |
 | `feat/ui-taste-foundation` | v2.7.0 | `748c072` | Fase 1 Asistencia Diaria Gym: Start Gate (`Iniciemos con el entrenamiento de hoy`), faltas retroactivas, mensajes de aliento, racha protegida y reprogramación semanal |
 | `feat/ui-taste-foundation` | v2.6.0 | `fc1ddae`, `044ffad`, `a296254` | Onboarding Gym 4 pasos, generador adaptativo 2–6 días, `GymProfileCard`, medidor IMC OMS, `WeightCheckInModal` y `GymRestDayBanner` |
@@ -308,7 +309,12 @@ student-os/
 
 ---
 
-## 🚀 7. Verificación del Sistema (v2.9.0)
+## 🚀 7. Verificación del Sistema (v2.10.0)
+- **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con `0` errores.
+- **Linter Estático:** `npx.cmd oxlint` con `0` advertencias y `0` errores en los 9 módulos creados/actualizados (`App.tsx`, `googleCalendarDiff.ts`, `accountDataCleanup.ts`, `gymSchedulePlanner.ts`, `GoogleChangeBanner.tsx`, `GoogleImpactModal.tsx`, `GymScheduleStepContent.tsx`, `GymOnboardingModal.tsx`, `GymTracker.tsx`).
+- **Prueba E2E Playwright (Chromium, modo claro/oscuro y móvil `390x844`):** validados login unificado con Google, limpieza de bloques `cb-1`..`cb-14` preservando Kanban/Universidad/Gym, apertura automática del onboarding Gym en 5 pasos con bloqueo en vivo ante eventos de Google Calendar, creación/push de los 4 bloques con `reminders.overrides`, auto-sync silencioso al volver el foco (`focus`/`visibilitychange`) sin presionar botones, banner `"Sin cruces"` vs `"Dónde choca"`, solución en 1 clic enviando `PATCH` a Google Calendar (bajando conflictos a `0`), espejo inteligente de ediciones desde móvil y cero desbordamiento horizontal ni errores de consola.
+
+### Historial de Verificación Previa (v2.9.0)
 - **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con 0 errores en `462ms`.
 - **Linter Estático:** `npx.cmd oxlint` con 0 advertencias y 0 errores sobre los 15 archivos nuevos/modificados (`types/index.ts`, `googleCalendar.ts`, `reminderPresets.ts`, `ReminderPresetPicker.tsx`, `AuthModal.tsx`, `CalendarTimelineGrid.tsx`, `WeeklyCalendar.tsx`, `QuickAddModal.tsx`, `GoogleCalendarSyncModal.tsx`, `GymOnboardingModal.tsx`, `GymProfileCard.tsx`, `GymMissFlowCard.tsx`, `GymTracker.tsx`, `Navbar.tsx`, `App.tsx`); `oxlint src/` reporta 0 errores y 7 advertencias preexistentes en archivos no tocados.
 - **Prueba E2E Playwright (Chromium):** Flujos 1–7 validados con mocks OAuth2 + Calendar API v3 (`oauthCalls: 1`, `googleEventsCreated: 6`, `googleEventsDeleted: 1`): login unificado con Google (`AuthModal` → avatar + nombre en `Navbar`), eventos externos Google Calendar (`all-day` + horario con icono/badge/alarma) deduplicados por `googleEventId`, filtros y colisiones en carriles separados, creación de bloques con `reminders.overrides` desde `Agendar bloque` y `QuickAddModal`, sincronización semanal de Gym con `Aviso: 1 h antes`, viewport móvil `390x844` sin overflow horizontal (`scrollWidth: 390 === innerWidth: 390`, botón móvil `+ Agregar aquí` de `44px`) y limpieza al cerrar sesión (0 consoleErrors y 0 pageErrors).
