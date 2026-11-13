@@ -6,6 +6,7 @@ import {
   CalendarSync,
   CheckCircle2,
   Clock,
+  Repeat,
   Sparkles,
   Sun,
   Sunset,
@@ -13,16 +14,18 @@ import {
   Trash2,
   Wand2,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek } from '../../types';
+import type { CalendarBlock, DayOfWeek, GymSessionDurationMinutes } from '../../types';
 import type {
   DeleteGoogleGymEventsResult,
   GoogleCalendarEvent,
 } from '../../services/googleCalendar';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import {
+  formatGymDurationLabel,
   getDayFreeSuggestions,
   getDayOccupiedTimeline,
-  MANUAL_GYM_START_OPTIONS,
+  getManualStartOptionsForDuration,
+  GYM_DURATION_OPTIONS,
   type PreferredTrainingPeriod,
   type ScheduledGymSlotDraft,
 } from '../../utils/gymSchedulePlanner';
@@ -40,11 +43,17 @@ export interface GymScheduleStepContentProps {
   selectedDays: DayOfWeek[];
   preferredPeriod: PreferredTrainingPeriod;
   onChangePreferredPeriod: (period: PreferredTrainingPeriod) => void;
+  defaultDurationMinutes: GymSessionDurationMinutes;
+  onChangeDefaultDurationMinutes: (duration: GymSessionDurationMinutes) => void;
   slotDrafts: ScheduledGymSlotDraft[];
   onSelectSlotStart: (
     day: DayOfWeek,
     startTime: string,
     source: 'recommended' | 'custom'
+  ) => void;
+  onSelectSlotDuration: (
+    day: DayOfWeek,
+    durationMinutes: GymSessionDurationMinutes
   ) => void;
   onRecommendAll: () => void;
   calendarBlocks: CalendarBlock[];
@@ -81,8 +90,11 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
   selectedDays,
   preferredPeriod,
   onChangePreferredPeriod,
+  defaultDurationMinutes,
+  onChangeDefaultDurationMinutes,
   slotDrafts,
   onSelectSlotStart,
+  onSelectSlotDuration,
   onRecommendAll,
   calendarBlocks,
   externalBusyByDate,
@@ -143,25 +155,29 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
   return (
     <div className="space-y-5">
       {/* Encabezado + estado Google Calendar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="space-y-1">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div className="space-y-1 min-w-0">
           <div className="flex items-center gap-2 text-[14px] font-medium text-[var(--ink)]">
             <CalendarCheck2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
-            <span>Elige tu horario diario sin cruces (bloques de 2h)</span>
+            <span>Elige tu horario semanal sin cruces</span>
           </div>
           <p className="text-[13px] text-[var(--muted)] leading-relaxed">
-            Comparamos cada día con tu Google Calendar y tus clases/bloques en StudentOS para evitar traslapes.
+            Cada día crea su propia serie recurrente semanal en Google Calendar con la duración exacta que elijas.
           </p>
         </div>
 
-        <div className="shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <span className="t-badge">
+            <Repeat className="w-3.5 h-3.5 shrink-0 text-[var(--action)]" aria-hidden="true" />
+            <span>Serie semanal</span>
+          </span>
           {isGoogleSyncing ? (
             <span role="status" aria-live="polite" className="t-badge t-badge-accent">
               <CalendarSync
                 className="w-3.5 h-3.5 animate-spin motion-reduce:animate-none shrink-0"
                 aria-hidden="true"
               />
-              <span>Sincronizando Google Calendar...</span>
+              <span>Sincronizando Google...</span>
             </span>
           ) : isGoogleConnected ? (
             <span className="t-badge t-badge-ok">
@@ -177,8 +193,8 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
         </div>
       </div>
 
-      {/* Preferencia de franja horaria + botón recomendar */}
-      <div className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3">
+      {/* Preferencia de franja horaria + duración global + botón recomendar */}
+      <div className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] p-4 space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <span className="text-[13px] font-medium text-[var(--ink)]">
             ¿En qué momento prefieres entrenar?
@@ -222,6 +238,38 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
               </button>
             );
           })}
+        </div>
+
+        <div className="pt-3 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink)] min-w-0">
+            <Clock className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+            <span>Duración por sesión (aplicar a todos)</span>
+          </div>
+
+          <div
+            role="group"
+            aria-label="Duración global por sesión"
+            className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5"
+          >
+            {GYM_DURATION_OPTIONS.map((mins) => {
+              const isSelected = defaultDurationMinutes === mins;
+              return (
+                <button
+                  key={`global-duration-${mins}`}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => onChangeDefaultDurationMinutes(mins)}
+                  className={`min-h-[44px] px-3.5 py-2 rounded-[10px] border text-[13px] font-semibold t-num cursor-pointer transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
+                    isSelected
+                      ? 'bg-[var(--action)] text-[var(--action-ink)] border-[var(--action)]'
+                      : 'bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] hover:border-[var(--line-strong)]'
+                  }`}
+                >
+                  {formatGymDurationLabel(mins)}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -301,7 +349,7 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
                   Sobrescribir / reemplazar horario anterior de gimnasio y Google Calendar al guardar
                 </strong>
                 {replacePreviousGymSchedule
-                  ? 'Tus sesiones anteriores de gym (en Google Calendar o locales) no causan auto-cruces al cambiar p. ej. de 07:00–09:00 a 06:00–08:00. Trabajo nocturno, Universidad y otros eventos de Google siguen validándose por día.'
+                  ? 'Tus sesiones anteriores de gym (en Google Calendar o locales) se cortarán desde este lunes (conservando el historial pasado) y no causan auto-cruces al cambiar p. ej. de 07:00–09:00 a 06:00–08:00.'
                   : 'Modo comparación activo: si eliges una hora que choca con tus sesiones anteriores de gym, aparecerá alerta de cruce por cada día.'}
               </span>
             </label>
@@ -366,8 +414,13 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
         {selectedDays.map((day) => {
           const dateIso = weekDates[day] ?? '';
           const draft = slotDrafts.find((item) => item.day === day);
+          const durationMinutes: GymSessionDurationMinutes =
+            draft?.durationMinutes ?? defaultDurationMinutes;
+          const durationLabel = formatGymDurationLabel(durationMinutes);
           const startTime = draft?.startTime ?? '18:00';
-          const endTime = draft?.endTime ?? '20:00';
+          const endTime =
+            draft?.endTime ??
+            minutesToTimeString(timeStringToMinutes(startTime) + durationMinutes);
           const hasConflict = draft?.hasConflict ?? false;
 
           const occupiedItems = getDayOccupiedTimeline({
@@ -382,6 +435,7 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
             day,
             dateIso,
             preferredPeriod,
+            durationMinutes,
             calendarBlocks,
             externalBusyByDate,
             googleEvents,
@@ -389,43 +443,51 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
             limit: 4,
           });
 
+          const manualStartOptions = getManualStartOptionsForDuration(durationMinutes);
           const selectId = `${baseId}-select-${day}`;
+          const durationLabelId = `${baseId}-duration-${day}`;
           const errorId = `${baseId}-error-${day}`;
 
           return (
             <section
               key={day}
               aria-label={`Horario del ${day}`}
-              className={`rounded-[14px] border p-4 space-y-3 transition-colors duration-150 motion-reduce:transition-none ${
+              className={`rounded-[14px] border p-3.5 sm:p-4 space-y-3 transition-colors duration-150 motion-reduce:transition-none ${
                 hasConflict
                   ? 'border-[var(--danger)] bg-[color-mix(in_oklab,var(--danger)_6%,var(--surface))]'
                   : 'border-[var(--line)] bg-[var(--surface)]'
               }`}
             >
               {/* Fila título del día + estado libre/cruce */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <h4 className="text-[15px] font-semibold text-[var(--ink)]">{day}</h4>
                   {dateIso && (
                     <span className="t-num text-[13px] text-[var(--muted)]">{dateIso}</span>
                   )}
                 </div>
 
-                {hasConflict ? (
-                  <span className="t-badge t-badge-danger">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                    <span>
-                      Cruce con {draft?.conflictSource === 'google' ? 'Google' : 'StudentOS'}
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  {hasConflict ? (
+                    <span className="t-badge t-badge-danger !whitespace-normal">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <span>
+                        Cruce con {draft?.conflictSource === 'google' ? 'Google' : 'StudentOS'}
+                      </span>
                     </span>
-                  </span>
-                ) : (
-                  <span className="t-badge t-badge-ok">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                    <span className="t-num">
-                      Elegido: {startTime}–{endTime}
+                  ) : (
+                    <span className="t-badge t-badge-ok !whitespace-normal">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      <span className="t-num">
+                        {startTime}–{endTime} ({durationLabel})
+                      </span>
                     </span>
+                  )}
+                  <span className="t-badge" title="Se repite todas las semanas en Google Calendar">
+                    <Repeat className="w-3 h-3 shrink-0 text-[var(--action)]" aria-hidden="true" />
+                    <span>Semanal</span>
                   </span>
-                )}
+                </div>
               </div>
 
               {/* Tira visual compacta de ocupados reales */}
@@ -465,10 +527,10 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
                 )}
               </div>
 
-              {/* Chips rápidos de huecos libres 2h */}
+              {/* Chips rápidos de huecos libres según duración elegida */}
               <div className="space-y-1.5">
                 <p className="text-[13px] font-medium text-[var(--muted)]">
-                  Huecos libres recomendados (2h):
+                  Huecos libres recomendados ({durationLabel}):
                 </p>
                 {freeSuggestions.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
@@ -497,16 +559,47 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
                   </div>
                 ) : (
                   <p className="text-[13px] text-[var(--warn)]">
-                    No quedan ventanas completas de 2 horas sin cruce entre 06:00 y 22:00 ese día.
+                    No quedan ventanas completas de {durationLabel} sin cruce entre 06:00 y 22:00 ese día. Prueba bajar la duración a 1 h 30 o 1 h.
                   </p>
                 )}
               </div>
 
-              {/* Selector de hora personalizada + validación inline */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--line)] items-end">
-                <div>
+              {/* Selectores por día: Duración (1h / 1h30 / 2h) + Hora de inicio */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2.5 border-t border-[var(--line)] items-end">
+                <div className="md:col-span-5 min-w-0">
+                  <span id={durationLabelId} className="t-label text-[13px]">
+                    Duración ({day})
+                  </span>
+                  <div
+                    role="group"
+                    aria-labelledby={durationLabelId}
+                    className="grid grid-cols-3 gap-1.5"
+                  >
+                    {GYM_DURATION_OPTIONS.map((mins) => {
+                      const isActive = durationMinutes === mins;
+                      return (
+                        <button
+                          key={`${day}-dur-${mins}`}
+                          type="button"
+                          aria-pressed={isActive}
+                          aria-label={`Duración ${day}: ${formatGymDurationLabel(mins)}`}
+                          onClick={() => onSelectSlotDuration(day, mins)}
+                          className={`min-h-[44px] px-2 py-2 rounded-[10px] border text-[13px] font-semibold t-num cursor-pointer transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
+                            isActive
+                              ? 'bg-[var(--action)] text-[var(--action-ink)] border-[var(--action)]'
+                              : 'bg-[var(--surface-2)] text-[var(--ink)] border-[var(--line)] hover:border-[var(--line-strong)]'
+                          }`}
+                        >
+                          {formatGymDurationLabel(mins)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="md:col-span-7 min-w-0">
                   <label htmlFor={selectId} className="t-label text-[13px]">
-                    O escoge tu hora de inicio ({day})
+                    Hora de inicio ({day})
                   </label>
                   <select
                     id={selectId}
@@ -514,27 +607,29 @@ export const GymScheduleStepContent: React.FC<GymScheduleStepContentProps> = ({
                     aria-invalid={hasConflict}
                     aria-describedby={hasConflict ? errorId : undefined}
                     onChange={(e) => onSelectSlotStart(day, e.target.value, 'custom')}
-                    className="t-input t-num min-h-[48px]"
+                    className="t-input t-num min-h-[44px]"
                   >
-                    {MANUAL_GYM_START_OPTIONS.map((optStart) => {
-                      const optEnd = minutesToTimeString(timeStringToMinutes(optStart) + 120);
+                    {manualStartOptions.map((optStart) => {
+                      const optEnd = minutesToTimeString(
+                        timeStringToMinutes(optStart) + durationMinutes
+                      );
                       return (
                         <option key={`${day}-opt-${optStart}`} value={optStart}>
-                          {optStart} – {optEnd} (2 horas)
+                          {optStart} – {optEnd} ({durationLabel})
                         </option>
                       );
                     })}
                   </select>
                 </div>
-
-                <div className="text-[13px] text-[var(--muted)] pb-2 sm:pb-3">
-                  Bloque automático:{' '}
-                  <span className="t-num font-semibold text-[var(--ink)]">
-                    {startTime} – {endTime}
-                  </span>{' '}
-                  (se publicará en Horario y Google Calendar).
-                </div>
               </div>
+
+              <p className="text-[13px] text-[var(--muted)]">
+                Serie semanal:{' '}
+                <span className="t-num font-semibold text-[var(--ink)]">
+                  cada {day} · {startTime} – {endTime} ({durationLabel})
+                </span>{' '}
+                en Google Calendar.
+              </p>
 
               {hasConflict && (
                 <div

@@ -13,12 +13,16 @@ import {
   CalendarCheck2,
   ExternalLink,
   Moon,
+  Repeat,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
-import { isStudentOsGymGoogleEvent } from '../../utils/gymScheduleFilter';
+import {
+  isGoogleEventMirroredByIds,
+  isStudentOsGymGoogleEvent,
+} from '../../utils/gymScheduleFilter';
 import { formatReminderSummary } from '../../utils/reminderPresets';
 import {
   expandCalendarBlocksToSegments,
@@ -174,12 +178,12 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
   // Expand overnight blocks into clean same-day [00:00, 24:00] segments
   const expandedLocalSegments = expandCalendarBlocksToSegments(blocks);
 
-  // Deduplicate Google Calendar events already mirrored onto a local block via googleEventId
+  // Deduplicate Google Calendar events already mirrored onto a local block via googleEventId (or recurringEventId)
   const syncedGoogleIds = new Set(
     blocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
   );
   const externalGoogleEvents = showGoogleEvents
-    ? googleEvents.filter((ev) => !syncedGoogleIds.has(ev.id))
+    ? googleEvents.filter((ev) => !isGoogleEventMirroredByIds(ev, syncedGoogleIds))
     : [];
   const timedExternalGoogle = externalGoogleEvents.filter((ev) => !ev.isAllDay);
   const allDayExternalGoogle = externalGoogleEvents.filter((ev) => ev.isAllDay);
@@ -604,6 +608,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                   if (item.kind === 'google') {
                     const ev = item.event;
                     const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                    const isRecurring = Boolean(ev.recurringEventId);
                     const hasAlarm = Boolean(ev.reminderMinutes && ev.reminderMinutes.length > 0);
                     const cardToneClass = hasConflict
                       ? 'border-solid bg-[color-mix(in_oklab,var(--danger)_12%,var(--surface))] border-[var(--danger)]'
@@ -682,8 +687,14 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                         </div>
 
                         <div className="flex items-center justify-between gap-1 text-[13px] text-[var(--muted)] mt-1 min-w-0 overflow-hidden">
-                          <span className="inline-flex items-center rounded px-1 py-0 text-[13px] font-medium border border-[color-mix(in_oklab,var(--ok)_40%,var(--line))] bg-[var(--surface)] text-[var(--ok)] truncate">
-                            {laneCount >= 3 ? 'G' : 'Google'}
+                          <span
+                            className="inline-flex items-center gap-1 rounded px-1 py-0 text-[13px] font-medium border border-[color-mix(in_oklab,var(--ok)_40%,var(--line))] bg-[var(--surface)] text-[var(--ok)] truncate"
+                            title={isRecurring ? 'Serie recurrente semanal en Google Calendar' : 'Google Calendar'}
+                          >
+                            <span>{laneCount >= 3 ? 'G' : 'Google'}</span>
+                            {isRecurring && laneCount < 3 && (
+                              <Repeat className="w-3 h-3 shrink-0" aria-hidden="true" />
+                            )}
                           </span>
                           {hasAlarm && (
                             <span

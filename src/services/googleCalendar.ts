@@ -1,8 +1,11 @@
-import type { Category, DayOfWeek } from '../types';
+import type { Category, DayOfWeek, WorkShiftConfig } from '../types';
 import type { BusyInterval } from '../utils/calendarSlotFinder';
 import { ORDERED_DAYS } from '../utils/routineGenerator';
 import { isOvernightTimeRange, shiftIsoDate } from '../utils/workSchedule';
-import { isStudentOsGymMetadata } from '../utils/gymScheduleFilter';
+import {
+  isStudentOsGymMetadata,
+  isStudentOsWorkShiftMetadata,
+} from '../utils/gymScheduleFilter';
 
 export const GOOGLE_CLIENT_ID_STORAGE_KEY = 'student_os_gcal_client_id';
 export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
@@ -50,6 +53,9 @@ export interface GoogleCalendarEvent {
   htmlLink?: string;
   reminderMinutes?: number[];
   isStudentOsGym?: boolean;
+  studentOsCategory?: Category;
+  recurringEventId?: string;
+  recurrence?: string[];
 }
 
 export interface UpsertGoogleGymEventParams {
@@ -63,6 +69,7 @@ export interface UpsertGoogleGymEventParams {
   timeZone?: string;
   reminderMinutes?: number[];
   studentOsCategory?: Category;
+  recurrence?: string[];
 }
 
 export interface UpsertGoogleGymEventResult {
@@ -73,6 +80,7 @@ export interface UpsertGoogleGymEventResult {
 export interface DeleteGoogleGymEventsResult {
   status: 'ok' | 'partial' | 'auth_missing' | 'error';
   deletedCount: number;
+  cutSeriesCount?: number;
   failedCount: number;
   deletedIds: string[];
   message: string;
@@ -716,6 +724,8 @@ export async function fetchGoogleEventsAndBusyForWeek(
       location?: string;
       htmlLink?: string;
       transparency?: string;
+      recurringEventId?: string;
+      recurrence?: string[];
       extendedProperties?: {
         private?: Record<string, string>;
       };
@@ -744,10 +754,19 @@ export async function fetchGoogleEventsAndBusyForWeek(
 
     const title = item.summary?.trim() || 'Evento de Google Calendar';
     const description = item.description?.trim() || undefined;
+    const privateProps = item.extendedProperties?.private;
+    const rawCategory = privateProps?.studentOsCategory;
+    const studentOsCategory: Category | undefined =
+      rawCategory === 'universidad' ||
+      rawCategory === 'gym' ||
+      rawCategory === 'trabajo' ||
+      rawCategory === 'personal'
+        ? rawCategory
+        : undefined;
     const isStudentOsGym = isStudentOsGymMetadata({
       title,
       description,
-      privateProps: item.extendedProperties?.private,
+      privateProps,
     });
     const overrideMinutes = (item.reminders?.overrides ?? [])
       .filter((r) => typeof r.minutes === 'number')
@@ -777,6 +796,9 @@ export async function fetchGoogleEventsAndBusyForWeek(
             htmlLink: item.htmlLink,
             reminderMinutes,
             isStudentOsGym,
+            studentOsCategory,
+            recurringEventId: item.recurringEventId,
+            recurrence: item.recurrence,
           });
         }
       }
@@ -821,6 +843,9 @@ export async function fetchGoogleEventsAndBusyForWeek(
             htmlLink: item.htmlLink,
             reminderMinutes,
             isStudentOsGym,
+            studentOsCategory,
+            recurringEventId: item.recurringEventId,
+            recurrence: item.recurrence,
           });
 
           if (blocksAvailability) {
@@ -990,8 +1015,61 @@ function toLocalRfc3339(dateIso: string, timeStr: string): string {
   return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}T${pad(localDate.getHours())}:${pad(localDate.getMinutes())}:00${sign}${offH}:${offM}`;
 }
 
+const GOOGLE_WEEKDAY_BY_DAY: Record<DayOfWeek, string> = {
+  Lunes: 'MO',
+  Martes: 'TU',
+  Miércoles: 'WE',
+  Jueves: 'TH',
+  Viernes: 'FR',
+  Sábado: 'SA',
+  Domingo: 'SU',
+};
+
 /**
- * Creates or updates a 2-hour gym (or schedule) event in the user's primary Google Calendar.
+ * Builds an RFC 5545 weekly RRULE array in ordered weekday sequence.
+ */
+export function buildWeeklyRecurrenceRule(days: DayOfWeek[], untilUtc?: string): string[] {
+  const orderedUniqueDays = ORDERED_DAYS.filter((day) => days.includes(day));
+  if (orderedUniqueDays.length === 0) return [];
+  const byDay = orderedUniqueDays.map((day) => GOOGLE_WEEKDAY_BY_DAY[day]).join(',');
+  const base = `RRULE:FREQ=WEEKLY;BYDAY=${byDay}`;
+  return [untilUtc ? `${base};UNTIL=${untilUtc}` : base];
+}
+
+/**
+ * Formats 1 second before Monday 00:00:00 local time as UTC RFC 5545 UNTIL timestamp (YYYYMMDDTHHMMSSZ)
+ * so cutting a recurring series before current Monday preserves all previous weeks intact.
+ */
+export function formatPrevSundayUntilUtc(mondayIso: string): string {
+  const { year, month, day } = parseLocalDateParts(mondayIso);
+  const cutoff = new Date(year, month - 1, day, 0, 0, -1, 0);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${cutoff.getUTCFullYear()}${pad(cutoff.getUTCMonth() + 1)}${pad(cutoff.getUTCDate())}T${pad(cutoff.getUTCHours())}${pad(cutoff.getUTCMinutes())}${pad(cutoff.getUTCSeconds())}Z`;
+}
+
+function applyUntilToRecurrenceRules(
+  recurrence: string[] | undefined,
+  untilUtc: string,
+  fallbackDayCode = 'MO'
+): string[] {
+  const sourceLines = recurrence && recurrence.length > 0 ? recurrence : [];
+  let updatedRrule = false;
+  const nextLines = sourceLines.map((line) => {
+    if (!line.toUpperCase().startsWith('RRULE:')) return line;
+    updatedRrule = true;
+    const cleaned = line
+      .replace(/;UNTIL=[^;]+/gi, '')
+      .replace(/;COUNT=[^;]+/gi, '');
+    return `${cleaned};UNTIL=${untilUtc}`;
+  });
+  if (!updatedRrule) {
+    nextLines.unshift(`RRULE:FREQ=WEEKLY;BYDAY=${fallbackDayCode};UNTIL=${untilUtc}`);
+  }
+  return nextLines;
+}
+
+/**
+ * Creates or updates a gym (or schedule) event or weekly recurring series in the user's primary Google Calendar.
  */
 export async function upsertGoogleGymEvent(
   accessToken: string,
@@ -1011,6 +1089,7 @@ export async function upsertGoogleGymEvent(
     description: string;
     start: { dateTime: string; timeZone: string };
     end: { dateTime: string; timeZone: string };
+    recurrence?: string[];
     extendedProperties?: {
       private: {
         studentOsSource: string;
@@ -1033,6 +1112,9 @@ export async function upsertGoogleGymEvent(
       dateTime: toLocalRfc3339(resolvedEndDateIso, params.endTime),
       timeZone,
     },
+    ...(params.recurrence && params.recurrence.length > 0
+      ? { recurrence: params.recurrence }
+      : {}),
     ...(params.studentOsCategory
       ? {
           extendedProperties: {
@@ -1138,21 +1220,117 @@ export async function deleteGoogleGymEvent(accessToken: string, eventId: string)
   );
 }
 
-/**
- * Queries Google Calendar from Monday of the current week through +8 weeks ahead and
- * deletes every StudentOS Gym event (both explicitly linked IDs and legacy/orphaned "Gym:" events).
- * Never swallows expired-session or API errors silently so callers can show honest UI feedback.
- */
-export async function deleteStudentOsGymEventsFromMonday(
+interface RawGoogleEventItem {
+  id?: string;
+  status?: string;
+  summary?: string;
+  description?: string;
+  recurringEventId?: string;
+  recurrence?: string[];
+  originalStartTime?: { dateTime?: string; date?: string };
+  start?: { dateTime?: string; date?: string };
+  extendedProperties?: {
+    private?: Record<string, string>;
+  };
+}
+
+interface MatchedInstanceRef {
+  id: string;
+  startMs: number;
+  originalStartMs: number;
+}
+
+function getGoogleEventStartMs(start?: { dateTime?: string; date?: string }): number {
+  if (start?.dateTime) return parseIsoInstantMs(start.dateTime);
+  if (start?.date) {
+    const { year, month, day } = parseLocalDateParts(start.date);
+    return new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
+  }
+  return Number.NaN;
+}
+
+async function fetchSingleGoogleEvent(
   accessToken: string,
-  weekDates: Record<DayOfWeek, string>,
-  extraLinkedIds: Iterable<string> = [],
-  excludeIds: Iterable<string> = []
-): Promise<DeleteGoogleGymEventsResult> {
+  eventId: string
+): Promise<RawGoogleEventItem | null> {
+  const response = await fetch(
+    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+  if (response.status === 404 || response.status === 410) {
+    return null;
+  }
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw buildErrorFromGoogleResponse(
+      response.status,
+      errText,
+      'No se pudo leer la serie recurrente en Google Calendar'
+    );
+  }
+  return (await response.json()) as RawGoogleEventItem;
+}
+
+async function patchGoogleEventRecurrence(
+  accessToken: string,
+  eventId: string,
+  recurrence: string[]
+): Promise<void> {
+  const response = await fetch(
+    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ recurrence }),
+    }
+  );
+
+  if (response.status === 404 || response.status === 410) {
+    return;
+  }
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw buildErrorFromGoogleResponse(
+      response.status,
+      errText,
+      'No se pudo acortar la serie recurrente en Google Calendar'
+    );
+  }
+}
+
+async function clearOrCutoffStudentOsEventsFromMonday(params: {
+  accessToken: string;
+  weekDates: Record<DayOfWeek, string>;
+  matcher: (item: {
+    title?: string;
+    description?: string;
+    privateProps?: Record<string, string>;
+  }) => boolean;
+  extraLinkedIds?: Iterable<string>;
+  excludeIds?: Iterable<string>;
+  entityLabel: 'gym' | 'turno laboral';
+}): Promise<DeleteGoogleGymEventsResult> {
+  const {
+    accessToken,
+    weekDates,
+    matcher,
+    extraLinkedIds = [],
+    excludeIds = [],
+    entityLabel,
+  } = params;
+
   if (!accessToken.trim()) {
     return {
       status: 'auth_missing',
       deletedCount: 0,
+      cutSeriesCount: 0,
       failedCount: 0,
       deletedIds: [],
       message:
@@ -1165,6 +1343,7 @@ export async function deleteStudentOsGymEventsFromMonday(
     return {
       status: 'ok',
       deletedCount: 0,
+      cutSeriesCount: 0,
       failedCount: 0,
       deletedIds: [],
       message: 'No se pudo determinar el lunes de la semana actual.',
@@ -1173,7 +1352,9 @@ export async function deleteStudentOsGymEventsFromMonday(
 
   const { year, month, day } = parseLocalDateParts(mondayIso);
   const windowStartLocal = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const windowStartMs = windowStartLocal.getTime();
   const windowEndLocal = new Date(year, month - 1, day + 57, 0, 0, 0, 0); // Monday -> +8 semanas
+  const untilUtc = formatPrevSundayUntilUtc(mondayIso);
 
   const query = new URLSearchParams({
     timeMin: windowStartLocal.toISOString(),
@@ -1189,11 +1370,15 @@ export async function deleteStudentOsGymEventsFromMonday(
     if (id.trim()) excludeSet.add(id.trim());
   }
 
-  const targetIds = new Set<string>();
+  const linkedSet = new Set<string>();
   for (const id of extraLinkedIds) {
     const trimmed = id.trim();
-    if (trimmed && !excludeSet.has(trimmed)) targetIds.add(trimmed);
+    if (trimmed && !excludeSet.has(trimmed)) linkedSet.add(trimmed);
   }
+
+  const standaloneIds = new Set<string>();
+  const masterToInstances = new Map<string, MatchedInstanceRef[]>();
+  const seenListedIds = new Set<string>();
 
   try {
     const listResp = await fetch(
@@ -1215,42 +1400,55 @@ export async function deleteStudentOsGymEventsFromMonday(
       return {
         status: listResp.status === 401 ? 'auth_missing' : 'error',
         deletedCount: 0,
-        failedCount: targetIds.size,
+        cutSeriesCount: 0,
+        failedCount: linkedSet.size,
         deletedIds: [],
         message: parsedErr.message,
       };
     }
 
-    const listData = (await listResp.json()) as {
-      items?: Array<{
-        id?: string;
-        status?: string;
-        summary?: string;
-        description?: string;
-        extendedProperties?: {
-          private?: Record<string, string>;
-        };
-      }>;
-    };
+    const listData = (await listResp.json()) as { items?: RawGoogleEventItem[] };
 
     for (const item of listData.items ?? []) {
-      if (!item.id || item.status === 'cancelled' || excludeSet.has(item.id)) continue;
+      if (!item.id || item.status === 'cancelled') continue;
+      seenListedIds.add(item.id);
+      if (item.recurringEventId) seenListedIds.add(item.recurringEventId);
+
       if (
-        targetIds.has(item.id) ||
-        isStudentOsGymMetadata({
+        excludeSet.has(item.id) ||
+        (item.recurringEventId && excludeSet.has(item.recurringEventId))
+      ) {
+        continue;
+      }
+
+      const matches =
+        linkedSet.has(item.id) ||
+        (item.recurringEventId ? linkedSet.has(item.recurringEventId) : false) ||
+        matcher({
           title: item.summary,
           description: item.description,
           privateProps: item.extendedProperties?.private,
-        })
-      ) {
-        targetIds.add(item.id);
+        });
+
+      if (!matches) continue;
+
+      const startMs = getGoogleEventStartMs(item.start);
+      const originalStartMs = getGoogleEventStartMs(item.originalStartTime);
+
+      if (item.recurringEventId) {
+        const list = masterToInstances.get(item.recurringEventId) ?? [];
+        list.push({ id: item.id, startMs, originalStartMs });
+        masterToInstances.set(item.recurringEventId, list);
+      } else if (!Number.isFinite(startMs) || startMs >= windowStartMs) {
+        standaloneIds.add(item.id);
       }
     }
   } catch (err) {
     return {
       status: 'error',
       deletedCount: 0,
-      failedCount: targetIds.size,
+      cutSeriesCount: 0,
+      failedCount: linkedSet.size,
       deletedIds: [],
       message:
         err instanceof Error
@@ -1259,34 +1457,145 @@ export async function deleteStudentOsGymEventsFromMonday(
     };
   }
 
-  if (targetIds.size === 0) {
+  // Inspect linked IDs not present in the [Monday, +8 weeks] expansion (e.g. stored master IDs)
+  for (const linkedId of linkedSet) {
+    if (
+      seenListedIds.has(linkedId) ||
+      standaloneIds.has(linkedId) ||
+      masterToInstances.has(linkedId)
+    ) {
+      continue;
+    }
+    try {
+      const fetched = await fetchSingleGoogleEvent(accessToken, linkedId);
+      if (!fetched || !fetched.id || fetched.status === 'cancelled') continue;
+      if (Array.isArray(fetched.recurrence) && fetched.recurrence.length > 0) {
+        if (!masterToInstances.has(fetched.id)) {
+          masterToInstances.set(fetched.id, []);
+        }
+      } else if (fetched.recurringEventId && !excludeSet.has(fetched.recurringEventId)) {
+        const list = masterToInstances.get(fetched.recurringEventId) ?? [];
+        list.push({
+          id: fetched.id,
+          startMs: getGoogleEventStartMs(fetched.start),
+          originalStartMs: getGoogleEventStartMs(fetched.originalStartTime),
+        });
+        masterToInstances.set(fetched.recurringEventId, list);
+      } else {
+        const startMs = getGoogleEventStartMs(fetched.start);
+        if (!Number.isFinite(startMs) || startMs >= windowStartMs) {
+          standaloneIds.add(fetched.id);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('expiró')) {
+        return {
+          status: 'auth_missing',
+          deletedCount: 0,
+          cutSeriesCount: 0,
+          failedCount: linkedSet.size,
+          deletedIds: [],
+          message: msg,
+        };
+      }
+    }
+  }
+
+  if (masterToInstances.size === 0 && standaloneIds.size === 0) {
     return {
       status: 'ok',
       deletedCount: 0,
+      cutSeriesCount: 0,
       failedCount: 0,
       deletedIds: [],
-      message:
-        'No quedaban eventos anteriores de gym en Google Calendar (desde esta semana hasta +8 semanas).',
+      message: `No quedaban eventos anteriores de ${entityLabel} en Google Calendar desde esta semana.`,
     };
   }
 
-  const deletedIds: string[] = [];
+  const processedIds: string[] = [];
+  let cutSeriesCount = 0;
   let failedCount = 0;
   let lastErrorMessage = '';
+  const idsToDelete = new Set<string>(standaloneIds);
 
-  for (const eventId of targetIds) {
+  for (const [masterId, instances] of masterToInstances.entries()) {
+    try {
+      const master = await fetchSingleGoogleEvent(accessToken, masterId);
+      if (!master) {
+        for (const inst of instances) {
+          if (!Number.isFinite(inst.startMs) || inst.startMs >= windowStartMs) {
+            idsToDelete.add(inst.id);
+          }
+        }
+        continue;
+      }
+
+      const masterStartMs = getGoogleEventStartMs(master.start);
+      if (Number.isFinite(masterStartMs) && masterStartMs < windowStartMs) {
+        // Started before this Monday: trim via UNTIL on Sunday 23:59:59 so prior weeks remain intact
+        const nextRecurrence = applyUntilToRecurrenceRules(master.recurrence, untilUtc);
+        await patchGoogleEventRecurrence(accessToken, masterId, nextRecurrence);
+        cutSeriesCount += 1;
+        processedIds.push(masterId);
+
+        for (const inst of instances) {
+          const isDetachedFutureModification =
+            Number.isFinite(inst.startMs) &&
+            inst.startMs >= windowStartMs &&
+            Number.isFinite(inst.originalStartMs) &&
+            inst.originalStartMs !== inst.startMs;
+          if (isDetachedFutureModification) {
+            idsToDelete.add(inst.id);
+          }
+        }
+      } else {
+        // Started this Monday or later: safe to delete the entire recurring series cleanly
+        idsToDelete.add(masterId);
+        for (const inst of instances) {
+          const isDetachedFutureModification =
+            Number.isFinite(inst.startMs) &&
+            inst.startMs >= windowStartMs &&
+            Number.isFinite(inst.originalStartMs) &&
+            inst.originalStartMs !== inst.startMs;
+          if (isDetachedFutureModification && inst.id !== masterId) {
+            idsToDelete.add(inst.id);
+          }
+        }
+      }
+    } catch (err) {
+      failedCount += 1;
+      lastErrorMessage =
+        err instanceof Error ? err.message : `Error al actualizar serie de ${entityLabel}.`;
+      if (lastErrorMessage.includes('expiró')) {
+        return {
+          status: 'auth_missing',
+          deletedCount: processedIds.length,
+          cutSeriesCount,
+          failedCount: masterToInstances.size + idsToDelete.size - processedIds.length,
+          deletedIds: processedIds,
+          message:
+            lastErrorMessage ||
+            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+        };
+      }
+    }
+  }
+
+  for (const eventId of idsToDelete) {
     try {
       await deleteGoogleGymEvent(accessToken, eventId);
-      deletedIds.push(eventId);
+      processedIds.push(eventId);
     } catch (err) {
       failedCount += 1;
       lastErrorMessage = err instanceof Error ? err.message : 'Error al eliminar evento en Google.';
       if (lastErrorMessage.includes('expiró')) {
         return {
           status: 'auth_missing',
-          deletedCount: deletedIds.length,
-          failedCount: targetIds.size - deletedIds.length,
-          deletedIds,
+          deletedCount: processedIds.length,
+          cutSeriesCount,
+          failedCount: idsToDelete.size - processedIds.length,
+          deletedIds: processedIds,
           message:
             lastErrorMessage ||
             'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
@@ -1297,19 +1606,117 @@ export async function deleteStudentOsGymEventsFromMonday(
 
   if (failedCount > 0) {
     return {
-      status: deletedIds.length > 0 ? 'partial' : 'error',
-      deletedCount: deletedIds.length,
+      status: processedIds.length > 0 ? 'partial' : 'error',
+      deletedCount: processedIds.length,
+      cutSeriesCount,
       failedCount,
-      deletedIds,
-      message: `Se borraron ${deletedIds.length} evento(s) en Google Calendar, pero fallaron ${failedCount}: ${lastErrorMessage}`,
+      deletedIds: processedIds,
+      message: `Se limpiaron ${processedIds.length} serie(s)/evento(s) de ${entityLabel}, pero fallaron ${failedCount}: ${lastErrorMessage}`,
     };
+  }
+
+  const deletedOnlyCount = processedIds.length - cutSeriesCount;
+  const summaryParts: string[] = [];
+  if (cutSeriesCount > 0) {
+    summaryParts.push(
+      `${cutSeriesCount} serie(s) previa(s) cortada(s) conservando historial anterior`
+    );
+  }
+  if (deletedOnlyCount > 0) {
+    summaryParts.push(`${deletedOnlyCount} evento(s)/serie(s) eliminados desde esta semana`);
   }
 
   return {
     status: 'ok',
-    deletedCount: deletedIds.length,
+    deletedCount: processedIds.length,
+    cutSeriesCount,
     failedCount: 0,
-    deletedIds,
-    message: `Se eliminaron ${deletedIds.length} evento(s) de gym en Google Calendar (desde esta semana hasta +8 semanas).`,
+    deletedIds: processedIds,
+    message:
+      summaryParts.length > 0
+        ? `Google Calendar actualizado (${summaryParts.join(' y ')}).`
+        : `No quedaban eventos anteriores de ${entityLabel} en Google Calendar.`,
   };
+}
+
+/**
+ * Cuts recurring StudentOS Gym series started before current Monday using UNTIL (preserving history)
+ * and deletes current/future recurring series or standalone Gym events from Monday onward.
+ */
+export async function deleteStudentOsGymEventsFromMonday(
+  accessToken: string,
+  weekDates: Record<DayOfWeek, string>,
+  extraLinkedIds: Iterable<string> = [],
+  excludeIds: Iterable<string> = []
+): Promise<DeleteGoogleGymEventsResult> {
+  return clearOrCutoffStudentOsEventsFromMonday({
+    accessToken,
+    weekDates,
+    matcher: isStudentOsGymMetadata,
+    extraLinkedIds,
+    excludeIds,
+    entityLabel: 'gym',
+  });
+}
+
+/**
+ * Cuts recurring StudentOS Work Shift series started before current Monday using UNTIL (preserving history)
+ * and deletes current/future work-shift events from Monday onward.
+ */
+export async function clearOrCutoffWorkShiftEventsFromMonday(
+  accessToken: string,
+  weekDates: Record<DayOfWeek, string>,
+  extraLinkedIds: Iterable<string> = [],
+  excludeIds: Iterable<string> = []
+): Promise<DeleteGoogleGymEventsResult> {
+  return clearOrCutoffStudentOsEventsFromMonday({
+    accessToken,
+    weekDates,
+    matcher: isStudentOsWorkShiftMetadata,
+    extraLinkedIds,
+    excludeIds,
+    entityLabel: 'turno laboral',
+  });
+}
+
+/**
+ * Creates a weekly RRULE recurring work shift series in Google Calendar matching active work days
+ * (respecting restDay via BYDAY and overnight end date rollover +1 day).
+ */
+export async function upsertWorkShiftRecurringSeries(
+  accessToken: string,
+  params: {
+    workShift: WorkShiftConfig;
+    weekDates: Record<DayOfWeek, string>;
+  }
+): Promise<UpsertGoogleGymEventResult> {
+  const { workShift, weekDates } = params;
+  const workDays = ORDERED_DAYS.filter((day) => day !== workShift.restDay);
+  if (workDays.length === 0) {
+    throw new Error('No hay días laborales activos para sincronizar con Google Calendar.');
+  }
+
+  const anchorDay = workDays.find((day) => Boolean(weekDates[day])) ?? workDays[0];
+  const anchorDateIso = weekDates[anchorDay];
+  if (!anchorDateIso) {
+    throw new Error('No se pudo determinar la fecha inicial de la semana para el turno.');
+  }
+
+  const recurrence = buildWeeklyRecurrenceRule(workDays);
+  const restLabel = workShift.restDay ? `descanso ${workShift.restDay}` : '7 días';
+  const overnightNote = isOvernightTimeRange(workShift.startTime, workShift.endTime)
+    ? ' (cruza medianoche +1 día)'
+    : '';
+
+  return upsertGoogleGymEvent(accessToken, {
+    title: workShift.title.trim() || 'Trabajo nocturno',
+    dateIso: anchorDateIso,
+    startTime: workShift.startTime,
+    endTime: workShift.endTime,
+    location: workShift.location?.trim() || undefined,
+    description: `Turno laboral recurrente${overnightNote} · ${restLabel}. Sincronizado desde StudentOS PRO MAX.`,
+    reminderMinutes: workShift.reminderMinutes ?? [30],
+    studentOsCategory: 'trabajo',
+    recurrence,
+  });
 }

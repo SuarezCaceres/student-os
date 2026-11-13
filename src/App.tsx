@@ -34,6 +34,7 @@ import {
   applyRealAccountCalendarCleanup,
 } from './utils/accountDataCleanup';
 import {
+  WORK_SHIFT_BLOCK_ID_PREFIX,
   WORK_SHIFT_INIT_FLAG_KEY,
   applyWorkShiftConfigToBlocks,
   ensureDefaultWorkShiftForRealAccount,
@@ -51,6 +52,8 @@ import {
   type RescheduleMode,
 } from './utils/gymAttendance';
 import {
+  buildWeeklyRecurrenceRule,
+  clearOrCutoffWorkShiftEventsFromMonday,
   connectGoogleCalendar,
   deleteGoogleGymEvent,
   deleteStudentOsGymEventsFromMonday,
@@ -61,14 +64,20 @@ import {
   trySilentGoogleReconnect,
   upsertGoogleCalendarEvent,
   upsertGoogleGymEvent,
+  upsertWorkShiftRecurringSeries,
   type DeleteGoogleGymEventsResult,
   type GoogleCalendarEvent,
 } from './services/googleCalendar';
 import {
   buildGymCalendarBlockPayload,
   findFreeTwoHourSlots,
+  timeStringToMinutes,
   type BusyInterval,
 } from './utils/calendarSlotFinder';
+import {
+  formatGymDurationLabel,
+  normalizeGymDurationMinutes,
+} from './utils/gymSchedulePlanner';
 import { WeeklyCalendar } from './components/calendar/WeeklyCalendar';
 import { GoogleCalendarSyncModal } from './components/calendar/GoogleCalendarSyncModal';
 import { GoogleChangeBanner } from './components/calendar/GoogleChangeBanner';
@@ -842,7 +851,7 @@ export const App: React.FC = () => {
             calendarBlocks: workingBlocks,
             externalBusyByDate: googleBusyByDateRef.current,
             weekDates,
-            preferredDurationMinutes: 120,
+            preferredDurationMinutes: state.gymProfile?.defaultSessionMinutes ?? 120,
             limit: 1,
             hasGoogleSync: true,
           });
@@ -855,16 +864,19 @@ export const App: React.FC = () => {
           existingGoogle?.title ??
           (/^(gym|gimnasio)\b/i.test(routine.name) ? routine.name : `Gym: ${routine.name}`);
 
+        const targetExistingId = existingLocal?.googleEventId ?? existingGoogle?.id;
         await upsertGoogleGymEvent(token, {
-          eventId: existingLocal?.googleEventId ?? existingGoogle?.id,
+          eventId: targetExistingId,
           title,
           dateIso,
           startTime,
           endTime,
           location: existingLocal?.location ?? existingGoogle?.location ?? gymLocation,
-          description: `Sesión semanal de entrenamiento (${routine.tag}) programada desde StudentOS.`,
-          reminderMinutes: existingLocal?.reminderMinutes ?? existingGoogle?.reminderMinutes ?? reminderMinutes,
+          description: `Sesión semanal recurrente (${routine.tag}) programada desde StudentOS.`,
+          reminderMinutes:
+            existingLocal?.reminderMinutes ?? existingGoogle?.reminderMinutes ?? reminderMinutes,
           studentOsCategory: 'gym',
+          ...(targetExistingId ? {} : { recurrence: buildWeeklyRecurrenceRule([day]) }),
         });
       }
 
@@ -920,12 +932,20 @@ export const App: React.FC = () => {
 
   const handleClearPreviousGymBlocks = useCallback(async (): Promise<DeleteGoogleGymEventsResult> => {
     const existingGymBlocks = calendarBlocksRef.current.filter((b) => b.category === 'gym');
-    const extraLinkedIds = existingGymBlocks
-      .map((b) => b.googleEventId)
-      .filter((id): id is string => Boolean(id));
-    const hadGoogleGymInCache = googleEventsRef.current.some((ev) =>
+    const cachedGoogleGymEvents = googleEventsRef.current.filter((ev) =>
       isStudentOsGymGoogleEvent(ev)
     );
+    const extraLinkedIds = Array.from(
+      new Set([
+        ...existingGymBlocks
+          .map((b) => b.googleEventId)
+          .filter((id): id is string => Boolean(id)),
+        ...cachedGoogleGymEvents.flatMap((ev) =>
+          ev.recurringEventId ? [ev.recurringEventId, ev.id] : [ev.id]
+        ),
+      ])
+    );
+    const hadGoogleGymInCache = cachedGoogleGymEvents.length > 0;
     const hasGoogleLink =
       isGoogleConnected || getStoredGoogleMeta().connected || Boolean(getStoredAccessToken());
 
@@ -949,6 +969,7 @@ export const App: React.FC = () => {
         return {
           status: 'auth_missing',
           deletedCount: 0,
+          cutSeriesCount: 0,
           failedCount: 0,
           deletedIds: [],
           message: msg,
@@ -958,6 +979,7 @@ export const App: React.FC = () => {
       return {
         status: 'ok',
         deletedCount: existingGymBlocks.length,
+        cutSeriesCount: 0,
         failedCount: 0,
         deletedIds: [],
         message:
@@ -975,7 +997,10 @@ export const App: React.FC = () => {
 
     if (result.deletedIds.length > 0) {
       const deletedSet = new Set(result.deletedIds);
-      const deletedEventsInCache = googleEventsRef.current.filter((ev) => deletedSet.has(ev.id));
+      const matchesDeleted = (ev: GoogleCalendarEvent) =>
+        deletedSet.has(ev.id) ||
+        Boolean(ev.recurringEventId && deletedSet.has(ev.recurringEventId));
+      const deletedEventsInCache = googleEventsRef.current.filter(matchesDeleted);
       const { filteredBusyByDate } = stripMatchingGymSources({
         gymBlocks: existingGymBlocks,
         googleEvents: deletedEventsInCache,
@@ -984,7 +1009,7 @@ export const App: React.FC = () => {
         includeOrphanGoogleGymEvents: true,
       });
 
-      const nextEvents = googleEventsRef.current.filter((ev) => !deletedSet.has(ev.id));
+      const nextEvents = googleEventsRef.current.filter((ev) => !matchesDeleted(ev));
       googleEventsRef.current = nextEvents;
       setGoogleEvents(nextEvents);
       saveGoogleEventsSnapshot(nextEvents);
@@ -1038,29 +1063,10 @@ export const App: React.FC = () => {
         ? payload.generatedRoutines
         : state.gymRoutines;
 
-      // Match reusable Google Event IDs per current-week day so unchanged days update in place cleanly
-      const reusableGoogleByDay = new Map<DayOfWeek, { id: string; htmlLink?: string }>();
-      if (shouldReplacePreviousGym) {
-        for (const ev of previousGoogleGymEvents) {
-          const dayIso = weekDates[ev.day];
-          if ((!dayIso || ev.dateIso === dayIso) && !reusableGoogleByDay.has(ev.day)) {
-            reusableGoogleByDay.set(ev.day, { id: ev.id, htmlLink: ev.htmlLink });
-          }
-        }
-        for (const localBlock of previousLocalGymBlocks) {
-          if (localBlock.googleEventId && !reusableGoogleByDay.has(localBlock.day)) {
-            reusableGoogleByDay.set(localBlock.day, {
-              id: localBlock.googleEventId,
-              htmlLink: localBlock.googleHtmlLink,
-            });
-          }
-        }
-      }
-
       const scheduledItems: Array<{
         block: CalendarBlock;
         dateIso: string;
-        reuseEventId?: string;
+        durationMinutes: number;
       }> = [];
 
       if (slots.length > 0) {
@@ -1070,9 +1076,10 @@ export const App: React.FC = () => {
           seenDays.add(slot.day);
 
           const routineForDay = effectiveRoutines.find((r) => r.dayOfWeek === slot.day);
-          const reusedGoogle = shouldReplacePreviousGym
-            ? reusableGoogleByDay.get(slot.day)
-            : undefined;
+          const durationMinutes = normalizeGymDurationMinutes(
+            slot.durationMinutes ??
+              timeStringToMinutes(slot.endTime) - timeStringToMinutes(slot.startTime)
+          );
           const builtBlock: CalendarBlock = {
             ...buildGymCalendarBlockPayload({
               day: slot.day,
@@ -1080,9 +1087,7 @@ export const App: React.FC = () => {
               endTime: slot.endTime,
               routineName: routineForDay?.name ?? `Entrenamiento ${slot.day}`,
               gymLocation,
-              googleEventId: reusedGoogle?.id,
             }),
-            googleHtmlLink: reusedGoogle?.htmlLink,
             reminderMinutes,
             syncWithGoogle: hasGoogleLink,
           };
@@ -1090,7 +1095,7 @@ export const App: React.FC = () => {
           scheduledItems.push({
             block: builtBlock,
             dateIso: slot.dateIso || weekDates[slot.day] || today,
-            reuseEventId: reusedGoogle?.id,
+            durationMinutes,
           });
         }
       }
@@ -1171,15 +1176,15 @@ export const App: React.FC = () => {
         for (const item of scheduledItems) {
           try {
             const saved = await upsertGoogleGymEvent(activeToken, {
-              eventId: item.reuseEventId,
               title: item.block.title,
               dateIso: item.dateIso,
               startTime: item.block.startTime,
               endTime: item.block.endTime,
               location: item.block.location,
-              description: `Sesión de gimnasio configurada en StudentOS (${item.block.day}).`,
+              description: `Sesión semanal recurrente de ${formatGymDurationLabel(item.durationMinutes)} configurada en StudentOS (${item.block.day}).`,
               reminderMinutes,
               studentOsCategory: 'gym',
+              recurrence: buildWeeklyRecurrenceRule([item.block.day]),
             });
             savedGoogleIds.push(saved.eventId);
           } catch (err) {
@@ -1195,10 +1200,20 @@ export const App: React.FC = () => {
         }
 
         let cleanupResult: DeleteGoogleGymEventsResult | null = null;
-        if (shouldReplacePreviousGym) {
-          const extraLinkedIds = previousLocalGymBlocks
-            .map((b) => b.googleEventId)
-            .filter((id): id is string => Boolean(id));
+        if (
+          shouldReplacePreviousGym &&
+          (savedGoogleIds.length > 0 || scheduledItems.length === 0)
+        ) {
+          const extraLinkedIds = Array.from(
+            new Set([
+              ...previousLocalGymBlocks
+                .map((b) => b.googleEventId)
+                .filter((id): id is string => Boolean(id)),
+              ...previousGoogleGymEvents.flatMap((ev) =>
+                ev.recurringEventId ? [ev.recurringEventId, ev.id] : [ev.id]
+              ),
+            ])
+          );
           cleanupResult = await deleteStudentOsGymEventsFromMonday(
             activeToken,
             weekDates,
@@ -1458,8 +1473,23 @@ export const App: React.FC = () => {
           // Ignore storage errors
         }
 
+        const extraLinkedWorkIds = new Set<string>();
+        for (const block of calendarBlocksRef.current) {
+          if (block.id.startsWith(WORK_SHIFT_BLOCK_ID_PREFIX) && block.googleEventId) {
+            extraLinkedWorkIds.add(block.googleEventId);
+          }
+        }
+        for (const ev of googleEventsRef.current) {
+          if (ev.studentOsCategory === 'trabajo') {
+            extraLinkedWorkIds.add(ev.recurringEventId || ev.id);
+          }
+        }
+
         const { blocks: updatedBlocks, removedGoogleEventIds, shiftBlocks } =
           applyWorkShiftConfigToBlocks(calendarBlocksRef.current, nextConfig);
+        for (const id of removedGoogleEventIds) {
+          extraLinkedWorkIds.add(id);
+        }
 
         calendarBlocksRef.current = updatedBlocks;
         setState((prev) => ({
@@ -1468,77 +1498,87 @@ export const App: React.FC = () => {
           calendarBlocks: updatedBlocks,
         }));
 
+        const hasGoogleLink =
+          isGoogleConnected || getStoredGoogleMeta().connected || Boolean(getStoredAccessToken());
         const activeToken =
-          getStoredAccessToken() || (isGoogleConnected ? await trySilentGoogleReconnect() : null);
+          getStoredAccessToken() || (hasGoogleLink ? await trySilentGoogleReconnect() : null);
 
-        if (activeToken && removedGoogleEventIds.length > 0) {
-          const removedSet = new Set(removedGoogleEventIds);
-          const nextEvents = googleEventsRef.current.filter((ev) => !removedSet.has(ev.id));
-          googleEventsRef.current = nextEvents;
-          setGoogleEvents(nextEvents);
-          saveGoogleEventsSnapshot(nextEvents);
-          for (const eventId of removedGoogleEventIds) {
-            try {
-              await deleteGoogleGymEvent(activeToken, eventId);
-            } catch {
-              // Ignore deletion errors for already-removed Google events
-            }
-          }
-        }
-
-        if (options.syncToGoogle && nextConfig.enabled && activeToken && shiftBlocks.length > 0) {
-          const syncedMetaByBlockId = new Map<string, { eventId: string; htmlLink?: string }>();
-          for (const shiftBlock of shiftBlocks) {
-            const dateIso = weekDates[shiftBlock.day];
-            if (!dateIso) continue;
-            try {
-              const saved = await upsertGoogleCalendarEvent(activeToken, {
-                eventId: shiftBlock.googleEventId,
-                title: shiftBlock.title,
-                dateIso,
-                startTime: shiftBlock.startTime,
-                endTime: shiftBlock.endTime,
-                location: shiftBlock.location,
-                description: `Turno laboral recurrente configurado en StudentOS (${shiftBlock.day}).`,
-                reminderMinutes: nextConfig.reminderMinutes ?? [30],
-                studentOsCategory: 'trabajo',
+        if (options.syncToGoogle && nextConfig.enabled && shiftBlocks.length > 0) {
+          if (!activeToken) {
+            if (hasGoogleLink) {
+              setGoogleActionBanner({
+                tone: 'warn',
+                text: 'Tu sesión de Google Calendar expiró. El turno laboral quedó guardado localmente; reconecta en Google Sync para publicar su serie recurrente.',
+                showSyncButton: true,
               });
-              syncedMetaByBlockId.set(shiftBlock.id, saved);
-            } catch {
-              // Keep local shift block intact if Google push fails
             }
+            return;
           }
 
-          if (syncedMetaByBlockId.size > 0) {
+          try {
+            const savedSeries = await upsertWorkShiftRecurringSeries(activeToken, {
+              workShift: nextConfig,
+              weekDates,
+            });
+
+            await clearOrCutoffWorkShiftEventsFromMonday(
+              activeToken,
+              weekDates,
+              extraLinkedWorkIds,
+              [savedSeries.eventId]
+            );
+
             setState((latest) => {
-              const nextBlocks = latest.calendarBlocks.map((block) => {
-                const saved = syncedMetaByBlockId.get(block.id);
-                return saved
+              const nextBlocks = latest.calendarBlocks.map((block) =>
+                block.id.startsWith(WORK_SHIFT_BLOCK_ID_PREFIX)
                   ? {
                       ...block,
-                      googleEventId: saved.eventId,
-                      googleHtmlLink: saved.htmlLink ?? block.googleHtmlLink,
+                      googleEventId: savedSeries.eventId,
+                      googleHtmlLink: savedSeries.htmlLink ?? block.googleHtmlLink,
                       syncWithGoogle: true,
                     }
-                  : block;
-              });
+                  : block
+              );
               calendarBlocksRef.current = nextBlocks;
               return {
                 ...latest,
                 calendarBlocks: nextBlocks,
               };
             });
-          }
 
-          await refreshGoogleCalendarWeek({
-            explicitToken: activeToken,
-            source: 'internal_mutation',
-          });
-        } else if (activeToken && removedGoogleEventIds.length > 0) {
-          await refreshGoogleCalendarWeek({
-            explicitToken: activeToken,
-            source: 'internal_mutation',
-          });
+            await refreshGoogleCalendarWeek({
+              explicitToken: activeToken,
+              source: 'internal_mutation',
+            });
+            setGoogleActionBanner(null);
+          } catch (err) {
+            setGoogleActionBanner({
+              tone: 'warn',
+              text:
+                err instanceof Error
+                  ? err.message
+                  : 'No se pudo sincronizar la serie del turno laboral con Google Calendar.',
+              showSyncButton: true,
+            });
+          }
+        } else if (activeToken && extraLinkedWorkIds.size > 0) {
+          const clearRes = await clearOrCutoffWorkShiftEventsFromMonday(
+            activeToken,
+            weekDates,
+            extraLinkedWorkIds
+          );
+          if (clearRes.status === 'auth_missing' || clearRes.status === 'error') {
+            setGoogleActionBanner({
+              tone: 'warn',
+              text: clearRes.message,
+              showSyncButton: true,
+            });
+          } else {
+            await refreshGoogleCalendarWeek({
+              explicitToken: activeToken,
+              source: 'internal_mutation',
+            });
+          }
         }
       } finally {
         setIsSavingWorkShift(false);

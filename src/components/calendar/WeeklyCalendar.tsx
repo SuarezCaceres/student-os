@@ -17,10 +17,14 @@ import {
   RefreshCw,
   ExternalLink,
   Moon,
+  Repeat,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
 import type { GoogleCalendarEvent } from '../../services/googleCalendar';
-import { isStudentOsGymGoogleEvent } from '../../utils/gymScheduleFilter';
+import {
+  isGoogleEventMirroredByIds,
+  isStudentOsGymGoogleEvent,
+} from '../../utils/gymScheduleFilter';
 import { triggerConfetti } from '../../utils/confetti';
 import { exportCalendarToICS } from '../../utils/icsExport';
 import { SectionHeader } from '../common/SectionHeader';
@@ -223,7 +227,9 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   const syncedGoogleIds = new Set(
     blocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
   );
-  const externalGoogleEvents = googleEvents.filter((ev) => !syncedGoogleIds.has(ev.id));
+  const externalGoogleEvents = googleEvents.filter(
+    (ev) => !isGoogleEventMirroredByIds(ev, syncedGoogleIds)
+  );
 
   // Preview conflict inside modal before saving
   const previewCandidate: CalendarBlock = {
@@ -537,6 +543,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
 
                       {dayGoogle.map((ev) => {
                         const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                        const isRecurring = Boolean(ev.recurringEventId);
                         return (
                           <div
                             key={`gcol-${ev.id}-${ev.dateIso}`}
@@ -564,6 +571,15 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                                 </span>
                                 {isGoogleGym && <span className="t-badge t-badge-gym">Gym</span>}
                                 <span className="t-badge t-badge-ok">Google</span>
+                                {isRecurring && (
+                                  <span
+                                    className="t-badge"
+                                    title="Serie semanal recurrente en Google Calendar"
+                                  >
+                                    <Repeat className="w-3 h-3 shrink-0 text-[var(--action)]" aria-hidden="true" />
+                                    <span>Semanal</span>
+                                  </span>
+                                )}
                               </div>
 
                               <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">

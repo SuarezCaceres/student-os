@@ -219,8 +219,11 @@ export interface UserGymProfile {
   bmi: number;
   bmiCategory: BmiCategory;
   reminderMinutesBefore?: number[];
+  defaultSessionMinutes?: GymSessionDurationMinutes;
   configuredAt: string;
 }
+
+export type GymSessionDurationMinutes = 60 | 90 | 120;
 
 export interface AppState {
   studentName: string;

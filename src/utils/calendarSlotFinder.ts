@@ -103,11 +103,19 @@ function mergeMinuteRanges(ranges: MinuteRange[]): MinuteRange[] {
   return merged;
 }
 
+function formatSlotDurationText(durationMinutes: number): string {
+  if (durationMinutes === 60) return '1 hora';
+  if (durationMinutes === 90) return '1 hora 30 min';
+  if (durationMinutes === 120) return '2 horas';
+  return `${durationMinutes} min`;
+}
+
 function buildSlotDescription(
   startMin: number,
   endMin: number,
   rawBusy: MinuteRange[],
-  usedTightFallback: boolean
+  usedTightFallback: boolean,
+  durationMinutes = 120
 ): string {
   let prevBlock: MinuteRange | undefined;
   let nextBlock: MinuteRange | undefined;
@@ -134,7 +142,7 @@ function buildSlotDescription(
   if (rawBusy.length === 0) {
     return 'Día completamente libre dentro de la franja 06:00 – 22:00.';
   }
-  return 'Ventana continua de 2 horas sin cruces en tu agenda.';
+  return `Ventana continua de ${formatSlotDurationText(durationMinutes)} sin cruces en tu agenda.`;
 }
 
 function scoreCandidateSlot(params: {
@@ -302,7 +310,7 @@ function generateDayCandidates(params: {
         durationMinutes,
         periodLabel,
         sourceBadge,
-        description: buildSlotDescription(startMin, endMin, mergedRaw, !applyBuffer),
+        description: buildSlotDescription(startMin, endMin, mergedRaw, !applyBuffer, durationMinutes),
         score: scoreCandidateSlot({
           startMin,
           endMin,

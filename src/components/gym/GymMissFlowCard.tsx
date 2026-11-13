@@ -12,9 +12,14 @@ import type {
   DayOfWeek,
   FitnessGoal,
   GymRoutine,
+  GymSessionDurationMinutes,
   GymType,
   MissReasonId,
 } from '../../types';
+import {
+  formatGymDurationLabel,
+  normalizeGymDurationMinutes,
+} from '../../utils/gymSchedulePlanner';
 import {
   findFreeTwoHourSlots,
   type BusyInterval,
@@ -45,6 +50,7 @@ export interface GymMissFlowCardProps {
   gymType?: GymType;
   customGymName?: string;
   defaultReminderMinutes?: number[];
+  defaultSessionMinutes?: GymSessionDurationMinutes;
   rescheduleOptions: RescheduleOption[];
   calendarBlocks?: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
@@ -87,6 +93,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
   gymType,
   customGymName,
   defaultReminderMinutes,
+  defaultSessionMinutes,
   rescheduleOptions,
   calendarBlocks = [],
   externalBusyByDate,
@@ -107,6 +114,9 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
     return first ? `${first.targetDay}::${first.mode}` : '';
   });
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
+  const [rescheduleDuration, setRescheduleDuration] = useState<GymSessionDurationMinutes>(() =>
+    normalizeGymDurationMinutes(defaultSessionMinutes)
+  );
   const [reminderMinutes, setReminderMinutes] = useState<number[]>(
     () => defaultReminderMinutes ?? DEFAULT_GYM_REMINDER_MINUTES
   );
@@ -144,12 +154,19 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
       calendarBlocks,
       externalBusyByDate,
       weekDates,
-      preferredDurationMinutes: 120,
+      preferredDurationMinutes: rescheduleDuration,
       bufferMinutes: 15,
       limit: 4,
       hasGoogleSync: isGoogleConnected,
     });
-  }, [selectedOption, calendarBlocks, externalBusyByDate, weekDates, isGoogleConnected]);
+  }, [
+    selectedOption,
+    rescheduleDuration,
+    calendarBlocks,
+    externalBusyByDate,
+    weekDates,
+    isGoogleConnected,
+  ]);
 
   const activeSlot: FreeTwoHourSlot | undefined =
     smartSlots.find((slot) => slot.id === selectedSlotId) ?? smartSlots[0];
@@ -527,12 +544,17 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                     slots={smartSlots}
                     selectedSlotId={activeSlot?.id ?? ''}
                     onSelectSlot={(slot) => setSelectedSlotId(slot.id)}
+                    durationMinutes={rescheduleDuration}
+                    onChangeDurationMinutes={(mins) => {
+                      setRescheduleDuration(mins);
+                      setSelectedSlotId('');
+                    }}
                     routineName={routine.name}
                     gymLocation={resolvedGymLocation}
                     isGoogleConnected={isGoogleConnected}
                     onOpenGoogleSync={onOpenGoogleSync}
-                    legendText={`Horario libre de 2 horas para el ${selectedOption.targetDay}`}
-                    emptyMessage={`No encontramos un hueco libre de 2 horas el ${selectedOption.targetDay} entre 06:00 y 22:00. Igual puedes reprogramar la rutina en tu plan semanal.`}
+                    legendText={`Horario libre de ${formatGymDurationLabel(rescheduleDuration)} para el ${selectedOption.targetDay}`}
+                    emptyMessage={`No encontramos un hueco libre de ${formatGymDurationLabel(rescheduleDuration)} el ${selectedOption.targetDay} entre 06:00 y 22:00. Prueba con otra duración o reprograma el día en tu plan semanal.`}
                   />
 
                   <div className="pt-3 border-t border-[var(--line)]">

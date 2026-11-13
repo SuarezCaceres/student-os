@@ -342,7 +342,7 @@ const WorkShiftFormBody: React.FC<FormBodyProps> = ({
               >
                 <span className="flex items-center gap-2 text-[13px] font-medium text-[var(--ink)]">
                   <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
-                  <span>Sincronizar turnos con Google Calendar</span>
+                  <span>Sincronizar serie semanal recurrente con Google Calendar (RRULE)</span>
                 </span>
                 <input
                   id={syncId}
@@ -352,6 +352,9 @@ const WorkShiftFormBody: React.FC<FormBodyProps> = ({
                   className="w-4 h-4 rounded accent-[var(--action)] cursor-pointer shrink-0"
                 />
               </label>
+              <p className="text-[12px] text-[var(--muted)] leading-snug px-0.5">
+                Publica una serie semanal recurrente con tus noches activas y tu día de descanso; si luego la cambias, las semanas pasadas quedan guardadas en Google.
+              </p>
 
               {!isGoogleConnected && onOpenGoogleSync && (
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[var(--muted)]">

@@ -41,13 +41,51 @@ export function isStudentOsGymMetadata(params: {
 }
 
 /**
+ * Pure metadata classifier identifying whether a Google Calendar event represents a
+ * StudentOS recurring work shift (explicitly avoids touching gym, classes, or personal events).
+ */
+export function isStudentOsWorkShiftMetadata(params: {
+  title?: string;
+  description?: string;
+  privateProps?: Record<string, string>;
+}): boolean {
+  const { title, description, privateProps } = params;
+  if (privateProps?.studentOsSource === 'student-os') {
+    return privateProps.studentOsCategory === 'trabajo';
+  }
+
+  const normalizedTitle = (title ?? '').trim().toLowerCase();
+  const normalizedDesc = (description ?? '').toLowerCase();
+
+  return (
+    normalizedDesc.includes('studentos') &&
+    (/trabajo\s+nocturno/i.test(normalizedTitle) ||
+      /turno\s+laboral/i.test(normalizedTitle) ||
+      /turno laboral.*studentos/i.test(normalizedDesc))
+  );
+}
+
+/**
+ * Returns true if a Google Calendar event (or recurring series instance) matches a linked googleEventId set.
+ */
+export function isGoogleEventMirroredByIds(
+  event: GoogleCalendarEvent,
+  linkedGoogleIds: ReadonlySet<string>
+): boolean {
+  return (
+    linkedGoogleIds.has(event.id) ||
+    Boolean(event.recurringEventId && linkedGoogleIds.has(event.recurringEventId))
+  );
+}
+
+/**
  * Determines whether an already-parsed `GoogleCalendarEvent` corresponds to a StudentOS Gym session.
  */
 export function isStudentOsGymGoogleEvent(
   event: GoogleCalendarEvent,
   linkedGymGoogleIds?: ReadonlySet<string>
 ): boolean {
-  if (linkedGymGoogleIds?.has(event.id)) {
+  if (linkedGymGoogleIds && isGoogleEventMirroredByIds(event, linkedGymGoogleIds)) {
     return true;
   }
   if (event.isStudentOsGym !== undefined) {
@@ -61,14 +99,17 @@ export function isStudentOsGymGoogleEvent(
 
 /**
  * Checks whether a synced Google Calendar event mirrors one of the StudentOS calendar blocks
- * (either by persisted `googleEventId` or by matching day/date, exact time window, and title).
+ * (either by persisted `googleEventId`/`recurringEventId` or by matching day/date, exact time window, and title).
  */
 export function doesGoogleEventMirrorBlock(
   event: GoogleCalendarEvent,
   block: CalendarBlock,
   weekDates?: Partial<Record<DayOfWeek, string>>
 ): boolean {
-  if (block.googleEventId && event.id === block.googleEventId) {
+  if (
+    block.googleEventId &&
+    (event.id === block.googleEventId || event.recurringEventId === block.googleEventId)
+  ) {
     return true;
   }
 
@@ -129,7 +170,7 @@ export function stripMatchingGymSources(params: {
 
   for (const ev of googleEvents) {
     const matchesBlock =
-      removedIdSet.has(ev.id) ||
+      isGoogleEventMirroredByIds(ev, removedIdSet) ||
       gymBlocks.some((block) => doesGoogleEventMirrorBlock(ev, block, weekDates));
     const matchesOrphanGym =
       includeOrphanGoogleGymEvents && isStudentOsGymGoogleEvent(ev, removedIdSet);

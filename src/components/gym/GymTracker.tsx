@@ -757,6 +757,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
           gymType={gymProfile?.gymType}
           customGymName={gymProfile?.customGymName}
           defaultReminderMinutes={gymProfile?.reminderMinutesBefore}
+          defaultSessionMinutes={gymProfile?.defaultSessionMinutes}
           rescheduleOptions={getRescheduleOptions(
             activeMissFlow.dayOfWeek,
             routines,

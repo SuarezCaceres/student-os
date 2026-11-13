@@ -9,7 +9,10 @@ import {
 import { getCurrentWeekDateMap } from './gymAttendance';
 import { ORDERED_DAYS } from './routineGenerator';
 import { expandCalendarBlocksToSegments, isOvernightTimeRange } from './workSchedule';
-import { isStudentOsGymGoogleEvent } from './gymScheduleFilter';
+import {
+  isGoogleEventMirroredByIds,
+  isStudentOsGymGoogleEvent,
+} from './gymScheduleFilter';
 
 export const GOOGLE_SNAPSHOT_STORAGE_KEY = 'student_os_gcal_snapshot_v1';
 
@@ -339,7 +342,12 @@ export function evaluateScheduleConflicts(params: {
   // Include Google-direct StudentOS Gym events so collisions with phone edits are detected
   // even when zero duplicate local gym blocks exist.
   const virtualGoogleGymBlocks: CalendarBlock[] = googleEvents
-    .filter((ev) => !ev.isAllDay && !mirroredEventIds.has(ev.id) && isStudentOsGymGoogleEvent(ev))
+    .filter(
+      (ev) =>
+        !ev.isAllDay &&
+        !isGoogleEventMirroredByIds(ev, mirroredEventIds) &&
+        isStudentOsGymGoogleEvent(ev)
+    )
     .map((ev) => ({
       id: `gcal-gym-${ev.id}`,
       day: ev.day,
@@ -377,7 +385,7 @@ export function evaluateScheduleConflicts(params: {
   }
 
   for (const ev of googleEvents) {
-    if (ev.isAllDay || mirroredEventIds.has(ev.id)) continue;
+    if (ev.isAllDay || isGoogleEventMirroredByIds(ev, mirroredEventIds)) continue;
     const start = timeStringToMinutes(ev.startTime);
     const end = timeStringToMinutes(ev.endTime);
     if (end <= start) continue;

@@ -12,7 +12,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek, GymRoutine } from '../../types';
+import type { CalendarBlock, DayOfWeek, GymRoutine, GymSessionDurationMinutes } from '../../types';
 import type {
   DeleteGoogleGymEventsResult,
   GoogleCalendarEvent,
@@ -20,8 +20,9 @@ import type {
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import { getCurrentWeekDateMap, getLocalIsoDate } from '../../utils/gymAttendance';
 import {
+  getManualStartOptionsForDuration,
   GYM_SESSION_DURATION_MINUTES,
-  MANUAL_GYM_START_OPTIONS,
+  normalizeGymDurationMinutes,
   recommendWeeklyGymSlots,
   validateGymSlotAgainstCalendar,
   type PreferredTrainingPeriod,
@@ -68,6 +69,7 @@ export interface GymOnboardingCompletePayload {
     dateIso: string;
     startTime: string;
     endTime: string;
+    durationMinutes?: GymSessionDurationMinutes;
   }>;
 }
 
@@ -261,23 +263,65 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     useState<DeleteGoogleGymEventsResult | null>(null);
   const [didClearPreviousGym, setDidClearPreviousGym] = useState<boolean>(false);
   const [preferredPeriod, setPreferredPeriod] = useState<PreferredTrainingPeriod>('auto');
+  const [defaultDurationMinutes, setDefaultDurationMinutes] =
+    useState<GymSessionDurationMinutes>(() => {
+      if (initialProfile?.defaultSessionMinutes) {
+        return normalizeGymDurationMinutes(initialProfile.defaultSessionMinutes);
+      }
+      const firstGoogle = previousGoogleGymEvents[0];
+      if (firstGoogle) {
+        const diff =
+          timeStringToMinutes(firstGoogle.endTime) -
+          timeStringToMinutes(firstGoogle.startTime);
+        if (diff > 0) return normalizeGymDurationMinutes(diff);
+      }
+      const firstLocal = existingGymBlocks[0];
+      if (firstLocal) {
+        const diff =
+          timeStringToMinutes(firstLocal.endTime) -
+          timeStringToMinutes(firstLocal.startTime);
+        if (diff > 0) return normalizeGymDurationMinutes(diff);
+      }
+      return GYM_SESSION_DURATION_MINUTES;
+    });
   const [slotOverridesByDay, setSlotOverridesByDay] = useState<
-    Partial<Record<DayOfWeek, { startTime: string; source: 'recommended' | 'custom' }>>
+    Partial<
+      Record<
+        DayOfWeek,
+        {
+          startTime?: string;
+          durationMinutes?: GymSessionDurationMinutes;
+          source: 'recommended' | 'custom';
+        }
+      >
+    >
   >(() => {
     if (!initialProfile) return {};
     const seeded: Partial<
-      Record<DayOfWeek, { startTime: string; source: 'recommended' | 'custom' }>
+      Record<
+        DayOfWeek,
+        {
+          startTime?: string;
+          durationMinutes?: GymSessionDurationMinutes;
+          source: 'recommended' | 'custom';
+        }
+      >
     > = {};
+    const seedFromEntry = (day: DayOfWeek, startTime: string, endTime: string) => {
+      if (seeded[day]) return;
+      const diff = timeStringToMinutes(endTime) - timeStringToMinutes(startTime);
+      const dur = diff > 0 ? normalizeGymDurationMinutes(diff) : GYM_SESSION_DURATION_MINUTES;
+      const validStarts = getManualStartOptionsForDuration(dur);
+      if (validStarts.includes(startTime)) {
+        seeded[day] = { startTime, durationMinutes: dur, source: 'custom' };
+      }
+    };
     // Google Calendar is primary source of truth when connected
     for (const ev of previousGoogleGymEvents) {
-      if (!seeded[ev.day] && MANUAL_GYM_START_OPTIONS.includes(ev.startTime)) {
-        seeded[ev.day] = { startTime: ev.startTime, source: 'custom' };
-      }
+      seedFromEntry(ev.day, ev.startTime, ev.endTime);
     }
     for (const block of existingGymBlocks) {
-      if (!seeded[block.day] && MANUAL_GYM_START_OPTIONS.includes(block.startTime)) {
-        seeded[block.day] = { startTime: block.startTime, source: 'custom' };
-      }
+      seedFromEntry(block.day, block.startTime, block.endTime);
     }
     return seeded;
   });
@@ -347,9 +391,19 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     ]);
 
   const slotDrafts: ScheduledGymSlotDraft[] = useMemo(() => {
+    const durationByDay: Partial<Record<DayOfWeek, GymSessionDurationMinutes>> = {};
+    for (const day of selectedDays) {
+      const overrideDur = slotOverridesByDay[day]?.durationMinutes;
+      if (overrideDur) {
+        durationByDay[day] = overrideDur;
+      }
+    }
+
     const recommendedDrafts = recommendWeeklyGymSlots({
       selectedDays,
       preferredPeriod,
+      defaultDurationMinutes,
+      durationByDay,
       calendarBlocks: planningCalendarBlocks,
       externalBusyByDate: planningExternalBusyByDate,
       googleEvents: planningGoogleEvents,
@@ -358,15 +412,24 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
 
     return recommendedDrafts.map((recDraft) => {
       const override = slotOverridesByDay[recDraft.day];
-      if (!override) return recDraft;
+      if (!override?.startTime) return recDraft;
+
+      const dayDuration = override.durationMinutes ?? defaultDurationMinutes;
+      const validStarts = getManualStartOptionsForDuration(dayDuration);
+      const maxValidStart = validStarts[validStarts.length - 1] ?? '20:00';
+      const resolvedStart =
+        timeStringToMinutes(override.startTime) > timeStringToMinutes(maxValidStart)
+          ? maxValidStart
+          : override.startTime;
 
       const endTime = minutesToTimeString(
-        timeStringToMinutes(override.startTime) + GYM_SESSION_DURATION_MINUTES
+        timeStringToMinutes(resolvedStart) + dayDuration
       );
       const conflict = validateGymSlotAgainstCalendar({
         day: recDraft.day,
         dateIso: recDraft.dateIso,
-        startTime: override.startTime,
+        startTime: resolvedStart,
+        durationMinutes: dayDuration,
         calendarBlocks: planningCalendarBlocks,
         externalBusyByDate: planningExternalBusyByDate,
         googleEvents: planningGoogleEvents,
@@ -375,8 +438,9 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       return {
         day: recDraft.day,
         dateIso: recDraft.dateIso,
-        startTime: override.startTime,
+        startTime: resolvedStart,
         endTime,
+        durationMinutes: dayDuration,
         source: override.source,
         hasConflict: conflict.hasConflict,
         conflictTitle: conflict.conflictTitle,
@@ -388,6 +452,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   }, [
     selectedDays,
     preferredPeriod,
+    defaultDurationMinutes,
     planningCalendarBlocks,
     planningExternalBusyByDate,
     planningGoogleEvents,
@@ -414,7 +479,18 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       setReplacePreviousGymSchedule(true);
 
       if (!resolvedResult || resolvedResult.status === 'ok' || resolvedResult.status === 'partial') {
-        setSlotOverridesByDay({});
+        setSlotOverridesByDay((prev) => {
+          const next: typeof prev = {};
+          for (const [dayKey, val] of Object.entries(prev)) {
+            if (val?.durationMinutes) {
+              next[dayKey as DayOfWeek] = {
+                durationMinutes: val.durationMinutes,
+                source: 'recommended',
+              };
+            }
+          }
+          return next;
+        });
         setDidClearPreviousGym(true);
       }
     } finally {
@@ -430,19 +506,97 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
     setErrorMsg(null);
     setSlotOverridesByDay((prev) => ({
       ...prev,
-      [day]: { startTime, source },
+      [day]: {
+        ...prev[day],
+        startTime,
+        source,
+      },
     }));
+  };
+
+  const handleSelectSlotDuration = (
+    day: DayOfWeek,
+    durationMinutes: GymSessionDurationMinutes
+  ) => {
+    setErrorMsg(null);
+    setSlotOverridesByDay((prev) => {
+      const current = prev[day];
+      const validStarts = getManualStartOptionsForDuration(durationMinutes);
+      const maxValidStart = validStarts[validStarts.length - 1] ?? '20:00';
+      const clampedStart =
+        current?.startTime &&
+        timeStringToMinutes(current.startTime) > timeStringToMinutes(maxValidStart)
+          ? maxValidStart
+          : current?.startTime;
+      return {
+        ...prev,
+        [day]: {
+          startTime: clampedStart,
+          durationMinutes,
+          source: current?.source ?? 'recommended',
+        },
+      };
+    });
+  };
+
+  const handleChangeDefaultDurationMinutes = (
+    nextDuration: GymSessionDurationMinutes
+  ) => {
+    setErrorMsg(null);
+    setDefaultDurationMinutes(nextDuration);
+    const validStarts = getManualStartOptionsForDuration(nextDuration);
+    const maxValidStart = validStarts[validStarts.length - 1] ?? '20:00';
+    const maxValidMin = timeStringToMinutes(maxValidStart);
+
+    setSlotOverridesByDay((prev) => {
+      const next: typeof prev = {};
+      for (const [dayKey, val] of Object.entries(prev)) {
+        if (!val) continue;
+        const clampedStart =
+          val.startTime && timeStringToMinutes(val.startTime) > maxValidMin
+            ? maxValidStart
+            : val.startTime;
+        next[dayKey as DayOfWeek] = {
+          ...val,
+          startTime: clampedStart,
+          durationMinutes: nextDuration,
+        };
+      }
+      return next;
+    });
   };
 
   const handleChangePreferredPeriod = (nextPeriod: PreferredTrainingPeriod) => {
     setErrorMsg(null);
     setPreferredPeriod(nextPeriod);
-    setSlotOverridesByDay({});
+    setSlotOverridesByDay((prev) => {
+      const next: typeof prev = {};
+      for (const [dayKey, val] of Object.entries(prev)) {
+        if (val?.durationMinutes) {
+          next[dayKey as DayOfWeek] = {
+            durationMinutes: val.durationMinutes,
+            source: 'recommended',
+          };
+        }
+      }
+      return next;
+    });
   };
 
   const handleRecommendAllSlots = () => {
     setErrorMsg(null);
-    setSlotOverridesByDay({});
+    setSlotOverridesByDay((prev) => {
+      const next: typeof prev = {};
+      for (const [dayKey, val] of Object.entries(prev)) {
+        if (val?.durationMinutes) {
+          next[dayKey as DayOfWeek] = {
+            durationMinutes: val.durationMinutes,
+            source: 'recommended',
+          };
+        }
+      }
+      return next;
+    });
   };
 
   const handleNextStep = () => {
@@ -516,6 +670,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       bmi: bmiInfo.bmi,
       bmiCategory: bmiInfo.category,
       reminderMinutesBefore,
+      defaultSessionMinutes: defaultDurationMinutes,
       configuredAt: getLocalIsoDate(),
     };
 
@@ -527,12 +682,15 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       replaceRoutines: !hasExistingRoutines || replaceRoutines,
       replacePreviousGymSchedule: hasPreviousSchedule ? replacePreviousGymSchedule : true,
       preferredPeriod,
-      scheduledGymSlots: slotDrafts.map(({ day, dateIso, startTime, endTime }) => ({
-        day,
-        dateIso,
-        startTime,
-        endTime,
-      })),
+      scheduledGymSlots: slotDrafts.map(
+        ({ day, dateIso, startTime, endTime, durationMinutes }) => ({
+          day,
+          dateIso,
+          startTime,
+          endTime,
+          durationMinutes,
+        })
+      ),
     });
   };
 
@@ -1087,8 +1245,11 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
             selectedDays={selectedDays}
             preferredPeriod={preferredPeriod}
             onChangePreferredPeriod={handleChangePreferredPeriod}
+            defaultDurationMinutes={defaultDurationMinutes}
+            onChangeDefaultDurationMinutes={handleChangeDefaultDurationMinutes}
             slotDrafts={slotDrafts}
             onSelectSlotStart={handleSelectSlotStart}
+            onSelectSlotDuration={handleSelectSlotDuration}
             onRecommendAll={handleRecommendAllSlots}
             calendarBlocks={planningCalendarBlocks}
             externalBusyByDate={planningExternalBusyByDate}

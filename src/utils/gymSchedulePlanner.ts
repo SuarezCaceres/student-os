@@ -1,4 +1,4 @@
-import type { CalendarBlock, DayOfWeek } from '../types';
+import type { CalendarBlock, DayOfWeek, GymSessionDurationMinutes } from '../types';
 import type { GoogleCalendarEvent } from '../services/googleCalendar';
 import {
   CALENDAR_END_MINUTES,
@@ -10,6 +10,7 @@ import {
   type FreeTwoHourSlot,
 } from './calendarSlotFinder';
 import { getCurrentWeekDateMap } from './gymAttendance';
+import { isGoogleEventMirroredByIds } from './gymScheduleFilter';
 import { expandCalendarBlocksToSegments } from './workSchedule';
 
 export type PreferredTrainingPeriod = 'auto' | 'manana' | 'tarde' | 'noche';
@@ -17,8 +18,9 @@ export type PreferredTrainingPeriod = 'auto' | 'manana' | 'tarde' | 'noche';
 export interface ScheduledGymSlotDraft {
   day: DayOfWeek;
   dateIso: string;
-  startTime: string; // HH:mm (bloque 2h)
+  startTime: string; // HH:mm
   endTime: string; // HH:mm
+  durationMinutes: GymSessionDurationMinutes;
   source: 'recommended' | 'custom';
   hasConflict: boolean;
   conflictTitle?: string;
@@ -44,11 +46,42 @@ export interface SlotConflictValidation {
   conflictEnd?: string;
 }
 
-export const GYM_SESSION_DURATION_MINUTES = 120;
+export const GYM_SESSION_DURATION_MINUTES: GymSessionDurationMinutes = 120;
 
-export const MANUAL_GYM_START_OPTIONS: string[] = Array.from(
-  { length: (20 - 6) * 2 + 1 },
-  (_, index) => minutesToTimeString(6 * 60 + index * 30)
+export const GYM_DURATION_OPTIONS: GymSessionDurationMinutes[] = [60, 90, 120];
+
+export function normalizeGymDurationMinutes(value?: number): GymSessionDurationMinutes {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return GYM_SESSION_DURATION_MINUTES;
+  }
+  if (value <= 75) return 60;
+  if (value <= 105) return 90;
+  return 120;
+}
+
+export function formatGymDurationLabel(minutes: number): string {
+  if (minutes === 60) return '1 h';
+  if (minutes === 90) return '1 h 30';
+  if (minutes === 120) return '2 h';
+  return `${minutes} min`;
+}
+
+export function getManualStartOptionsForDuration(
+  durationMinutes: number = GYM_SESSION_DURATION_MINUTES
+): string[] {
+  const maxStartMinutes = Math.max(
+    CALENDAR_START_MINUTES,
+    CALENDAR_END_MINUTES - Math.max(30, durationMinutes)
+  );
+  const options: string[] = [];
+  for (let m = CALENDAR_START_MINUTES; m <= maxStartMinutes; m += 30) {
+    options.push(minutesToTimeString(m));
+  }
+  return options;
+}
+
+export const MANUAL_GYM_START_OPTIONS: string[] = getManualStartOptionsForDuration(
+  GYM_SESSION_DURATION_MINUTES
 );
 
 function buildEffectiveExternalBusyByDate(
@@ -129,6 +162,11 @@ export function getDayOccupiedTimeline(params: {
   const { day, dateIso, calendarBlocks, externalBusyByDate, googleEvents } = params;
   const items: TimelineOccupiedItem[] = [];
   const seenKeys = new Set<string>();
+  const syncedGoogleIds = new Set(
+    calendarBlocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
+  );
+  const localSegments = expandCalendarBlocksToSegments(calendarBlocks);
+  const dayLocalSegments = localSegments.filter((seg) => seg.day === day);
 
   const pushUnique = (item: TimelineOccupiedItem) => {
     const key = `${item.source}:${item.isAllDay ? 'all' : `${item.startTime}-${item.endTime}`}:${item.title
@@ -141,6 +179,7 @@ export function getDayOccupiedTimeline(params: {
 
   for (const ev of googleEvents ?? []) {
     if (ev.dateIso !== dateIso && ev.day !== day) continue;
+    if (isGoogleEventMirroredByIds(ev, syncedGoogleIds)) continue;
     pushUnique({
       id: `google-${ev.id}-${ev.dateIso}`,
       title: ev.title,
@@ -152,6 +191,14 @@ export function getDayOccupiedTimeline(params: {
   }
 
   for (const busy of externalBusyByDate?.[dateIso] ?? []) {
+    const mirrorsMirroredLocal = dayLocalSegments.some(
+      (seg) =>
+        Boolean(seg.block.googleEventId) &&
+        seg.startTime === busy.startTime &&
+        seg.endTime === busy.endTime &&
+        seg.block.title.trim().toLowerCase() === (busy.title || '').trim().toLowerCase()
+    );
+    if (mirrorsMirroredLocal) continue;
     pushUnique({
       id: `busy-${dateIso}-${busy.startTime}-${busy.endTime}-${busy.title}`,
       title: busy.title || 'Google Calendar',
@@ -161,9 +208,7 @@ export function getDayOccupiedTimeline(params: {
     });
   }
 
-  const localSegments = expandCalendarBlocksToSegments(calendarBlocks);
-  for (const seg of localSegments) {
-    if (seg.day !== day) continue;
+  for (const seg of dayLocalSegments) {
     const title =
       seg.segmentRole === 'overnight_continuation'
         ? `${seg.block.title} (turno ${seg.originDay})`
@@ -261,12 +306,13 @@ export function validateGymSlotAgainstCalendar(params: {
 }
 
 /**
- * Returns up to `limit` collision-free 2-hour slots for one day, biased toward the chosen period.
+ * Returns up to `limit` collision-free training slots for one day, biased toward the chosen period.
  */
 export function getDayFreeSuggestions(params: {
   day: DayOfWeek;
   dateIso: string;
   preferredPeriod: PreferredTrainingPeriod;
+  durationMinutes?: GymSessionDurationMinutes;
   calendarBlocks: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
   googleEvents?: GoogleCalendarEvent[];
@@ -277,6 +323,7 @@ export function getDayFreeSuggestions(params: {
     day,
     dateIso,
     preferredPeriod,
+    durationMinutes = GYM_SESSION_DURATION_MINUTES,
     calendarBlocks,
     externalBusyByDate,
     googleEvents,
@@ -292,7 +339,7 @@ export function getDayFreeSuggestions(params: {
     calendarBlocks,
     externalBusyByDate: effectiveBusyByDate,
     weekDates: effectiveWeekDates,
-    preferredDurationMinutes: GYM_SESSION_DURATION_MINUTES,
+    preferredDurationMinutes: durationMinutes,
     bufferMinutes: 15,
     limit: 24,
     hasGoogleSync: Object.keys(effectiveBusyByDate).length > 0,
@@ -335,6 +382,8 @@ export function getDayFreeSuggestions(params: {
 export function recommendWeeklyGymSlots(params: {
   selectedDays: DayOfWeek[];
   preferredPeriod: PreferredTrainingPeriod;
+  defaultDurationMinutes?: GymSessionDurationMinutes;
+  durationByDay?: Partial<Record<DayOfWeek, GymSessionDurationMinutes>>;
   calendarBlocks: CalendarBlock[];
   externalBusyByDate?: Record<string, BusyInterval[]>;
   googleEvents?: GoogleCalendarEvent[];
@@ -343,6 +392,8 @@ export function recommendWeeklyGymSlots(params: {
   const {
     selectedDays,
     preferredPeriod,
+    defaultDurationMinutes = GYM_SESSION_DURATION_MINUTES,
+    durationByDay,
     calendarBlocks,
     externalBusyByDate,
     googleEvents,
@@ -353,10 +404,12 @@ export function recommendWeeklyGymSlots(params: {
 
   return selectedDays.map((day) => {
     const dateIso = weekDates[day] ?? '';
+    const dayDuration = durationByDay?.[day] ?? defaultDurationMinutes;
     const suggestions = getDayFreeSuggestions({
       day,
       dateIso,
       preferredPeriod,
+      durationMinutes: dayDuration,
       calendarBlocks,
       externalBusyByDate: effectiveBusyByDate,
       weekDates,
@@ -370,6 +423,7 @@ export function recommendWeeklyGymSlots(params: {
         dateIso: best.dateIso || dateIso,
         startTime: best.startTime,
         endTime: best.endTime,
+        durationMinutes: dayDuration,
         source: 'recommended',
         hasConflict: false,
       };
@@ -378,12 +432,13 @@ export function recommendWeeklyGymSlots(params: {
     const fallbackStart =
       preferredPeriod === 'manana' ? '06:00' : preferredPeriod === 'tarde' ? '15:00' : '18:00';
     const fallbackEnd = minutesToTimeString(
-      timeStringToMinutes(fallbackStart) + GYM_SESSION_DURATION_MINUTES
+      timeStringToMinutes(fallbackStart) + dayDuration
     );
     const conflict = validateGymSlotAgainstCalendar({
       day,
       dateIso,
       startTime: fallbackStart,
+      durationMinutes: dayDuration,
       calendarBlocks,
       externalBusyByDate: effectiveBusyByDate,
       googleEvents,
@@ -394,6 +449,7 @@ export function recommendWeeklyGymSlots(params: {
       dateIso,
       startTime: fallbackStart,
       endTime: fallbackEnd,
+      durationMinutes: dayDuration,
       source: 'recommended',
       hasConflict: conflict.hasConflict,
       conflictTitle: conflict.conflictTitle,

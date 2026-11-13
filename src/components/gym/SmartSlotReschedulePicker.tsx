@@ -3,19 +3,27 @@ import {
   Calendar,
   CalendarClock,
   CheckCircle2,
+  Clock,
   ExternalLink,
   ShieldCheck,
 } from 'lucide-react';
+import type { GymSessionDurationMinutes } from '../../types';
 import {
   buildGoogleCalendarTemplateUrl,
   type FreeTwoHourSlot,
 } from '../../utils/calendarSlotFinder';
 import { formatShortSpanishDate } from '../../utils/gymAttendance';
+import {
+  formatGymDurationLabel,
+  GYM_DURATION_OPTIONS,
+} from '../../utils/gymSchedulePlanner';
 
 export interface SmartSlotReschedulePickerProps {
   slots: FreeTwoHourSlot[];
   selectedSlotId: string;
   onSelectSlot: (slot: FreeTwoHourSlot) => void;
+  durationMinutes?: GymSessionDurationMinutes;
+  onChangeDurationMinutes?: (duration: GymSessionDurationMinutes) => void;
   routineName?: string;
   gymLocation?: string;
   isGoogleConnected?: boolean;
@@ -28,21 +36,31 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
   slots,
   selectedSlotId,
   onSelectSlot,
+  durationMinutes = 120,
+  onChangeDurationMinutes,
   routineName,
   gymLocation,
   isGoogleConnected = false,
   onOpenGoogleSync,
-  legendText = 'Elige un bloque libre de 2 horas para reprogramar tu sesión',
-  emptyMessage = 'No hay ventanas libres de 2 horas entre las 06:00 y 22:00 en los días disponibles de esta semana.',
+  legendText,
+  emptyMessage,
 }) => {
   const baseId = useId();
   const radioGroupName = `${baseId}-smart-slot-group`;
+  const durationLabel = formatGymDurationLabel(durationMinutes);
+  const resolvedLegendText =
+    legendText ?? `Elige un bloque libre de ${durationLabel} para reprogramar tu sesión`;
+  const resolvedEmptyMessage =
+    emptyMessage ??
+    `No hay ventanas libres de ${durationLabel} entre las 06:00 y 22:00 en los días disponibles de esta semana.`;
 
   const activeSlot = slots.find((s) => s.id === selectedSlotId) ?? slots[0];
   const fallbackTemplateUrl =
     !isGoogleConnected && activeSlot
       ? buildGoogleCalendarTemplateUrl({
-          title: routineName?.trim() ? `Gym: ${routineName.trim()}` : 'Sesión de Gimnasio (2h)',
+          title: routineName?.trim()
+            ? `Gym: ${routineName.trim()}`
+            : `Sesión de Gimnasio (${durationLabel})`,
           dateIso: activeSlot.dateIso,
           startTime: activeSlot.startTime,
           endTime: activeSlot.endTime,
@@ -56,7 +74,7 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
       <fieldset className="border-0 p-0 m-0 space-y-3">
         <legend className="text-[15px] font-semibold text-[var(--ink)] flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
-          <span>{legendText}</span>
+          <span>{resolvedLegendText}</span>
         </legend>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
@@ -79,6 +97,39 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
             </button>
           )}
         </div>
+
+        {onChangeDurationMinutes && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2.5">
+            <span className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink)]">
+              <Clock className="w-3.5 h-3.5 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span>Duración para esta recuperación</span>
+            </span>
+            <div
+              role="group"
+              aria-label="Duración para reprogramar sesión"
+              className="grid grid-cols-3 sm:flex gap-1.5"
+            >
+              {GYM_DURATION_OPTIONS.map((mins) => {
+                const isSelected = durationMinutes === mins;
+                return (
+                  <button
+                    key={`resched-dur-${mins}`}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => onChangeDurationMinutes(mins)}
+                    className={`min-h-[44px] px-3 py-1.5 rounded-[10px] border text-[13px] font-semibold t-num cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-[var(--action)] text-[var(--action-ink)] border-[var(--action)]'
+                        : 'bg-[var(--surface)] text-[var(--ink)] border-[var(--line)] hover:border-[var(--line-strong)]'
+                    }`}
+                  >
+                    {formatGymDurationLabel(mins)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {slots.length > 0 ? (
           <div className="space-y-2">
@@ -151,9 +202,9 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
         ) : (
           <div className="p-4 rounded-[14px] border border-[var(--line)] bg-[var(--surface)] space-y-1">
             <p className="text-[14px] font-medium text-[var(--ink)]">
-              Sin ventanas de 2 horas disponibles
+              Sin ventanas de {durationLabel} disponibles
             </p>
-            <p className="text-[13px] text-[var(--muted)] leading-relaxed">{emptyMessage}</p>
+            <p className="text-[13px] text-[var(--muted)] leading-relaxed">{resolvedEmptyMessage}</p>
           </div>
         )}
       </fieldset>
