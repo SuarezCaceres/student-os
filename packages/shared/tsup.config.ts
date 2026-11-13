@@ -4,7 +4,8 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
-  dts: true,
+  // Los .d.ts los emite tsc (tsconfig.build.json): rollup-plugin-dts exige la API de TypeScript 6 y el monorepo hoistea TS 7.
+  dts: false,
   clean: true,
   sourcemap: true,
   target: 'es2022',

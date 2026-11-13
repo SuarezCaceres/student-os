@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@student-os/shared": "*",
     "@supabase/supabase-js": "^2.119.0",
     "@tailwindcss/vite": "^4.3.4",
     "canvas-confetti": "^1.9.4",

@@ -1,11 +1,10 @@
 # Render Blueprint de la API de StudentOS.
 #
-# UBICACION: vive en apps/api/ (alcance de API-CORE). Render solo lee `render.yaml` desde la RAIZ
-# del repo: el Integrador lo MOVERA (o copiara) a la raiz al crear el servicio. Las rutas ya estan
-# escritas con `rootDir: apps/api`, asi que funciona tal cual desde la raiz.
+# UBICACION: raiz del repo (Render solo lee `render.yaml` desde aqui). Es un monorepo: se construye
+# desde la raiz, sin `rootDir`.
 #
 # Alternativa sin Blueprint: crear un "Web Service" a mano con los mismos valores
-# (Root Directory = apps/api, Build/Start Command, Health Check Path = /health).
+# (sin Root Directory; Build/Start Command como abajo, Health Check Path = /health).
 
 services:
   - type: web
@@ -13,15 +12,11 @@ services:
     runtime: node
     plan: free
     # region: elige la MISMA region que el proyecto Supabase para minimizar latencia a la BD.
-    rootDir: apps/api
+    # Monorepo: se construye desde la raiz del repo (sin rootDir).
     # Instala (incluyendo devDependencies: nest-cli/typescript/prisma hacen falta para compilar),
     # genera el cliente Prisma y compila. NO ejecuta migraciones: las aplica el Integrador a mano.
-    #
-    # NOTA para el Integrador: cuando exista el workspace raiz (npm workspaces + packages/shared),
-    # cambia el buildCommand por:
-    #   cd ../.. && npm ci --include=dev && npm run build -w packages/shared && npm run build -w apps/api && cd apps/api && npx prisma generate
-    buildCommand: npm install --include=dev && npx prisma generate && npm run build
-    startCommand: npm run start
+    buildCommand: npm ci --include=dev && npm run build -w @student-os/shared && npm run prisma:generate -w @student-os/api && npm run build -w @student-os/api
+    startCommand: npm run start -w @student-os/api
     healthCheckPath: /health
     # No despliega solo en cada push: los despliegues a produccion los aprueba el usuario.
     autoDeploy: false

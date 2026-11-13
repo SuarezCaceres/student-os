@@ -13,8 +13,9 @@
   "scripts": {
     "dev:web": "npm run dev -w apps/web",
     "dev:api": "npm run start:dev -w apps/api --if-present",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @student-os/shared && npm run build -w @student-os/api && npm run build -w @student-os/web",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "prepare": "npm run build -w @student-os/shared"
   }
 }

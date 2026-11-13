@@ -28,6 +28,7 @@
     "@nestjs/platform-express": "^11.1.0",
     "@nestjs/throttler": "^6.4.0",
     "@prisma/client": "^6.19.0",
+    "@student-os/shared": "*",
     "helmet": "^8.1.0",
     "jose": "^5.10.0",
     "nestjs-pino": "^4.4.0",
