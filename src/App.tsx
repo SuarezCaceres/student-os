@@ -664,7 +664,7 @@ export const App: React.FC = () => {
       }));
       await refreshGoogleCalendarWeek(token);
     } catch {
-      // Open sync modal if user needs to authorize or adjust Client ID
+      // Open sync modal if user needs to authorize or reconnect Google Calendar
       setIsGoogleSyncModalOpen(true);
     } finally {
       setIsSyncingGymToGoogle(false);

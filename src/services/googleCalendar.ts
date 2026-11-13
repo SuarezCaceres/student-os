@@ -472,7 +472,7 @@ export async function signInWithGoogleAccount(
   const clientId = customId || getConfiguredGoogleClientId();
   if (!clientId) {
     throw new Error(
-      'Falta tu Client ID de Google OAuth 2.0. Configúralo en VITE_GOOGLE_CLIENT_ID o ingrésalo en Opciones de desarrollador.'
+      'Falta configurar VITE_GOOGLE_CLIENT_ID en el archivo .env.local del proyecto para iniciar sesión con Google.'
     );
   }
 

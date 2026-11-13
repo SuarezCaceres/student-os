@@ -13,13 +13,8 @@ import {
   EyeOff,
   Loader2,
   CalendarCheck,
-  KeyRound,
 } from 'lucide-react';
-import {
-  getConfiguredGoogleClientId,
-  isGoogleCalendarReady,
-  signInWithGoogleAccount,
-} from '../../services/googleCalendar';
+import { signInWithGoogleAccount } from '../../services/googleCalendar';
 
 export interface UserSession {
   name: string;
@@ -55,10 +50,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [showGoogleConfig, setShowGoogleConfig] = useState(false);
-  const [googleClientIdInput, setGoogleClientIdInput] = useState(() =>
-    getConfiguredGoogleClientId()
-  );
 
   const modalRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
@@ -139,18 +130,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const handleGoogleSignIn = async () => {
     setError(null);
-    const trimmedClientId = googleClientIdInput.trim();
-    if (!trimmedClientId && !isGoogleCalendarReady()) {
-      setShowGoogleConfig(true);
-      setError(
-        'Falta tu Client ID de Google OAuth 2.0. Pégalo abajo o defínelo en VITE_GOOGLE_CLIENT_ID (.env.local).'
-      );
-      return;
-    }
-
     setIsGoogleLoading(true);
     try {
-      const result = await signInWithGoogleAccount(trimmedClientId || undefined);
+      const result = await signInWithGoogleAccount();
       const displayName =
         result.user.name ||
         result.user.email?.split('@')[0] ||
@@ -311,43 +293,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span>Calendar</span>
             </span>
           </button>
-
-          {(!isGoogleCalendarReady() || showGoogleConfig) && (
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface-2)] p-3 space-y-2">
-              <label
-                htmlFor="auth-google-client-id"
-                className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink)]"
-              >
-                <KeyRound className="h-3.5 w-3.5 text-[var(--action)]" aria-hidden="true" />
-                <span>Google OAuth Client ID</span>
-              </label>
-              <input
-                id="auth-google-client-id"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                value={googleClientIdInput}
-                onChange={(e) => setGoogleClientIdInput(e.target.value)}
-                placeholder="123456-abc.apps.googleusercontent.com"
-                className="w-full min-h-[44px] rounded-lg border border-[var(--line-strong)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink)] placeholder-[var(--muted)] focus:border-[var(--action)] focus:outline-none"
-              />
-              <p className="text-[13px] text-[var(--muted)] leading-snug">
-                Opcional si ya definiste <code>VITE_GOOGLE_CLIENT_ID</code> en tu archivo <code>.env.local</code>.
-              </p>
-            </div>
-          )}
-
-          {isGoogleCalendarReady() && !showGoogleConfig && (
-            <div className="flex items-center justify-center">
-              <button
-                type="button"
-                onClick={() => setShowGoogleConfig(true)}
-                className="min-h-[36px] text-[13px] text-[var(--muted)] hover:text-[var(--ink)] underline cursor-pointer"
-              >
-                Usar otro Client ID de Google
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Visual Divider */}

@@ -1,10 +1,8 @@
-import React, { useId, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Calendar,
   CheckCircle2,
-  ChevronDown,
   Download,
-  KeyRound,
   LogOut,
   RefreshCw,
   Send,
@@ -16,11 +14,8 @@ import {
   connectGoogleCalendar,
   disconnectGoogleCalendar,
   fetchGoogleEventsAndBusyForWeek,
-  getConfiguredGoogleClientId,
   getStoredAccessToken,
   getStoredGoogleMeta,
-  hasEnvGoogleClientId,
-  saveCustomGoogleClientId,
   upsertGoogleGymEvent,
   type GoogleCalendarEvent,
   type GoogleCalendarMeta,
@@ -71,17 +66,8 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
   onBlockGoogleSynced,
   onConnectionChange,
 }) => {
-  const clientIdInputId = useId();
-  const clientIdHelpId = useId();
-  const guidePanelId = useId();
-  const devPanelId = useId();
-
-  const envHasClientId = hasEnvGoogleClientId();
-  const [clientIdInput, setClientIdInput] = useState<string>(() => getConfiguredGoogleClientId());
   const [meta, setMeta] = useState<GoogleCalendarMeta>(() => getStoredGoogleMeta());
   const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAccessToken());
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
-  const [isDevConfigOpen, setIsDevConfigOpen] = useState(!envHasClientId);
   const [pushReminderMinutes, setPushReminderMinutes] = useState<number[]>(
     DEFAULT_BLOCK_REMINDER_MINUTES
   );
@@ -96,25 +82,9 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
   const isBusy = isConnecting || isSyncingBusy || isPushingBlocks;
   const resolvedWeekDates = weekDates ?? getCurrentWeekDateMap();
 
-  const handleSaveClientId = () => {
-    const saved = saveCustomGoogleClientId(clientIdInput);
-    setClientIdInput(saved);
-    setStatus(
-      saved
-        ? {
-            type: 'ok',
-            text: 'Client ID guardado localmente en este navegador.',
-          }
-        : {
-            type: 'warn',
-            text: 'Se limpió el Client ID personalizado. Se usará VITE_GOOGLE_CLIENT_ID si está definido.',
-          }
-    );
-  };
-
   const acquireTokenOrThrow = async (): Promise<string> => {
     if (accessToken) return accessToken;
-    const result = await connectGoogleCalendar(clientIdInput);
+    const result = await connectGoogleCalendar();
     setAccessToken(result.accessToken);
     setMeta(result.meta);
     onConnectionChange?.(true, result.accessToken);
@@ -125,7 +95,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
     setStatus(null);
     setIsConnecting(true);
     try {
-      const result = await connectGoogleCalendar(clientIdInput);
+      const result = await connectGoogleCalendar();
       setAccessToken(result.accessToken);
       setMeta(result.meta);
       onConnectionChange?.(true, result.accessToken);
@@ -304,7 +274,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
               ? 'La sesión temporal OAuth expiró al recargar. Vuelve a conectar para leer disponibilidad o enviar eventos.'
               : meta.connected
                 ? 'Sesión activa. Puedes sincronizar tus eventos ocupados o enviar tu horario actual a Google.'
-                : 'Conecta tu cuenta con OAuth 2.0 (solo navegador) o descarga un archivo .ics sin iniciar sesión.'}
+                : 'Conecta tu cuenta con Google en 1 clic o descarga un archivo .ics sin iniciar sesión.'}
           </p>
         </div>
 
@@ -424,116 +394,6 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
             helperText="Google notificará cada bloque exportado con esta anticipación (si no tenía otro aviso)."
           />
         </div>
-      </div>
-
-      {/* Row 3: Optional Developer OAuth Client ID (collapsed automatically when env var is set) */}
-      <div className="t-row space-y-2.5">
-        <button
-          type="button"
-          aria-expanded={isDevConfigOpen}
-          aria-controls={devPanelId}
-          onClick={() => setIsDevConfigOpen((prev) => !prev)}
-          className="w-full min-h-[44px] flex items-center justify-between gap-3 py-1 text-left text-[14px] font-medium text-[var(--ink)] hover:text-[var(--action)] transition-colors cursor-pointer"
-        >
-          <span className="inline-flex items-center gap-2">
-            <KeyRound className="w-4 h-4 text-[var(--muted)] shrink-0" aria-hidden="true" />
-            <span>Opciones de desarrollador (Google OAuth Client ID)</span>
-          </span>
-          <ChevronDown
-            className={`w-4 h-4 shrink-0 text-[var(--muted)] transition-transform duration-150 motion-reduce:transition-none ${
-              isDevConfigOpen ? 'rotate-180' : ''
-            }`}
-            aria-hidden="true"
-          />
-        </button>
-
-        {isDevConfigOpen && (
-          <div id={devPanelId} className="space-y-2.5 pt-1">
-            <p id={clientIdHelpId} className="text-[13px] text-[var(--muted)] leading-relaxed">
-              Se guarda únicamente en tu navegador (<span className="t-num">localStorage</span>). No
-              requiere backend ni clave secreta.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                id={clientIdInputId}
-                type="text"
-                value={clientIdInput}
-                onChange={(e) => setClientIdInput(e.target.value)}
-                aria-describedby={clientIdHelpId}
-                placeholder="1234567890-abcdef.apps.googleusercontent.com"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                className="t-input t-num flex-1"
-              />
-              <button
-                type="button"
-                onClick={handleSaveClientId}
-                disabled={isBusy}
-                className="t-btn t-btn-secondary shrink-0"
-              >
-                Guardar ID
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Row 4: Collapsible 3-step Authorized Origins Guide */}
-      <div className="t-row">
-        <button
-          type="button"
-          aria-expanded={isGuideOpen}
-          aria-controls={guidePanelId}
-          onClick={() => setIsGuideOpen((prev) => !prev)}
-          className="w-full min-h-[44px] flex items-center justify-between gap-3 py-1 text-left text-[14px] font-medium text-[var(--ink)] hover:text-[var(--action)] transition-colors cursor-pointer"
-        >
-          <span>Guía rápida (3 pasos) para obtener tu Client ID</span>
-          <ChevronDown
-            className={`w-4 h-4 shrink-0 text-[var(--muted)] transition-transform duration-150 motion-reduce:transition-none ${
-              isGuideOpen ? 'rotate-180' : ''
-            }`}
-            aria-hidden="true"
-          />
-        </button>
-
-        {isGuideOpen && (
-          <div
-            id={guidePanelId}
-            className="mt-3 p-4 rounded-[12px] bg-[var(--surface-2)] border border-[var(--line)] space-y-2.5"
-          >
-            <ol className="list-decimal pl-5 space-y-2 text-[13px] text-[var(--muted)] leading-relaxed">
-              <li>
-                Abre <strong className="text-[var(--ink)]">Google Cloud Console</strong>, crea o
-                elige un proyecto y habilita <strong className="text-[var(--ink)]">Google Calendar API</strong>.
-              </li>
-              <li>
-                Ve a <strong className="text-[var(--ink)]">APIs y servicios → Credenciales → Crear ID de cliente de OAuth</strong>{' '}
-                (tipo <strong className="text-[var(--ink)]">Aplicación web</strong>) y agrega en{' '}
-                <strong className="text-[var(--ink)]">Orígenes autorizados de JavaScript</strong>:
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  <code className="t-badge t-num text-[var(--ink)]">http://localhost:5174</code>
-                  <code className="t-badge t-num text-[var(--ink)]">http://localhost:5173</code>
-                </div>
-              </li>
-              <li>
-                Copia tu Client ID (<span className="t-num">.apps.googleusercontent.com</span>),
-                pégalo arriba o defínelo en <code className="t-num text-[var(--ink)]">VITE_GOOGLE_CLIENT_ID</code>.
-              </li>
-            </ol>
-
-            <div className="pt-2 border-t border-[var(--line)] flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsGuideOpen(false)}
-                className="t-btn t-btn-ghost min-h-[40px] px-3 text-[13px]"
-              >
-                Ocultar guía
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
