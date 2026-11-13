@@ -2421,18 +2421,26 @@ export const App: React.FC = () => {
             <>
               <StatsHero
                 state={state}
+                googleEvents={googleEvents}
+                todayDateIso={getLocalIsoDate()}
+                missingGymScheduleCount={missingScheduledGymDays.length}
                 onOpenQuickAddWithTab={(tab) => handleOpenQuickAdd(tab)}
+                onNavigateTab={setActiveTab}
               />
               <OverviewBento
                 state={state}
                 googleEvents={googleEvents}
                 todayDateIso={getLocalIsoDate()}
+                attendanceLogs={state.gymAttendanceLogs}
+                missingScheduledGymDays={missingScheduledGymDays}
                 onNavigateTab={setActiveTab}
                 onToggleGymSet={handleToggleGymSet}
                 onUpdateUniStatus={handleUpdateUniStatus}
+                onUpdateAssignment={handleUpdateAssignment}
                 onUpdateKanbanStatus={handleUpdateKanbanStatus}
                 onOpenQuickAdd={handleOpenQuickAdd}
                 onHabitsChange={handleHabitsChange}
+                onSaveReflection={handleSaveReflection}
                 onRestoreState={handleRestoreState}
               />
             </>
