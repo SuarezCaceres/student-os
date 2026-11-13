@@ -1,27 +1,138 @@
-import React, { useState, useId } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import {
-  Dumbbell,
+  AlertCircle,
+  AlertTriangle,
+  CalendarCheck2,
+  CalendarClock,
   Check,
+  CheckCircle2,
+  Clock,
+  Dumbbell,
   Plus,
-  Trash2,
-  Trophy,
+  RefreshCw,
+  Settings2,
   Timer,
-  TrendingUp,
+  Trophy,
 } from 'lucide-react';
-import type { GymRoutine, GymExercise, DayOfWeek } from '../../types';
+import type {
+  CalendarBlock,
+  DayOfWeek,
+  ExerciseHistoryEntry,
+  GymAttendanceLog,
+  GymExercise,
+  GymRoutine,
+  GymSessionDurationMinutes,
+  MissReasonId,
+  UserGymProfile,
+  WeightHistoryEntry,
+} from '../../types';
+import type { MissingScheduledGymDay } from '../../utils/gymScheduleSync';
+import { GymScheduleMismatchBanner } from './GymScheduleMismatchBanner';
+import type { BusyInterval } from '../../utils/calendarSlotFinder';
+import type {
+  DeleteGoogleGymEventsResult,
+  GoogleCalendarEvent,
+} from '../../services/googleCalendar';
 import { triggerBigCelebration, triggerConfetti } from '../../utils/confetti';
+import {
+  buildSessionAttendanceLog,
+  findPendingMissedDays,
+  formatElapsedSeconds,
+  formatShortSpanishDate,
+  getCurrentWeekDateMap,
+  getLocalIsoDate,
+  getRescheduleOptions,
+  getTodayDayOfWeek,
+  type RescheduleMode,
+} from '../../utils/gymAttendance';
+import { getGymDisplayName, getRecommendedRestSeconds } from '../../utils/routineGenerator';
 import { SectionHeader } from '../common/SectionHeader';
 import { ModalShell } from '../common/ModalShell';
 import { RestTimerFloating } from './RestTimerFloating';
 import { ExerciseProgressModal } from './ExerciseProgressModal';
+import { ExerciseVideoModal } from './ExerciseVideoModal';
+import { QuickWeightModal } from './QuickWeightModal';
+import { ExerciseCard } from './ExerciseCard';
+import { GymOnboardingModal, type GymOnboardingCompletePayload } from './GymOnboardingModal';
+import { GymProfileCard } from './GymProfileCard';
+import { WeightCheckInModal } from './WeightCheckInModal';
+import { GymRestDayBanner } from './GymRestDayBanner';
+import { GymStartGateCard } from './GymStartGateCard';
+import { GymMissFlowCard } from './GymMissFlowCard';
+import { GymMissedSummaryCard } from './GymMissedSummaryCard';
 
 export interface GymTrackerProps {
   routines: GymRoutine[];
+  gymProfile?: UserGymProfile;
+  weightHistory?: WeightHistoryEntry[];
+  attendanceLogs?: GymAttendanceLog[];
+  calendarBlocks?: CalendarBlock[];
+  externalBusyByDate?: Record<string, BusyInterval[]>;
+  googleEvents?: GoogleCalendarEvent[];
+  isGoogleConnected?: boolean;
+  isGoogleSyncing?: boolean;
+  isSyncingGymToGoogle?: boolean;
+  autoOpenOnboarding?: boolean;
+  onOnboardingOpenChange?: (isOpen: boolean) => void;
+  onOpenGoogleSync?: () => void;
+  onSyncGymWeekToGoogle?: () => Promise<void> | void;
+  onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
+  onClearPreviousGymBlocks?: () => Promise<DeleteGoogleGymEventsResult | void> | void;
+  onLogBodyWeight?: (newWeightKg: number) => void;
+  onStartSession?: (payload: {
+    dayOfWeek: DayOfWeek;
+    date: string;
+    routineId: string;
+    routineName: string;
+  }) => void;
+  onLogMissedWorkout?: (payload: {
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+    routineId: string;
+    routineName: string;
+    reason: MissReasonId;
+    note?: string;
+    encouragementMessage: string;
+  }) => void;
+  onRescheduleWorkout?: (payload: {
+    fromDay: DayOfWeek;
+    fromDate: string;
+    toDay: DayOfWeek;
+    mode: RescheduleMode;
+    reminderMinutes?: number[];
+    selectedSlot?: {
+      dateIso: string;
+      startTime: string;
+      endTime: string;
+    };
+  }) => void;
   onToggleSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onAddExercise: (day: DayOfWeek, exercise: GymExercise) => void;
   onDeleteExercise: (routineId: string, exerciseId: string) => void;
-  onFinishWorkout: () => void;
+  onFinishWorkout: (payload?: {
+    dayOfWeek: DayOfWeek;
+    date: string;
+    routineId: string;
+    routineName: string;
+    durationMinutes?: number;
+  }) => void;
   onUpdateExercise?: (day: DayOfWeek, updated: GymExercise) => void;
+  missingScheduledDays?: MissingScheduledGymDay[];
+  onDismissMissingGymDay?: (dateIso: string, dayOfWeek: DayOfWeek) => void;
+  onSwapFixedGymDay?: (payload: {
+    fromDay: DayOfWeek;
+    fromDate: string;
+    toDay: DayOfWeek;
+    slot: {
+      startTime: string;
+      endTime: string;
+      durationMinutes: GymSessionDurationMinutes;
+    };
+  }) => Promise<void> | void;
+  onRemoveFixedGymDay?: (payload: {
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+  }) => Promise<void> | void;
 }
 
 const DAYS_LIST: DayOfWeek[] = [
@@ -34,33 +145,70 @@ const DAYS_LIST: DayOfWeek[] = [
   'Domingo',
 ];
 
-const JS_DAYS_MAP: DayOfWeek[] = [
-  'Domingo',
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-];
-
-function getTodayDayOfWeek(): DayOfWeek {
-  return JS_DAYS_MAP[new Date().getDay()];
-}
-
 export const GymTracker: React.FC<GymTrackerProps> = ({
   routines,
+  gymProfile,
+  weightHistory,
+  attendanceLogs,
+  calendarBlocks = [],
+  externalBusyByDate,
+  googleEvents,
+  isGoogleConnected = false,
+  isGoogleSyncing = false,
+  isSyncingGymToGoogle = false,
+  autoOpenOnboarding,
+  onOnboardingOpenChange,
+  onOpenGoogleSync,
+  onSyncGymWeekToGoogle,
+  onSaveGymPlan,
+  onClearPreviousGymBlocks,
+  onLogBodyWeight,
+  onStartSession,
+  onLogMissedWorkout,
+  onRescheduleWorkout,
   onToggleSet,
   onAddExercise,
   onDeleteExercise,
   onFinishWorkout,
   onUpdateExercise,
+  missingScheduledDays = [],
+  onDismissMissingGymDay,
+  onSwapFixedGymDay,
+  onRemoveFixedGymDay,
 }) => {
   const formId = useId();
 
-  // Purity-safe lazy state initialization for today's day
+  // Purity-safe lazy state initialization for today's day, local week dates & onboarding
   const [todayDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [todayIso] = useState<string>(() => getLocalIsoDate());
+  const [weekDates] = useState<Record<DayOfWeek, string>>(() => getCurrentWeekDateMap());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getTodayDayOfWeek());
+  const [onboardingInitialStep, setOnboardingInitialStep] = useState<1 | 2 | 3 | 4 | 5>(1);
+  const [internalOnboardingOpen, setInternalOnboardingOpen] = useState<boolean>(
+    () => autoOpenOnboarding ?? !gymProfile
+  );
+  const isOnboardingOpen =
+    autoOpenOnboarding !== undefined ? autoOpenOnboarding : internalOnboardingOpen;
+  const setIsOnboardingOpen = (nextOpen: boolean) => {
+    setInternalOnboardingOpen(nextOpen);
+    onOnboardingOpenChange?.(nextOpen);
+  };
+  const openOnboardingAtStep = (targetStep: 1 | 2 | 3 | 4 | 5) => {
+    setOnboardingInitialStep(targetStep);
+    setIsOnboardingOpen(true);
+  };
+  const [isWeightCheckInOpen, setIsWeightCheckInOpen] = useState<boolean>(false);
+  const [fallbackLogs, setFallbackLogs] = useState<GymAttendanceLog[]>([]);
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  const [statusAnnouncement, setStatusAnnouncement] = useState<string>('');
+  const [pinnedMissDay, setPinnedMissDay] = useState<{
+    dayOfWeek: DayOfWeek;
+    dateIso: string;
+    routine: GymRoutine;
+    isRetroactive: boolean;
+    initialStage: 'reason' | 'encouragement_reschedule';
+    existingReason?: MissReasonId;
+  } | null>(null);
 
   // Rest Timer state
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -70,6 +218,8 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
   // Exercise Progress Modal & fallback local overrides (used when onUpdateExercise is not passed)
   const [selectedExerciseIdForModal, setSelectedExerciseIdForModal] = useState<string | null>(null);
+  const [selectedExerciseIdForVideoModal, setSelectedExerciseIdForVideoModal] = useState<string | null>(null);
+  const [selectedExerciseIdForWeightModal, setSelectedExerciseIdForWeightModal] = useState<string | null>(null);
   const [exerciseOverrides, setExerciseOverrides] = useState<
     Record<string, Omit<Partial<GymExercise>, 'completedSets'>>
   >({});
@@ -103,6 +253,43 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     selectedExerciseIdForModal
       ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForModal) || null
       : null;
+
+  const selectedExerciseForVideoModal =
+    selectedExerciseIdForVideoModal
+      ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForVideoModal) || null
+      : null;
+
+  const selectedExerciseForWeightModal =
+    selectedExerciseIdForWeightModal
+      ? currentRoutine.exercises.find((ex) => ex.id === selectedExerciseIdForWeightModal) || null
+      : null;
+
+  const handleSaveQuickWeight = (newWeight: number, reps: string) => {
+    if (!selectedExerciseForWeightModal) return;
+
+    const currentPR =
+      selectedExerciseForWeightModal.personalRecordKg ||
+      (selectedExerciseForWeightModal.weightKg
+        ? Math.round(selectedExerciseForWeightModal.weightKg * 1.1)
+        : 80);
+    const isNewPR = newWeight > currentPR;
+
+    const newHistoryEntry: ExerciseHistoryEntry = {
+      date: todayIso,
+      weightKg: newWeight,
+      reps: reps.trim(),
+    };
+
+    const updated: GymExercise = {
+      ...selectedExerciseForWeightModal,
+      weightKg: newWeight,
+      reps: reps.trim(),
+      personalRecordKg: isNewPR ? newWeight : currentPR,
+      history: [...(selectedExerciseForWeightModal.history || []), newHistoryEntry],
+    };
+
+    handleUpdateExerciseFromModal(updated);
+  };
 
   // Calculate day progress
   let totalSets = 0;
@@ -191,14 +378,207 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     triggerConfetti();
   };
 
+  const effectiveLogs = attendanceLogs ?? fallbackLogs;
+  const selectedDateIso = weekDates[selectedDay];
+  const selectedDayLog = effectiveLogs.find((l) => l.date === selectedDateIso);
+  const isSessionInProgress = selectedDayLog?.status === 'in_progress';
+
+  useEffect(() => {
+    if (!isSessionInProgress) return;
+    const id = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [isSessionInProgress]);
+
+  const startedMs = selectedDayLog?.startedAt
+    ? new Date(selectedDayLog.startedAt).getTime()
+    : Number.NaN;
+  const elapsedSeconds =
+    isSessionInProgress && Number.isFinite(startedMs)
+      ? Math.max(0, Math.floor((nowMs - startedMs) / 1000))
+      : 0;
+
+  const pendingMissedDays = findPendingMissedDays(
+    gymProfile,
+    routines,
+    effectiveLogs,
+    weekDates,
+    todayIso
+  );
+
+  const pendingForSelected = pendingMissedDays.find((p) => p.dayOfWeek === selectedDay);
+  const autoPendingMiss =
+    selectedDay === todayDay ? pendingMissedDays[0] : pendingForSelected;
+
+  const activeMissFlow =
+    pinnedMissDay ??
+    (autoPendingMiss
+      ? {
+          dayOfWeek: autoPendingMiss.dayOfWeek,
+          dateIso: autoPendingMiss.date,
+          routine: autoPendingMiss.routine,
+          isRetroactive: true,
+          initialStage: 'reason' as const,
+          existingReason: undefined,
+        }
+      : null);
+
+  const hasAnyCompletedSet = currentRoutine.exercises.some((ex) =>
+    ex.completedSets.some(Boolean)
+  );
+
+  const gymDisplayName = gymProfile
+    ? getGymDisplayName(gymProfile.gymType, gymProfile.customGymName)
+    : undefined;
+
+  const upsertFallbackLog = (nextLog: GymAttendanceLog) => {
+    setFallbackLogs((prev) => [...prev.filter((l) => l.date !== nextLog.date), nextLog]);
+  };
+
+  const handleStartTodaySession = () => {
+    const { nowMs: startNow, log } = buildSessionAttendanceLog({
+      date: todayIso,
+      dayOfWeek: todayDay,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+      status: 'in_progress',
+    });
+    setNowMs(startNow);
+    setStatusAnnouncement(`Sesión de ${todayDay} iniciada. Cronómetro de 2 horas en marcha.`);
+    const payload = {
+      dayOfWeek: todayDay,
+      date: todayIso,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+    };
+    if (onStartSession) {
+      onStartSession(payload);
+    } else {
+      upsertFallbackLog(log);
+    }
+  };
+
+  const handleCompleteTodayWorkout = () => {
+    const durationMinutes =
+      elapsedSeconds > 0 ? Math.max(1, Math.round(elapsedSeconds / 60)) : undefined;
+    triggerBigCelebration();
+    setStatusAnnouncement(`Entrenamiento del ${selectedDay} registrado como completado.`);
+    const payload = {
+      dayOfWeek: selectedDay,
+      date: selectedDateIso,
+      routineId: currentRoutine.id,
+      routineName: currentRoutine.name,
+      durationMinutes,
+    };
+    if (!onStartSession) {
+      const { log } = buildSessionAttendanceLog({
+        date: selectedDateIso,
+        dayOfWeek: selectedDay,
+        routineId: currentRoutine.id,
+        routineName: currentRoutine.name,
+        status: 'completed',
+        durationMinutes,
+      });
+      upsertFallbackLog(log);
+    }
+    onFinishWorkout(payload);
+  };
+
+  const recommendedRestDuration = gymProfile
+    ? getRecommendedRestSeconds(gymProfile.goal)
+    : 90;
+
+  const isConfiguredRestDay =
+    Boolean(gymProfile) &&
+    !gymProfile?.selectedDays.includes(selectedDay) &&
+    currentRoutine.exercises.length === 0;
+
+  const nextTrainingDay: DayOfWeek | undefined = (() => {
+    if (!gymProfile || gymProfile.selectedDays.length === 0) return undefined;
+    const currentIndex = DAYS_LIST.indexOf(selectedDay);
+    for (let offset = 1; offset <= 7; offset++) {
+      const candidate = DAYS_LIST[(currentIndex + offset) % 7];
+      if (gymProfile.selectedDays.includes(candidate)) {
+        return candidate;
+      }
+    }
+    return gymProfile.selectedDays[0];
+  })();
+
+  const shouldShowTodayStartGate =
+    selectedDay === todayDay &&
+    currentRoutine.exercises.length > 0 &&
+    selectedDayLog?.status !== 'in_progress' &&
+    selectedDayLog?.status !== 'completed' &&
+    !hasAnyCompletedSet;
+
+  const selectedMissRescheduleOptions =
+    selectedDayLog?.status === 'missed'
+      ? getRescheduleOptions(selectedDay, routines, gymProfile, weekDates, todayIso)
+      : [];
+
+  // Derived weekly adherence telemetry (avoid duplicating in state)
+  const weeklyPlannedCount = DAYS_LIST.reduce((acc, day) => {
+    const dayRoutine = routines.find((r) => r.dayOfWeek === day);
+    const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
+    const isScheduled = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
+    return acc + (isScheduled ? 1 : 0);
+  }, 0);
+
+  const weeklyCompletedCount = DAYS_LIST.reduce((acc, day) => {
+    const dayLog = effectiveLogs.find((l) => l.date === weekDates[day]);
+    return acc + (dayLog?.status === 'completed' ? 1 : 0);
+  }, 0);
+
+  const weeklyRescheduledCount = DAYS_LIST.reduce((acc, day) => {
+    const dayLog = effectiveLogs.find((l) => l.date === weekDates[day]);
+    return acc + (dayLog?.status === 'rescheduled' ? 1 : 0);
+  }, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 w-full">
+      <p role="status" aria-atomic="true" className="sr-only">
+        {statusAnnouncement}
+      </p>
       {/* Header */}
       <SectionHeader
         title="Entrenamiento y gimnasio"
         subtitle="Marca tus series en un toque, controla tus descansos y supera tus marcas."
         actions={
           <>
+            <button
+              type="button"
+              onClick={() => openOnboardingAtStep(1)}
+              className="t-btn t-btn-secondary"
+            >
+              <Settings2 className="w-4 h-4" aria-hidden="true" />
+              <span>{gymProfile ? 'Mi perfil gym' : 'Configurar gym'}</span>
+            </button>
+
+            {onSyncGymWeekToGoogle && (
+              <button
+                type="button"
+                onClick={isGoogleConnected ? onSyncGymWeekToGoogle : onOpenGoogleSync}
+                disabled={isSyncingGymToGoogle}
+                className="t-btn t-btn-secondary"
+                title="Publicar tus sesiones de entrenamiento de esta semana en Google Calendar con avisos previos"
+              >
+                {isSyncingGymToGoogle ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-[var(--action)] shrink-0" aria-hidden="true" />
+                ) : (
+                  <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                )}
+                <span>
+                  {isSyncingGymToGoogle
+                    ? 'Sincronizando gym...'
+                    : isGoogleConnected
+                      ? 'Sincronizar Gym con Google'
+                      : 'Conectar avisos Google'}
+                </span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => {
@@ -210,7 +590,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                 isTimerOpen ? '!border-[var(--action)] !text-[var(--action)]' : ''
               }`}
             >
-              <Timer className="w-4 h-4" />
+              <Timer className="w-4 h-4" aria-hidden="true" />
               <span>Cronómetro</span>
             </button>
 
@@ -240,84 +620,435 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               onClick={() => setShowAddForm(true)}
               className="t-btn t-btn-primary"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4" aria-hidden="true" />
               <span>Agregar ejercicio</span>
             </button>
           </>
         }
       />
 
-      {/* Tactile Day Selector (Lunes - Domingo, >=44px height) */}
-      <div
-        role="tablist"
-        aria-label="Seleccionar día de entrenamiento"
-        className="flex md:grid md:grid-cols-7 items-center gap-1.5 p-1.5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line)] overflow-x-auto no-scrollbar"
-      >
-        {DAYS_LIST.map((day) => {
-          const isToday = day === todayDay;
-          const isSelected = day === selectedDay;
+      {/* Automatic Calendar vs Gym Plan Mismatch Recovery Banner (Above-the-fold priority) */}
+      {!isGoogleSyncing && !isSyncingGymToGoogle && missingScheduledDays.length > 0 && (
+        <GymScheduleMismatchBanner
+          missingDays={missingScheduledDays}
+          selectedDay={selectedDay}
+          gymProfile={gymProfile}
+          routines={routines}
+          calendarBlocks={calendarBlocks}
+          externalBusyByDate={externalBusyByDate}
+          googleEvents={googleEvents}
+          weekDates={weekDates}
+          todayIso={todayIso}
+          isGoogleConnected={isGoogleConnected}
+          isSyncingAction={isGoogleSyncing || isSyncingGymToGoogle}
+          onSelectCalendarDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
+          onOpenFullScheduleEditor={() => openOnboardingAtStep(5)}
+          onOpenGoogleSync={onOpenGoogleSync}
+          onMoveThisWeek={async (payload) => {
+            await onRescheduleWorkout?.({
+              ...payload,
+              reminderMinutes: gymProfile?.reminderMinutesBefore,
+            });
+            setPinnedMissDay(null);
+            setSelectedDay(payload.toDay);
+            setStatusAnnouncement(
+              `Sesión del ${payload.fromDay} reprogramada al ${payload.toDay} para esta semana.`
+            );
+          }}
+          onSwapFixedDay={async (payload) => {
+            await onSwapFixedGymDay?.(payload);
+            setPinnedMissDay(null);
+            setSelectedDay(payload.toDay);
+            setStatusAnnouncement(
+              `Día fijo actualizado: ${payload.fromDay} cambiado a ${payload.toDay}.`
+            );
+          }}
+          onRemoveFixedDay={async (payload) => {
+            await onRemoveFixedGymDay?.(payload);
+            setPinnedMissDay(null);
+            setStatusAnnouncement(`${payload.dayOfWeek} eliminado de tu plan fijo semanal.`);
+          }}
+          onDismissDay={(dateIso, dayOfWeek) => {
+            onDismissMissingGymDay?.(dateIso, dayOfWeek);
+            setStatusAnnouncement(`Aviso del ${dayOfWeek} ignorado por esta semana.`);
+          }}
+        />
+      )}
 
-          return (
+      {/* Profile Summary & BMI Card (or first-time setup prompt) */}
+      {gymProfile ? (
+        <GymProfileCard
+          profile={gymProfile}
+          onOpenOnboarding={() => openOnboardingAtStep(1)}
+          onOpenWeightCheckIn={() => setIsWeightCheckInOpen(true)}
+        />
+      ) : (
+        <div className="t-card p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-[15px] font-medium text-[var(--ink)]">
+              Personaliza tu gimnasio, frecuencia semanal, objetivo e IMC
+            </p>
+            <p className="text-[14px] text-[var(--muted)] mt-0.5">
+              Configúralo una sola vez para generar rutinas adaptadas a tus días y sede.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openOnboardingAtStep(1)}
+            className="t-btn t-btn-primary shrink-0"
+          >
+            <Settings2 className="w-4 h-4" aria-hidden="true" />
+            <span>Configurar mi plan</span>
+          </button>
+        </div>
+      )}
+
+      {/* Weekly Adherence Telemetry Strip + Tactile Day Selector */}
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-[13px] text-[var(--muted)]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>
+              Asistencia esta semana:{' '}
+              <strong className="t-num font-semibold text-[var(--ink)]">
+                {weeklyCompletedCount}/{weeklyPlannedCount}
+              </strong>{' '}
+              completadas
+            </span>
+            {weeklyRescheduledCount > 0 && (
+              <span className="t-num">· {weeklyRescheduledCount} reprogramada{weeklyRescheduledCount > 1 ? 's' : ''}</span>
+            )}
+          </div>
+
+          {pendingMissedDays.length > 0 && selectedDay !== pendingMissedDays[0].dayOfWeek && (
             <button
-              key={day}
               type="button"
-              role="tab"
-              aria-selected={isSelected}
-              onClick={() => setSelectedDay(day)}
-              className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
-                isSelected
-                  ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
-                  : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
-              }`}
+              onClick={() => {
+                setPinnedMissDay(null);
+                setSelectedDay(pendingMissedDays[0].dayOfWeek);
+              }}
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--warn)] hover:underline cursor-pointer"
             >
-              <span className="sm:hidden">{day.slice(0, 3)}</span>
-              <span className="hidden sm:inline">{day}</span>
-              {isToday && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none font-medium ${
-                    isSelected
-                      ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
-                      : 'bg-[var(--surface)] text-[var(--muted)] border border-[var(--line)]'
-                  }`}
-                >
-                  Hoy
-                </span>
-              )}
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Registrar falta pendiente ({pendingMissedDays[0].dayOfWeek})</span>
             </button>
-          );
-        })}
+          )}
+        </div>
+
+        <div
+          role="tablist"
+          aria-label="Seleccionar día de entrenamiento"
+          className="w-full max-w-full min-w-0 flex md:grid md:grid-cols-7 items-center gap-1.5 p-1.5 rounded-[16px] bg-[var(--surface-2)] border border-[var(--line)] overflow-x-auto no-scrollbar"
+        >
+          {DAYS_LIST.map((day) => {
+            const isToday = day === todayDay;
+            const isSelected = day === selectedDay;
+            const dayDateIso = weekDates[day];
+            const dayLog = effectiveLogs.find((l) => l.date === dayDateIso);
+            const dayRoutine = routines.find((r) => r.dayOfWeek === day);
+            const hasExercises = Boolean(dayRoutine && dayRoutine.exercises.length > 0);
+            const isScheduledDay = gymProfile ? gymProfile.selectedDays.includes(day) : hasExercises;
+            const isPendingMissTab = pendingMissedDays.some((p) => p.dayOfWeek === day);
+            const isMissingFromCalendarTab = missingScheduledDays.some((m) => m.dayOfWeek === day);
+
+            let statusIcon: React.ReactNode = null;
+            let dayStatusLabel = 'descanso';
+            if (dayLog?.status === 'completed') {
+              statusIcon = <Check className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />;
+              dayStatusLabel = 'completada';
+            } else if (isMissingFromCalendarTab) {
+              statusIcon = (
+                <AlertTriangle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'sesión eliminada del calendario';
+            } else if (isPendingMissTab) {
+              statusIcon = (
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'falta pendiente por registrar';
+            } else if (dayLog?.status === 'missed') {
+              statusIcon = (
+                <AlertCircle className="w-3.5 h-3.5 text-[var(--warn)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'falta registrada';
+            } else if (dayLog?.status === 'rescheduled') {
+              statusIcon = (
+                <CalendarClock className="w-3.5 h-3.5 text-[var(--muted)] shrink-0" aria-hidden="true" />
+              );
+              dayStatusLabel = 'reprogramada';
+            } else if (dayLog?.status === 'in_progress') {
+              statusIcon = <Clock className="w-3.5 h-3.5 text-[var(--action)] shrink-0" aria-hidden="true" />;
+              dayStatusLabel = 'sesión en curso';
+            } else if (isScheduledDay || hasExercises) {
+              statusIcon = (
+                <span
+                  aria-hidden="true"
+                  className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--gym)]"
+                />
+              );
+              dayStatusLabel = 'rutina programada';
+            }
+
+            return (
+              <button
+                key={day}
+                type="button"
+                role="tab"
+                aria-selected={isSelected}
+                aria-label={`${day}${isToday ? ' (Hoy)' : ''}: ${dayStatusLabel}`}
+                onClick={() => {
+                  setPinnedMissDay(null);
+                  setSelectedDay(day);
+                }}
+                className={`min-h-[46px] min-w-[86px] md:min-w-0 px-3 py-2 rounded-[12px] text-[14px] font-medium inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer select-none transition-all focus-visible:outline-2 focus-visible:outline-[var(--action)] ${
+                  isSelected
+                    ? isMissingFromCalendarTab
+                      ? 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--warn)] shadow-2xs'
+                      : 'bg-[var(--surface)] text-[var(--ink)] border border-[var(--line-strong)] shadow-2xs'
+                    : isMissingFromCalendarTab
+                      ? 'border border-[color-mix(in_oklab,var(--warn)_42%,transparent)] bg-[color-mix(in_oklab,var(--warn)_8%,transparent)] text-[var(--ink)]'
+                      : 'border border-transparent text-[var(--muted)] hover:text-[var(--ink)]'
+                }`}
+              >
+                {statusIcon}
+                <span className="sm:hidden">{day.slice(0, 3)}</span>
+                <span className="hidden sm:inline">{day}</span>
+                {isToday && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[13px] leading-none font-medium ${
+                      isSelected
+                        ? 'bg-[color-mix(in_oklab,var(--action)_16%,transparent)] text-[var(--action)]'
+                        : 'bg-[var(--surface)] text-[var(--muted)] border border-[var(--line)]'
+                    }`}
+                  >
+                    Hoy
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Main Routine Card */}
+      {/* Main Routine Gate / Missed Flow / Rest Day / Active Exercise Routine */}
+      {activeMissFlow ? (
+        <GymMissFlowCard
+          key={activeMissFlow.dateIso}
+          dayOfWeek={activeMissFlow.dayOfWeek}
+          dateIso={activeMissFlow.dateIso}
+          routine={activeMissFlow.routine}
+          isRetroactive={activeMissFlow.isRetroactive}
+          pendingCount={pendingMissedDays.length}
+          initialStage={activeMissFlow.initialStage}
+          existingReason={activeMissFlow.existingReason}
+          goal={gymProfile?.goal}
+          gymType={gymProfile?.gymType}
+          customGymName={gymProfile?.customGymName}
+          defaultReminderMinutes={gymProfile?.reminderMinutesBefore}
+          defaultSessionMinutes={gymProfile?.defaultSessionMinutes}
+          rescheduleOptions={getRescheduleOptions(
+            activeMissFlow.dayOfWeek,
+            routines,
+            gymProfile,
+            weekDates,
+            todayIso
+          )}
+          calendarBlocks={calendarBlocks}
+          externalBusyByDate={externalBusyByDate}
+          isGoogleConnected={isGoogleConnected}
+          onOpenGoogleSync={onOpenGoogleSync}
+          weekDates={weekDates}
+          onCancel={() => setPinnedMissDay(null)}
+          onSubmitMissReason={(payload) => {
+            setStatusAnnouncement(
+              `Inasistencia del ${payload.dayOfWeek} registrada. Elige cómo reprogramar tu semana.`
+            );
+            setPinnedMissDay({
+              ...activeMissFlow,
+              initialStage: 'encouragement_reschedule',
+              existingReason: payload.reason,
+            });
+            if (onLogMissedWorkout) {
+              onLogMissedWorkout({
+                dayOfWeek: payload.dayOfWeek,
+                dateIso: payload.dateIso,
+                routineId: payload.routine.id,
+                routineName: payload.routine.name,
+                reason: payload.reason,
+                note: payload.note,
+                encouragementMessage: payload.encouragementMessage,
+              });
+            } else {
+              upsertFallbackLog({
+                id: `att-${payload.dateIso}-${payload.routine.id}`,
+                date: payload.dateIso,
+                dayOfWeek: payload.dayOfWeek,
+                routineId: payload.routine.id,
+                routineName: payload.routine.name,
+                status: 'missed',
+                missReason: payload.reason,
+                missNote: payload.note,
+                encouragementMessage: payload.encouragementMessage,
+                streakProtected: true,
+              });
+            }
+          }}
+          onReschedule={(payload) => {
+            if (onRescheduleWorkout) {
+              onRescheduleWorkout(payload);
+            } else {
+              upsertFallbackLog({
+                id: `att-${payload.fromDate}-${activeMissFlow.routine.id}`,
+                date: payload.fromDate,
+                dayOfWeek: payload.fromDay,
+                routineId: activeMissFlow.routine.id,
+                routineName: activeMissFlow.routine.name,
+                status: 'rescheduled',
+                missReason: activeMissFlow.existingReason,
+                rescheduledToDay: payload.toDay,
+                rescheduledToDate: weekDates[payload.toDay],
+                rescheduledSlotStart: payload.selectedSlot?.startTime,
+                rescheduledSlotEnd: payload.selectedSlot?.endTime,
+                streakProtected: true,
+              });
+            }
+            setStatusAnnouncement(
+              payload.selectedSlot
+                ? `Rutina reprogramada del ${payload.fromDay} al ${payload.toDay} (${payload.selectedSlot.startTime} – ${payload.selectedSlot.endTime}).`
+                : `Rutina reprogramada del ${payload.fromDay} al ${payload.toDay}.`
+            );
+            setPinnedMissDay(null);
+            triggerConfetti();
+          }}
+          onFinishWithoutReschedule={() => setPinnedMissDay(null)}
+        />
+      ) : selectedDayLog?.status === 'missed' || selectedDayLog?.status === 'rescheduled' ? (
+        <GymMissedSummaryCard
+          log={selectedDayLog}
+          isToday={selectedDay === todayDay}
+          canReschedule={selectedMissRescheduleOptions.length > 0}
+          onGoToDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
+          onOpenReschedule={() =>
+            setPinnedMissDay({
+              dayOfWeek: selectedDay,
+              dateIso: selectedDateIso,
+              routine: currentRoutine,
+              isRetroactive: selectedDay !== todayDay,
+              initialStage: 'encouragement_reschedule',
+              existingReason: selectedDayLog.missReason,
+            })
+          }
+          onOverrideStartToday={
+            selectedDay === todayDay && currentRoutine.exercises.length > 0
+              ? handleStartTodaySession
+              : undefined
+          }
+        />
+      ) : isConfiguredRestDay ? (
+        <GymRestDayBanner
+          selectedDay={selectedDay}
+          nextTrainingDay={nextTrainingDay}
+          goal={gymProfile?.goal}
+          onSelectDay={(day) => {
+            setPinnedMissDay(null);
+            setSelectedDay(day);
+          }}
+          onAddExtraExercise={() => setShowAddForm(true)}
+        />
+      ) : shouldShowTodayStartGate ? (
+        <GymStartGateCard
+          routine={currentRoutine}
+          dayOfWeek={selectedDay}
+          dateIso={selectedDateIso}
+          gymDisplayName={gymDisplayName}
+          restSeconds={recommendedRestDuration}
+          onStartSession={handleStartTodaySession}
+          onReportMissed={() =>
+            setPinnedMissDay({
+              dayOfWeek: todayDay,
+              dateIso: todayIso,
+              routine: currentRoutine,
+              isRetroactive: false,
+              initialStage: 'reason',
+            })
+          }
+        />
+      ) : (
       <section className="t-card p-6">
-        {/* Routine Header & Progress */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-5 border-b border-[var(--line)]">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
-              <span className="text-[13px] text-[var(--muted)]">· {selectedDay}</span>
+        {/* Routine Header, Session Status & Progress */}
+        <div className="pb-5 border-b border-[var(--line)]">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="t-badge t-badge-gym">{currentRoutine.tag}</span>
+                <span className="text-[13px] text-[var(--muted)]">
+                  · {selectedDay} ({formatShortSpanishDate(selectedDateIso)})
+                </span>
+                {isSessionInProgress && (
+                  <span className="t-badge t-badge-accent">
+                    <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    <span>Sesión en curso</span>
+                  </span>
+                )}
+                {selectedDayLog?.status === 'completed' && (
+                  <span className="t-badge t-badge-ok t-num">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    Completado
+                    {selectedDayLog.durationMinutes ? ` · ${selectedDayLog.durationMinutes} min` : ''}
+                  </span>
+                )}
+                {selectedDateIso > todayIso && currentRoutine.exercises.length > 0 && (
+                  <span className="t-badge">Próxima sesión · ~2h</span>
+                )}
+              </div>
+              <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug text-balance">
+                {currentRoutine.name}
+              </h3>
             </div>
-            <h3 className="text-xl sm:text-2xl font-medium tracking-[-0.025em] text-[var(--ink)] leading-snug">
-              {currentRoutine.name}
-            </h3>
+
+            <div className="w-full md:w-72 shrink-0">
+              <div className="flex items-center justify-between gap-2 text-[13px] mb-2">
+                <span className="text-[var(--muted)]">Progreso del día</span>
+                <span className="t-num font-medium text-[var(--ink)]">
+                  {completedSets}/{totalSets} series · {progressPercent}%
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    progressPercent === 100 ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
+                  }`}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="w-full md:w-72 shrink-0">
-            <div className="flex items-center justify-between gap-2 text-[13px] mb-2">
-              <span className="text-[var(--muted)]">Progreso del día</span>
-              <span className="t-num font-medium text-[var(--ink)]">
-                {completedSets}/{totalSets} series · {progressPercent}%
-              </span>
-            </div>
-            <div className="w-full h-2 rounded-full bg-[var(--surface-2)] overflow-hidden">
+          {isSessionInProgress && (
+            <div className="mt-4 pt-3.5 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 text-[13px] text-[var(--muted)]">
+                <Clock className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+                <span>Cronómetro de sesión (~2h objetivo)</span>
+                <span className="t-num font-semibold text-[var(--ink)]">
+                  {formatElapsedSeconds(elapsedSeconds)} / 02:00:00
+                </span>
+              </div>
               <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  progressPercent === 100 ? 'bg-[var(--ok)]' : 'bg-[var(--action)]'
-                }`}
-                style={{ width: `${progressPercent}%` }}
-              />
+                className="w-full sm:w-56 h-1.5 rounded-full bg-[var(--surface-2)] overflow-hidden"
+                aria-hidden="true"
+              >
+                <div
+                  className="h-full rounded-full bg-[var(--action)] transition-all duration-300"
+                  style={{ width: `${Math.min(100, Math.round((elapsedSeconds / 7200) * 100))}%` }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Exercises List (clean .t-row separation, zero triple nesting) */}
@@ -341,123 +1072,21 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               </button>
             </div>
           ) : (
-            <div>
-              {currentRoutine.exercises.map((exercise) => {
-                const allSetsCompleted =
-                  exercise.sets > 0 &&
-                  exercise.completedSets.slice(0, exercise.sets).filter(Boolean).length ===
-                    exercise.sets;
-
-                return (
-                  <div
-                    key={exercise.id}
-                    className="t-row flex flex-col lg:flex-row lg:items-center justify-between gap-4"
-                  >
-                    {/* Exercise Info */}
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-[16px] sm:text-[18px] font-medium text-[var(--ink)] leading-snug">
-                          {exercise.name}
-                        </h4>
-
-                        {allSetsCompleted && (
-                          <span className="t-badge t-badge-ok">
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Completado</span>
-                          </span>
-                        )}
-
-                        {exercise.personalRecordKg !== undefined && (
-                          <span className="t-badge t-badge-gym t-num">
-                            <Trophy className="w-3.5 h-3.5" />
-                            <span>PR {exercise.personalRecordKg} kg</span>
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1.5 text-[14px] text-[var(--muted)]">
-                        <span className="t-num font-medium text-[var(--ink)]">
-                          {exercise.weightKg !== undefined
-                            ? `${exercise.weightKg} kg · ${exercise.reps}`
-                            : `${exercise.sets} ${exercise.sets === 1 ? 'serie' : 'series'} · ${exercise.reps}`}
-                        </span>
-                        {exercise.weightKg !== undefined && (
-                          <span className="t-num text-[13px] text-[var(--muted)]">
-                            · {exercise.sets} {exercise.sets === 1 ? 'serie' : 'series'}
-                          </span>
-                        )}
-                        {exercise.notes && (
-                          <span className="text-[13px] text-[var(--muted)]">
-                            · {exercise.notes}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Interactive Set Bubbles (S1..S4) + Progress/1RM + Delete */}
-                    <div className="flex flex-wrap items-center justify-between sm:justify-start lg:justify-end gap-2.5 shrink-0">
-                      <div
-                        className="flex items-center gap-2 flex-wrap"
-                        role="group"
-                        aria-label={`Series de ${exercise.name}`}
-                      >
-                        {Array.from({ length: exercise.sets }).map((_, setIdx) => {
-                          const isDone = Boolean(exercise.completedSets[setIdx]);
-
-                          return (
-                            <button
-                              key={setIdx}
-                              type="button"
-                              aria-pressed={isDone}
-                              aria-label={`Serie ${setIdx + 1} de ${exercise.name}: ${
-                                isDone ? 'completada' : 'pendiente'
-                              }`}
-                              onClick={() =>
-                                handleToggleSetWithTimer(
-                                  currentRoutine.id,
-                                  exercise.id,
-                                  setIdx,
-                                  isDone
-                                )
-                              }
-                              className={`min-w-[48px] min-h-[48px] rounded-[12px] t-num text-[14px] font-medium inline-flex flex-col items-center justify-center gap-0.5 cursor-pointer select-none border transition-all active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--action)] focus-visible:outline-offset-2 ${
-                                isDone
-                                  ? 'bg-[var(--ok)] text-[#0a0d14] border-[var(--ok)]'
-                                  : 'bg-[var(--surface-2)] text-[var(--ink)] border-[var(--line-strong)] hover:border-[var(--action)]'
-                              }`}
-                            >
-                              <span>S{setIdx + 1}</span>
-                              {isDone && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedExerciseIdForModal(exercise.id)}
-                          className="t-btn t-btn-secondary !min-h-[44px] !px-3 !text-[13px]"
-                          title="Ver récord personal, calculadora 1RM e historial"
-                        >
-                          <TrendingUp className="w-4 h-4 text-[var(--action)]" />
-                          <span>Ver progreso / 1RM</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => onDeleteExercise(currentRoutine.id, exercise.id)}
-                          className="t-btn t-btn-ghost t-btn-icon hover:!text-[var(--danger)]"
-                          aria-label={`Eliminar ${exercise.name}`}
-                          title="Eliminar ejercicio"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-3.5">
+              {currentRoutine.exercises.map((exercise) => (
+                <ExerciseCard
+                  key={exercise.id}
+                  exercise={exercise}
+                  routineId={currentRoutine.id}
+                  onToggleSet={(routineId, exerciseId, setIdx, currentlyDone) =>
+                    handleToggleSetWithTimer(routineId, exerciseId, setIdx, currentlyDone)
+                  }
+                  onOpenVideo={(ex) => setSelectedExerciseIdForVideoModal(ex.id)}
+                  onOpenWeightLog={(ex) => setSelectedExerciseIdForWeightModal(ex.id)}
+                  onOpenProgressModal={(id) => setSelectedExerciseIdForModal(id)}
+                  onDelete={(routineId, exerciseId) => onDeleteExercise(routineId, exerciseId)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -466,24 +1095,28 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         {currentRoutine.exercises.length > 0 && (
           <div className="mt-6 pt-5 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-[14px] text-[var(--muted)]">
-              {progressPercent === 100
+              {selectedDayLog?.status === 'completed'
+                ? 'Entrenamiento registrado en tu historial de esta semana.'
+                : progressPercent === 100
                 ? 'Completaste todas las series programadas para este día.'
                 : 'Registra tu entrenamiento al terminar para sumar un día más a tu racha.'}
             </p>
             <button
               type="button"
-              onClick={() => {
-                triggerBigCelebration();
-                onFinishWorkout();
-              }}
+              onClick={handleCompleteTodayWorkout}
               className="t-btn t-btn-primary w-full sm:w-auto"
             >
               <Trophy className="w-4 h-4" />
-              <span>Terminar rutina de hoy</span>
+              <span>
+                {selectedDayLog?.status === 'completed'
+                  ? 'Sesión completada'
+                  : 'Terminar rutina de hoy'}
+              </span>
             </button>
           </div>
         )}
       </section>
+      )}
 
       {/* Add Exercise Modal */}
       <ModalShell
@@ -603,11 +1236,58 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
       {/* Floating Rest Timer */}
       <RestTimerFloating
-        key={timerKey}
+        key={`${timerKey}-${recommendedRestDuration}`}
         isOpen={isTimerOpen}
         onClose={() => setIsTimerOpen(false)}
-        defaultDuration={90}
+        defaultDuration={recommendedRestDuration}
         autoStart={timerAutoStart}
+      />
+
+      {/* Gym Onboarding & Profile Setup Wizard */}
+      <GymOnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          setOnboardingInitialStep(1);
+        }}
+        initialProfile={gymProfile}
+        initialStep={onboardingInitialStep}
+        hasExistingRoutines={routines.some((r) => r.exercises.length > 0)}
+        calendarBlocks={calendarBlocks}
+        externalBusyByDate={externalBusyByDate}
+        googleEvents={googleEvents}
+        weekDates={weekDates}
+        isGoogleConnected={isGoogleConnected}
+        isGoogleSyncing={isGoogleSyncing || isSyncingGymToGoogle}
+        onClearPreviousGymBlocks={onClearPreviousGymBlocks}
+        onOpenGoogleSync={onOpenGoogleSync}
+        onComplete={(payload) => {
+          onSaveGymPlan?.(payload);
+          setPinnedMissDay(null);
+          setIsOnboardingOpen(false);
+          setOnboardingInitialStep(1);
+          triggerConfetti();
+          if (
+            payload.profile.selectedDays.length > 0 &&
+            !payload.profile.selectedDays.includes(selectedDay)
+          ) {
+            setSelectedDay(payload.profile.selectedDays[0]);
+          }
+        }}
+      />
+
+      {/* Body Weight Check-in & BMI History Modal */}
+      <WeightCheckInModal
+        isOpen={isWeightCheckInOpen}
+        onClose={() => setIsWeightCheckInOpen(false)}
+        currentWeightKg={gymProfile?.weightKg ?? 72}
+        heightCm={gymProfile?.heightCm ?? 174}
+        targetWeightKg={gymProfile?.targetWeightKg}
+        weightHistory={weightHistory}
+        onSaveWeight={(newWeight) => {
+          onLogBodyWeight?.(newWeight);
+          triggerConfetti();
+        }}
       />
 
       {/* Exercise Progress & 1RM Modal */}
@@ -617,6 +1297,26 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         isOpen={Boolean(selectedExerciseForModal)}
         onClose={() => setSelectedExerciseIdForModal(null)}
         onUpdateExercise={handleUpdateExerciseFromModal}
+      />
+
+      {/* Exercise Video & Technique Modal */}
+      <ExerciseVideoModal
+        key={selectedExerciseForVideoModal?.id ?? 'video-closed'}
+        exercise={selectedExerciseForVideoModal}
+        isOpen={Boolean(selectedExerciseForVideoModal)}
+        onClose={() => setSelectedExerciseIdForVideoModal(null)}
+        onOpenWeightLog={() => {
+          setSelectedExerciseIdForWeightModal(selectedExerciseIdForVideoModal);
+        }}
+      />
+
+      {/* Quick Weight Progress Logging Modal */}
+      <QuickWeightModal
+        key={selectedExerciseForWeightModal?.id ?? 'weight-closed'}
+        exercise={selectedExerciseForWeightModal}
+        isOpen={Boolean(selectedExerciseForWeightModal)}
+        onClose={() => setSelectedExerciseIdForWeightModal(null)}
+        onSaveWeight={handleSaveQuickWeight}
       />
     </div>
   );

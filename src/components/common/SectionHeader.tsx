@@ -18,8 +18,8 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   const HeadingTag = as;
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-2">
-      <div className="min-w-0">
+    <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-4 pb-2">
+      <div className="min-w-0 xl:shrink-0">
         <div className="flex flex-wrap items-center gap-2.5">
           <HeadingTag className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-[var(--ink)] leading-tight">
             {title}
@@ -27,14 +27,14 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
           {badge}
         </div>
         {subtitle && (
-          <p className="text-sm sm:text-[15px] text-[var(--muted)] mt-1 max-w-[62ch] leading-relaxed">
+          <p className="text-sm sm:text-[15px] text-[var(--muted)] mt-1 max-w-[44ch] leading-relaxed">
             {subtitle}
           </p>
         )}
       </div>
 
       {actions && (
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap xl:justify-end items-center gap-2.5 min-w-0">
           {actions}
         </div>
       )}

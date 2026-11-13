@@ -31,6 +31,16 @@ export interface ExerciseHistoryEntry {
   reps: string;
 }
 
+export interface ExerciseTechniqueGuide {
+  videoUrl?: string;
+  posterUrl?: string;
+  muscleGroups: string[];
+  setupCues: string[];
+  executionCues: string[];
+  breathingCues: string;
+  commonMistakes: string[];
+}
+
 export interface GymExercise {
   id: string;
   name: string;
@@ -42,6 +52,8 @@ export interface GymExercise {
   personalRecordKg?: number;
   restSeconds?: number;
   history?: ExerciseHistoryEntry[];
+  technique?: ExerciseTechniqueGuide;
+  thumbnailUrl?: string;
 }
 
 export interface GymRoutine {
@@ -60,6 +72,22 @@ export interface CalendarBlock {
   title: string;
   category: Category;
   location?: string;
+  googleEventId?: string;
+  googleHtmlLink?: string;
+  reminderMinutes?: number[];
+  syncWithGoogle?: boolean;
+  isRecurringWorkShift?: boolean;
+}
+
+export interface WorkShiftConfig {
+  enabled: boolean;
+  title: string;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm (<= startTime indicates overnight shift ending next day)
+  restDay: DayOfWeek | null; // Night the user does NOT start a shift (e.g. Jueves 22:00 -> Viernes 06:00)
+  location?: string;
+  reminderMinutes?: number[];
+  syncWithGoogle?: boolean;
 }
 
 export type AssignmentType = 'tarea' | 'proyecto' | 'examen' | 'laboratorio';
@@ -96,13 +124,24 @@ export interface DailyHabits {
   targetPomodoros: number;
 }
 
-export type ResourceType = 'youtube' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+export type ResourceType = 'youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+
+export type ResourceCategory =
+  | 'ia_claude'
+  | 'ia_gemini'
+  | 'skills'
+  | 'video_gen'
+  | 'cursos'
+  | 'conferencias'
+  | 'reels_instagram'
+  | 'general';
 
 export interface LearningResource {
   id: string;
   title: string;
   url?: string;
   type: ResourceType;
+  category?: ResourceCategory;
   notes?: string;
 }
 
@@ -118,6 +157,74 @@ export interface WeeklyReflection {
   updatedAt: string;
 }
 
+export type GymType = 'smart_fit' | 'utp' | 'barrio' | 'casa' | 'otro';
+export type FitnessGoal = 'hipertrofia' | 'fuerza' | 'perdida_grasa' | 'salud';
+export type FitnessExperience = 'principiante' | 'intermedio' | 'avanzado';
+export type BmiCategory = 'bajo_peso' | 'normal' | 'sobrepeso' | 'obesidad';
+
+export interface WeightHistoryEntry {
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+  bmi: number;
+}
+
+export type MissReasonId =
+  | 'estudios_examenes'
+  | 'cansancio_sueno'
+  | 'trabajo_horarios'
+  | 'salud_lesion'
+  | 'tiempo_transporte'
+  | 'otro';
+
+export type GymSessionStatus =
+  | 'idle'
+  | 'in_progress'
+  | 'completed'
+  | 'missed'
+  | 'rescheduled';
+
+export interface GymAttendanceLog {
+  id: string;
+  date: string; // Local wall-clock YYYY-MM-DD
+  dayOfWeek: DayOfWeek;
+  routineId: string;
+  routineName: string;
+  status: GymSessionStatus;
+  startedAt?: string;
+  finishedAt?: string;
+  durationMinutes?: number;
+  missReason?: MissReasonId;
+  missNote?: string;
+  encouragementMessage?: string;
+  rescheduledToDay?: DayOfWeek;
+  rescheduledToDate?: string;
+  rescheduledSlotStart?: string;
+  rescheduledSlotEnd?: string;
+  rescheduledCalendarBlockId?: string;
+  googleEventId?: string;
+  reminderMinutes?: number[];
+  streakProtected?: boolean;
+}
+
+export interface UserGymProfile {
+  gymType: GymType;
+  customGymName?: string;
+  trainingDaysCount: number; // 2 | 3 | 4 | 5 | 6
+  selectedDays: DayOfWeek[];
+  goal: FitnessGoal;
+  experience: FitnessExperience;
+  heightCm: number;
+  weightKg: number;
+  targetWeightKg?: number;
+  bmi: number;
+  bmiCategory: BmiCategory;
+  reminderMinutesBefore?: number[];
+  defaultSessionMinutes?: GymSessionDurationMinutes;
+  configuredAt: string;
+}
+
+export type GymSessionDurationMinutes = 60 | 90 | 120;
+
 export interface AppState {
   studentName: string;
   career: string;
@@ -125,6 +232,11 @@ export interface AppState {
   streak: number;
   theme: 'dark' | 'light';
   dailyHabits?: DailyHabits;
+  workShift?: WorkShiftConfig;
+  gymProfile?: UserGymProfile;
+  weightHistory?: WeightHistoryEntry[];
+  gymAttendanceLogs?: GymAttendanceLog[];
+  dismissedGymScheduleAlerts?: string[];
   weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];

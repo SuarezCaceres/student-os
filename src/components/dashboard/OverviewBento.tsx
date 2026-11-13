@@ -11,8 +11,11 @@ import {
   Database,
   BookOpen,
   ExternalLink,
+  Moon,
 } from 'lucide-react';
 import { YoutubeIcon } from '../common/YoutubeIcon';
+import { TiktokIcon } from '../common/TiktokIcon';
+import { InstagramIcon } from '../common/InstagramIcon';
 import type {
   AppState,
   DayOfWeek,
@@ -22,13 +25,24 @@ import type {
   Category,
   ReflectionMood,
 } from '../../types';
+import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import { isStudentOsGymGoogleEvent } from '../../utils/gymScheduleFilter';
+import { getLocalIsoDate } from '../../utils/gymAttendance';
 import { triggerConfetti } from '../../utils/confetti';
 import type { NavTab } from '../layout/Navbar';
 import { DailyHabitsCard } from './DailyHabitsCard';
 import { BackupModal } from './BackupModal';
+import {
+  expandCalendarBlocksToSegments,
+  getNextDayOfWeek,
+  isOvernightTimeRange,
+  parseTimeToMinutes,
+} from '../../utils/workSchedule';
 
 export interface OverviewBentoProps {
   state: AppState;
+  googleEvents?: GoogleCalendarEvent[];
+  todayDateIso?: string;
   onNavigateTab: (tab: NavTab) => void;
   onToggleGymSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onUpdateUniStatus: (id: string, status: AssignmentStatus) => void;
@@ -54,6 +68,8 @@ const MOOD_LABELS: Record<ReflectionMood, string> = {
 
 export const OverviewBento: React.FC<OverviewBentoProps> = ({
   state,
+  googleEvents = [],
+  todayDateIso,
   onNavigateTab,
   onToggleGymSet,
   onUpdateUniStatus,
@@ -88,9 +104,34 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
     .filter((k) => k.status === 'in_progress')
     .slice(0, 4);
 
-  const todayBlocks = state.calendarBlocks
-    .filter((b) => b.day === todayDay)
-    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const todaySegments = expandCalendarBlocksToSegments(state.calendarBlocks)
+    .filter((seg) => seg.day === todayDay)
+    .sort((a, b) => parseTimeToMinutes(a.startTime) - parseTimeToMinutes(b.startTime));
+
+  const resolvedTodayIso = todayDateIso ?? getLocalIsoDate();
+  const mirroredGoogleIds = new Set(
+    state.calendarBlocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
+  );
+  const todayGoogleEvents = googleEvents.filter(
+    (ev) =>
+      !mirroredGoogleIds.has(ev.id) &&
+      (ev.dateIso ? ev.dateIso === resolvedTodayIso : ev.day === todayDay)
+  );
+  const todayAgendaEntries = [
+    ...todaySegments.map((segment) => ({
+      kind: 'local' as const,
+      sortMinutes: parseTimeToMinutes(segment.startTime),
+      segment,
+    })),
+    ...todayGoogleEvents.map((event) => ({
+      kind: 'google' as const,
+      sortMinutes: event.isAllDay ? -1 : parseTimeToMinutes(event.startTime),
+      event,
+    })),
+  ].sort((a, b) => a.sortMinutes - b.sortMinutes);
+
+  const workShift = state.workShift;
+  const isWorkRestTonight = Boolean(workShift?.enabled && workShift.restDay === todayDay);
 
   const currentWeek = state.currentAcademicWeek;
   const currentWeekAssignments = state.universityAssignments.filter((a) => a.week === currentWeek);
@@ -304,28 +345,118 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
               </button>
             </div>
 
-            {todayBlocks.length === 0 ? (
+            {workShift?.enabled && (
+              <div className="mb-3 rounded-[10px] border border-[var(--line)] bg-[var(--surface-2)] px-3 py-2 flex items-center justify-between gap-2 text-[13px]">
+                <span className="flex items-center gap-1.5 text-[var(--ink)] min-w-0">
+                  <Moon className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                  <span className="truncate">
+                    {isWorkRestTonight ? (
+                      <>
+                        Descanso hoy (sin entrada{' '}
+                        <span className="t-num font-medium">{workShift.startTime}</span>)
+                      </>
+                    ) : (
+                      <>
+                        Turno:{' '}
+                        <span className="t-num font-medium">
+                          {workShift.startTime}–{workShift.endTime}
+                        </span>
+                        {isOvernightTimeRange(workShift.startTime, workShift.endTime) ? ' (+1d)' : ''}
+                      </>
+                    )}
+                  </span>
+                </span>
+                {workShift.restDay && (
+                  <span className="t-badge shrink-0">Descanso: {workShift.restDay.slice(0, 3)}</span>
+                )}
+              </div>
+            )}
+
+            {todayAgendaEntries.length === 0 ? (
               <p className="py-8 text-[14px] text-[var(--muted)]">
                 No tienes clases ni bloques agendados para hoy.
               </p>
             ) : (
               <div>
-                {todayBlocks.map((b) => (
-                  <div key={b.id} className="t-row">
-                    <div className="t-num text-[13px] font-medium text-[var(--action)] flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 shrink-0" />
-                      <span>
-                        {b.startTime} – {b.endTime}
-                      </span>
+                {todayAgendaEntries.map((entry) => {
+                  if (entry.kind === 'google') {
+                    const ev = entry.event;
+                    const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                    return (
+                      <div key={`gcal-today-${ev.id}-${ev.dateIso}`} className="t-row">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div
+                            className={`t-num text-[13px] font-medium flex flex-wrap items-center gap-1.5 ${
+                              isGoogleGym ? 'text-[var(--gym)]' : 'text-[var(--ok)]'
+                            }`}
+                          >
+                            {isGoogleGym ? (
+                              <Dumbbell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            ) : (
+                              <Clock className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                            )}
+                            <span>
+                              {ev.isAllDay ? 'Todo el día' : `${ev.startTime} – ${ev.endTime}`}
+                            </span>
+                            {isGoogleGym && <span className="t-badge t-badge-gym">Gym</span>}
+                            <span className="t-badge t-badge-ok">Google</span>
+                          </div>
+                          {ev.htmlLink && (
+                            <a
+                              href={ev.htmlLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Abrir en Google Calendar: ${ev.title}`}
+                              title="Abrir en Google Calendar"
+                              className="text-[var(--muted)] hover:text-[var(--ink)] p-1"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                            </a>
+                          )}
+                        </div>
+                        <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
+                          {ev.title}
+                        </h4>
+                        {ev.location && (
+                          <p className="text-[13px] text-[var(--muted)] mt-0.5">{ev.location}</p>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  const seg = entry.segment;
+                  const b = seg.block;
+                  return (
+                    <div key={seg.segmentId} className="t-row">
+                      <div className="t-num text-[13px] font-medium text-[var(--action)] flex flex-wrap items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {seg.segmentRole === 'overnight_start'
+                            ? `${b.startTime} – ${b.endTime} (+1d)`
+                            : seg.segmentRole === 'overnight_continuation'
+                            ? `00:00 – ${seg.endTime}`
+                            : `${seg.startTime} – ${seg.endTime}`}
+                        </span>
+                        {seg.segmentRole === 'overnight_continuation' && (
+                          <span className="text-[var(--muted)] font-normal">
+                            · cierre turno {seg.originDay}
+                          </span>
+                        )}
+                        {seg.segmentRole === 'overnight_start' && (
+                          <span className="text-[var(--muted)] font-normal">
+                            · termina {getNextDayOfWeek(seg.day)} {b.endTime}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
+                        {b.title}
+                      </h4>
+                      {b.location && (
+                        <p className="text-[13px] text-[var(--muted)] mt-0.5">{b.location}</p>
+                      )}
                     </div>
-                    <h4 className="text-[15px] font-medium text-[var(--ink)] mt-0.5">
-                      {b.title}
-                    </h4>
-                    {b.location && (
-                      <p className="text-[13px] text-[var(--muted)] mt-0.5">{b.location}</p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -528,12 +659,16 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                           key={res.id}
                           href={res.url}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           className="t-row group flex items-center justify-between gap-3 min-h-[44px]"
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
                             {res.type === 'youtube' ? (
                               <YoutubeIcon className="w-4 h-4 text-[var(--danger)] shrink-0 mt-1" />
+                            ) : res.type === 'tiktok' ? (
+                              <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                            ) : res.type === 'instagram' ? (
+                              <InstagramIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
                             ) : (
                               <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
                             )}
@@ -552,7 +687,13 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                         </a>
                       ) : (
                         <div key={res.id} className="t-row flex items-start gap-2.5">
-                          <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                          {res.type === 'tiktok' ? (
+                            <TiktokIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                          ) : res.type === 'instagram' ? (
+                            <InstagramIcon className="w-4 h-4 text-[var(--ink)] shrink-0 mt-1" />
+                          ) : (
+                            <BookOpen className="w-4 h-4 text-[var(--action)] shrink-0 mt-1" />
+                          )}
                           <div className="min-w-0">
                             <div className="text-[14px] font-medium text-[var(--ink)] truncate">
                               {res.title}

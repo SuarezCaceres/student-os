@@ -12,19 +12,54 @@ import {
   LayoutGrid,
   Columns3,
   AlertTriangle,
+  Bell,
+  CalendarCheck2,
+  RefreshCw,
+  ExternalLink,
+  Moon,
+  Repeat,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek, Category } from '../../types';
+import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
+import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import {
+  isGoogleEventMirroredByIds,
+  isStudentOsGymGoogleEvent,
+} from '../../utils/gymScheduleFilter';
 import { triggerConfetti } from '../../utils/confetti';
 import { exportCalendarToICS } from '../../utils/icsExport';
 import { SectionHeader } from '../common/SectionHeader';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { ModalShell } from '../common/ModalShell';
 import { CalendarTimelineGrid } from './CalendarTimelineGrid';
+import { GoogleCalendarSyncModal } from './GoogleCalendarSyncModal';
+import { ReminderPresetPicker } from './ReminderPresetPicker';
+import { WorkShiftModal } from './WorkShiftModal';
+import {
+  DEFAULT_BLOCK_REMINDER_MINUTES,
+  formatReminderSummary,
+} from '../../utils/reminderPresets';
+import {
+  DEFAULT_NIGHT_WORK_SHIFT,
+  doCalendarBlocksCollide,
+  expandCalendarBlocksToSegments,
+  isOvernightTimeRange,
+  parseTimeToMinutes,
+} from '../../utils/workSchedule';
 
 export interface WeeklyCalendarProps {
   blocks: CalendarBlock[];
   onAddBlock: (block: CalendarBlock) => void;
   onDeleteBlock: (id: string) => void;
+  onDeleteGoogleEvent?: (event: GoogleCalendarEvent) => Promise<void> | void;
+  isGoogleConnected?: boolean;
+  isGoogleSyncing?: boolean;
+  googleEvents?: GoogleCalendarEvent[];
+  googleBusyCount?: number;
+  onOpenGoogleSync?: () => void;
+  onRefreshGoogleWeek?: () => void;
+  workShift?: WorkShiftConfig;
+  isSavingWorkShift?: boolean;
+  onSaveWorkShift?: (config: WorkShiftConfig, options: { syncToGoogle: boolean }) => Promise<void> | void;
 }
 
 const DAYS_OF_WEEK: DayOfWeek[] = [
@@ -47,29 +82,40 @@ const DAYS_INDEX_MAP: DayOfWeek[] = [
   'Sábado',
 ];
 
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
-  return (h || 0) * 60 + (m || 0);
-}
-
 function checkBlockCollision(a: CalendarBlock, b: CalendarBlock): boolean {
-  if (a.id === b.id || a.day !== b.day) return false;
-  const startA = timeToMinutes(a.startTime);
-  const endA = timeToMinutes(a.endTime);
-  const startB = timeToMinutes(b.startTime);
-  const endB = timeToMinutes(b.endTime);
-
-  return startA < endB && startB < endA;
+  return doCalendarBlocksCollide(a, b);
 }
 
 export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   blocks,
   onAddBlock,
   onDeleteBlock,
+  onDeleteGoogleEvent,
+  isGoogleConnected = false,
+  isGoogleSyncing = false,
+  googleEvents = [],
+  googleBusyCount = 0,
+  onOpenGoogleSync,
+  onRefreshGoogleWeek,
+  workShift,
+  isSavingWorkShift = false,
+  onSaveWorkShift,
 }) => {
   const [todayDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
   const [viewMode, setViewMode] = useState<'grid' | 'columns'>('grid');
   const [mobileDay, setMobileDay] = useState<DayOfWeek>(() => DAYS_INDEX_MAP[new Date().getDay()]);
+  const [isFallbackSyncOpen, setIsFallbackSyncOpen] = useState(false);
+  const [isWorkShiftModalOpen, setIsWorkShiftModalOpen] = useState(false);
+  const resolvedWorkShift = workShift ?? { ...DEFAULT_NIGHT_WORK_SHIFT, enabled: false };
+  const [showGoogleEvents, setShowGoogleEvents] = useState(true);
+
+  const handleOpenGoogleSync = () => {
+    if (onOpenGoogleSync) {
+      onOpenGoogleSync();
+    } else {
+      setIsFallbackSyncOpen(true);
+    }
+  };
 
   // Add Block Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,6 +125,10 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   const [formEnd, setFormEnd] = useState('11:00');
   const [formLocation, setFormLocation] = useState('');
   const [formCategory, setFormCategory] = useState<Category>('universidad');
+  const [formReminderMinutes, setFormReminderMinutes] = useState<number[]>(
+    DEFAULT_BLOCK_REMINDER_MINUTES
+  );
+  const [formSyncGoogle, setFormSyncGoogle] = useState<boolean>(isGoogleConnected);
   const [timeError, setTimeError] = useState('');
 
   const formId = useId();
@@ -88,9 +138,12 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
   const startInputId = useId();
   const endInputId = useId();
   const locInputId = useId();
+  const syncCheckId = useId();
 
   const openAddModal = (defaultDay: DayOfWeek) => {
     setFormDay(defaultDay);
+    setFormReminderMinutes(DEFAULT_BLOCK_REMINDER_MINUTES);
+    setFormSyncGoogle(isGoogleConnected);
     setTimeError('');
     setIsModalOpen(true);
   };
@@ -105,11 +158,12 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     const trimmedTitle = formTitle.trim();
     if (!trimmedTitle) return;
 
-    if (timeToMinutes(formEnd) <= timeToMinutes(formStart)) {
-      setTimeError('La hora de fin debe ser posterior a la hora de inicio.');
+    if (parseTimeToMinutes(formEnd) === parseTimeToMinutes(formStart)) {
+      setTimeError('La hora de fin debe ser distinta a la hora de inicio.');
       return;
     }
 
+    const shouldSync = isGoogleConnected && formSyncGoogle;
     const newBlock: CalendarBlock = {
       id: `cb-${Date.now()}`,
       day: formDay,
@@ -118,6 +172,8 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
       title: trimmedTitle,
       category: formCategory,
       location: formLocation.trim() ? formLocation.trim() : undefined,
+      reminderMinutes: formReminderMinutes,
+      syncWithGoogle: shouldSync,
     };
 
     onAddBlock(newBlock);
@@ -168,6 +224,13 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     }
   };
 
+  const syncedGoogleIds = new Set(
+    blocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
+  );
+  const externalGoogleEvents = googleEvents.filter(
+    (ev) => !isGoogleEventMirroredByIds(ev, syncedGoogleIds)
+  );
+
   // Preview conflict inside modal before saving
   const previewCandidate: CalendarBlock = {
     id: '__preview__',
@@ -177,8 +240,9 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
     title: formTitle || 'Nuevo bloque',
     category: formCategory,
   };
+  const formIsOvernight = isOvernightTimeRange(formStart, formEnd);
   const modalConflicts =
-    timeToMinutes(formEnd) > timeToMinutes(formStart)
+    parseTimeToMinutes(formEnd) !== parseTimeToMinutes(formStart)
       ? blocks.filter((existing) => checkBlockCollision(previewCandidate, existing))
       : [];
 
@@ -210,6 +274,56 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               ]}
             />
 
+            {isGoogleConnected && onRefreshGoogleWeek && (
+              <button
+                type="button"
+                onClick={onRefreshGoogleWeek}
+                disabled={isGoogleSyncing}
+                className="t-btn t-btn-secondary"
+                title="Actualizar eventos de la semana desde Google Calendar"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 shrink-0 ${isGoogleSyncing ? 'animate-spin text-[var(--action)]' : ''}`}
+                  aria-hidden="true"
+                />
+                <span>{isGoogleSyncing ? 'Actualizando...' : 'Actualizar Google'}</span>
+              </button>
+            )}
+
+            {onSaveWorkShift && (
+              <button
+                type="button"
+                onClick={() => setIsWorkShiftModalOpen(true)}
+                className="t-btn t-btn-secondary"
+                title="Configurar turno laboral recurrente (ej. 22:00–06:00 y día de descanso)"
+              >
+                <Briefcase className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Turno laboral</span>
+                {workShift?.enabled && (
+                  <span
+                    aria-label="Turno activo"
+                    className="w-2 h-2 rounded-full bg-[var(--ok)] shrink-0"
+                  />
+                )}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleOpenGoogleSync}
+              className="t-btn t-btn-secondary"
+              title="Conectar o gestionar cuenta Google Calendar (OAuth 2.0)"
+            >
+              <Calendar className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span>Google Calendar</span>
+              {isGoogleConnected && (
+                <span
+                  aria-label="Conectado"
+                  className="w-2 h-2 rounded-full bg-[var(--ok)] shrink-0"
+                />
+              )}
+            </button>
+
             <button
               type="button"
               onClick={handleExportICS}
@@ -232,24 +346,50 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
         }
       />
 
-      {/* Category Legend */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="t-badge t-badge-accent">
-          <GraduationCap className="w-3.5 h-3.5" />
-          <span>Universidad</span>
-        </span>
-        <span className="t-badge t-badge-ok">
-          <Briefcase className="w-3.5 h-3.5" />
-          <span>Trabajo</span>
-        </span>
-        <span className="t-badge t-badge-gym">
-          <Dumbbell className="w-3.5 h-3.5" />
-          <span>Gym</span>
-        </span>
-        <span className="t-badge text-[var(--ink)]">
-          <User className="w-3.5 h-3.5" />
-          <span>Personal</span>
-        </span>
+      {/* Category Legend & Google Filter */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="t-badge t-badge-accent">
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>Universidad</span>
+          </span>
+          <span className="t-badge t-badge-ok">
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>Trabajo</span>
+          </span>
+          <span className="t-badge t-badge-gym">
+            <Dumbbell className="w-3.5 h-3.5" />
+            <span>Gym</span>
+          </span>
+          <span className="t-badge text-[var(--ink)]">
+            <User className="w-3.5 h-3.5" />
+            <span>Personal</span>
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {isGoogleConnected && (
+            <button
+              type="button"
+              aria-pressed={showGoogleEvents}
+              onClick={() => setShowGoogleEvents((prev) => !prev)}
+              className={`min-h-[44px] px-3 py-1.5 rounded-xl border text-[13px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer ${
+                showGoogleEvents
+                  ? 'border-[color-mix(in_oklab,var(--ok)_50%,var(--line))] bg-[color-mix(in_oklab,var(--ok)_12%,var(--surface))] text-[var(--ok)]'
+                  : 'border-[var(--line)] bg-[var(--surface-2)] text-[var(--muted)]'
+              }`}
+            >
+              <CalendarCheck2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span className="t-num">Eventos Google ({externalGoogleEvents.length})</span>
+            </button>
+          )}
+
+          {(isGoogleConnected || googleBusyCount > 0) && (
+            <span className="t-badge t-badge-ok t-num">
+              Google Calendar conectado{googleBusyCount > 0 ? ` · ${googleBusyCount} ocupados` : ''}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Main Content: Timeline Grid vs Day Columns */}
@@ -257,17 +397,29 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
         <CalendarTimelineGrid
           blocks={blocks}
           onDeleteBlock={onDeleteBlock}
+          onDeleteGoogleEvent={onDeleteGoogleEvent}
+          googleEvents={googleEvents}
+          showGoogleEvents={showGoogleEvents}
           selectedMobileDay={mobileDay}
           onSelectMobileDay={setMobileDay}
           onRequestAddBlock={openAddModal}
+          workShift={workShift}
+          onEditWorkShift={onSaveWorkShift ? () => setIsWorkShiftModalOpen(true) : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {DAYS_OF_WEEK.map((day) => {
             const isToday = day === todayDay;
-            const dayBlocks = blocks
-              .filter((b) => b.day === day)
+            const expandedAllSegments = expandCalendarBlocksToSegments(blocks);
+            const daySegments = expandedAllSegments
+              .filter((seg) => seg.day === day)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const dayGoogle = showGoogleEvents
+              ? externalGoogleEvents
+                  .filter((ev) => ev.day === day)
+                  .sort((a, b) => a.startTime.localeCompare(b.startTime))
+              : [];
+            const totalDayCount = daySegments.length + dayGoogle.length;
 
             return (
               <article
@@ -285,7 +437,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                         {day}
                       </h3>
                       <p className="text-[13px] text-[var(--muted)] t-num mt-0.5">
-                        {dayBlocks.length} {dayBlocks.length === 1 ? 'bloque' : 'bloques'}
+                        {totalDayCount} {totalDayCount === 1 ? 'bloque' : 'bloques'}
                       </p>
                     </div>
 
@@ -297,7 +449,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                   </div>
 
                   {/* Day Rows (.t-row inside .t-card — max 2 box levels) */}
-                  {dayBlocks.length === 0 ? (
+                  {totalDayCount === 0 ? (
                     <div className="py-10 text-center">
                       <p className="text-[14px] text-[var(--muted)]">
                         Día despejado, sin bloques agendados.
@@ -305,15 +457,19 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                     </div>
                   ) : (
                     <div className="mt-3">
-                      {dayBlocks.map((block) => {
+                      {daySegments.map((segment) => {
+                        const block = segment.block;
                         const meta = getCategoryMeta(block.category);
-                        const hasConflict = dayBlocks.some((other) =>
+                        const hasConflict = blocks.some((other) =>
                           checkBlockCollision(block, other)
+                        );
+                        const hasAlarm = Boolean(
+                          block.reminderMinutes && block.reminderMinutes.length > 0
                         );
 
                         return (
                           <div
-                            key={block.id}
+                            key={segment.segmentId}
                             className="t-row group flex items-start justify-between gap-2.5"
                           >
                             <div className="min-w-0 flex-1">
@@ -330,11 +486,21 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                                     hasConflict ? 'text-[var(--danger)]' : 'text-[var(--muted)]'
                                   }`}
                                 >
-                                  {block.startTime} – {block.endTime}
+                                  {segment.segmentRole === 'overnight_start'
+                                    ? `${block.startTime} – ${block.endTime} (+1d)`
+                                    : segment.segmentRole === 'overnight_continuation'
+                                    ? `00:00 – ${segment.endTime} · turno ${segment.originDay}`
+                                    : `${segment.startTime} – ${segment.endTime}`}
                                 </span>
                                 <span className={meta.badgeClass}>
                                   {meta.label}
                                 </span>
+                                {block.googleEventId && (
+                                  <span className="t-badge t-badge-ok">
+                                    <CalendarCheck2 className="w-3 h-3" aria-hidden="true" />
+                                    <span>Sync</span>
+                                  </span>
+                                )}
                                 {hasConflict && (
                                   <span className="t-badge t-badge-danger">
                                     <AlertTriangle className="w-3.5 h-3.5" />
@@ -346,6 +512,13 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                               <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">
                                 {block.title}
                               </h4>
+
+                              {hasAlarm && (
+                                <p className="flex items-center gap-1.5 text-[13px] text-[var(--action)] mt-1">
+                                  <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span>{formatReminderSummary(block.reminderMinutes)}</span>
+                                </p>
+                              )}
 
                               {block.location && (
                                 <p className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] mt-1 truncate">
@@ -364,6 +537,99 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
+                          </div>
+                        );
+                      })}
+
+                      {dayGoogle.map((ev) => {
+                        const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                        const isRecurring = Boolean(ev.recurringEventId);
+                        return (
+                          <div
+                            key={`gcol-${ev.id}-${ev.dateIso}`}
+                            className="t-row group flex items-start justify-between gap-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isGoogleGym ? (
+                                  <Dumbbell
+                                    className="w-3.5 h-3.5 text-[var(--gym)] shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <CalendarCheck2
+                                    className="w-3.5 h-3.5 text-[var(--ok)] shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <span
+                                  className={`t-num text-[13px] font-medium ${
+                                    isGoogleGym ? 'text-[var(--gym)]' : 'text-[var(--ok)]'
+                                  }`}
+                                >
+                                  {ev.isAllDay ? 'Todo el día' : `${ev.startTime} – ${ev.endTime}`}
+                                </span>
+                                {isGoogleGym && <span className="t-badge t-badge-gym">Gym</span>}
+                                <span className="t-badge t-badge-ok">Google</span>
+                                {isRecurring && (
+                                  <span
+                                    className="t-badge"
+                                    title="Serie semanal recurrente en Google Calendar"
+                                  >
+                                    <Repeat className="w-3 h-3 shrink-0 text-[var(--action)]" aria-hidden="true" />
+                                    <span>Semanal</span>
+                                  </span>
+                                )}
+                              </div>
+
+                              <h4 className="text-[15px] font-medium text-[var(--ink)] leading-snug mt-1.5">
+                                {ev.title}
+                              </h4>
+
+                              {ev.reminderMinutes && ev.reminderMinutes.length > 0 && (
+                                <p
+                                  className={`flex items-center gap-1.5 text-[13px] mt-1 ${
+                                    isGoogleGym ? 'text-[var(--gym)]' : 'text-[var(--ok)]'
+                                  }`}
+                                >
+                                  <Bell className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span>{formatReminderSummary(ev.reminderMinutes)}</span>
+                                </p>
+                              )}
+
+                              {ev.location && (
+                                <p className="flex items-center gap-1.5 text-[13px] text-[var(--muted)] mt-1 truncate">
+                                  <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  <span className="truncate">{ev.location}</span>
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-0.5 shrink-0 -mr-1.5">
+                              {ev.htmlLink && (
+                                <a
+                                  href={ev.htmlLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="t-btn t-btn-ghost t-btn-icon text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
+                                  aria-label={`Abrir en Google Calendar: ${ev.title}`}
+                                  title="Abrir en Google Calendar"
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </a>
+                              )}
+                              {onDeleteGoogleEvent && isGoogleGym && (
+                                <button
+                                  type="button"
+                                  onClick={() => void onDeleteGoogleEvent(ev)}
+                                  className="t-btn t-btn-ghost t-btn-icon text-[var(--muted)] hover:text-[var(--danger)] sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 focus-visible:opacity-100 shrink-0"
+                                  aria-label={`Eliminar de Google Calendar: ${ev.title}`}
+                                  title="Eliminar de Google Calendar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -511,6 +777,16 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
             </p>
           )}
 
+          {!timeError && formIsOvernight && (
+            <div className="rounded-[12px] border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2 flex items-center gap-2 text-[13px] text-[var(--muted)]">
+              <Moon className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+              <span>
+                Bloque nocturno: cruza medianoche y termina al día siguiente a las{' '}
+                <span className="t-num font-medium text-[var(--ink)]">{formEnd}</span>.
+              </span>
+            </div>
+          )}
+
           {!timeError && modalConflicts.length > 0 && (
             <div className="rounded-[12px] border border-[color-mix(in_oklab,var(--warn)_38%,var(--line))] bg-[color-mix(in_oklab,var(--warn)_10%,var(--surface))] px-3.5 py-2.5 flex items-start gap-2.5 text-[13px] text-[var(--ink)]">
               <AlertTriangle
@@ -541,8 +817,67 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               className="t-input"
             />
           </div>
+
+          <div className="pt-1 border-t border-[var(--line)] space-y-3">
+            <ReminderPresetPicker
+              compact
+              value={formReminderMinutes}
+              onChange={setFormReminderMinutes}
+              label="Aviso / alarma previa"
+              helperText="Al sincronizarse, Google enviará la alarma automática a tus dispositivos."
+            />
+
+            {isGoogleConnected ? (
+              <label
+                htmlFor={syncCheckId}
+                className="min-h-[44px] flex items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink)] cursor-pointer hover:border-[var(--action)] transition-colors"
+              >
+                <input
+                  id={syncCheckId}
+                  type="checkbox"
+                  checked={formSyncGoogle}
+                  onChange={(e) => setFormSyncGoogle(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--action)] shrink-0 cursor-pointer"
+                />
+                <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Guardar también en Google Calendar (con alarma)</span>
+              </label>
+            ) : (
+              <button
+                type="button"
+                onClick={handleOpenGoogleSync}
+                className="w-full min-h-[44px] flex items-center justify-between gap-2 rounded-xl border border-dashed border-[var(--line-strong)] bg-[var(--surface-2)] px-3.5 py-2.5 text-[13px] text-[var(--muted)] hover:text-[var(--ink)] hover:border-[var(--action)] cursor-pointer transition-colors"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <CalendarCheck2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
+                  <span>Conecta Google para recibir esta alarma en tu celular</span>
+                </span>
+                <span className="font-semibold text-[var(--action)] shrink-0">Conectar</span>
+              </button>
+            )}
+          </div>
         </form>
       </ModalShell>
+
+      {!onOpenGoogleSync && (
+        <GoogleCalendarSyncModal
+          isOpen={isFallbackSyncOpen}
+          onClose={() => setIsFallbackSyncOpen(false)}
+          calendarBlocks={blocks}
+        />
+      )}
+
+      {onSaveWorkShift && (
+        <WorkShiftModal
+          isOpen={isWorkShiftModalOpen}
+          onClose={() => setIsWorkShiftModalOpen(false)}
+          workShift={resolvedWorkShift}
+          isGoogleConnected={isGoogleConnected}
+          isSaving={isSavingWorkShift}
+          onOpenGoogleSync={handleOpenGoogleSync}
+          onSave={onSaveWorkShift}
+        />
+      )}
     </section>
   );
 };

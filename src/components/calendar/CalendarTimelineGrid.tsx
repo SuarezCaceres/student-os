@@ -9,15 +9,39 @@ import {
   Briefcase,
   User,
   Plus,
+  Bell,
+  CalendarCheck2,
+  ExternalLink,
+  Moon,
+  Repeat,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
-import type { CalendarBlock, DayOfWeek, Category } from '../../types';
+import type { CalendarBlock, DayOfWeek, Category, WorkShiftConfig } from '../../types';
+import type { GoogleCalendarEvent } from '../../services/googleCalendar';
+import {
+  isGoogleEventMirroredByIds,
+  isStudentOsGymGoogleEvent,
+} from '../../utils/gymScheduleFilter';
+import { formatReminderSummary } from '../../utils/reminderPresets';
+import {
+  expandCalendarBlocksToSegments,
+  getNextDayOfWeek,
+  parseTimeToMinutes,
+  type ExpandedBlockSegment,
+} from '../../utils/workSchedule';
 
 export interface CalendarTimelineGridProps {
   blocks: CalendarBlock[];
   onDeleteBlock: (id: string) => void;
+  onDeleteGoogleEvent?: (event: GoogleCalendarEvent) => Promise<void> | void;
+  googleEvents?: GoogleCalendarEvent[];
+  showGoogleEvents?: boolean;
   selectedMobileDay?: DayOfWeek;
   onSelectMobileDay?: (day: DayOfWeek) => void;
   onRequestAddBlock?: (day: DayOfWeek) => void;
+  workShift?: WorkShiftConfig;
+  onEditWorkShift?: () => void;
 }
 
 const DAYS_OF_WEEK: { day: DayOfWeek; short: string }[] = [
@@ -40,22 +64,25 @@ const DAYS_INDEX_MAP: DayOfWeek[] = [
   'Sábado',
 ];
 
-const START_HOUR = 7; // 07:00
-const END_HOUR = 22; // 22:00
-const TOTAL_HOURS = END_HOUR - START_HOUR; // 15 hours
-const HOUR_HEIGHT = 68; // px per hour
+const FOCUSED_START_HOUR = 6; // 06:00 default view (includes 06:00-08:00 gym & 22:00-24:00 night shift start)
+const FULL_START_HOUR = 0; // 00:00 expanded dawn view
+const END_HOUR = 24; // 24:00
+const HOUR_HEIGHT = 64; // px per hour
 
-function timeToMinutes(timeStr: string): number {
-  const [h, m] = timeStr.split(':').map((n) => parseInt(n, 10));
-  return (h || 0) * 60 + (m || 0);
+interface TimelineCollisionEntry {
+  id: string;
+  parentId: string;
+  day: DayOfWeek;
+  startTime: string;
+  endTime: string;
 }
 
-function checkBlockCollision(a: CalendarBlock, b: CalendarBlock): boolean {
-  if (a.id === b.id || a.day !== b.day) return false;
-  const startA = timeToMinutes(a.startTime);
-  const endA = timeToMinutes(a.endTime);
-  const startB = timeToMinutes(b.startTime);
-  const endB = timeToMinutes(b.endTime);
+function checkIntervalCollision(a: TimelineCollisionEntry, b: TimelineCollisionEntry): boolean {
+  if (a.id === b.id || a.parentId === b.parentId || a.day !== b.day) return false;
+  const startA = parseTimeToMinutes(a.startTime);
+  const endA = parseTimeToMinutes(a.endTime);
+  const startB = parseTimeToMinutes(b.startTime);
+  const endB = parseTimeToMinutes(b.endTime);
 
   return startA < endB && startB < endA;
 }
@@ -71,14 +98,20 @@ function readCurrentTimeSnapshot(): { todayDay: DayOfWeek; currentMinutes: numbe
 export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
   blocks,
   onDeleteBlock,
+  onDeleteGoogleEvent,
+  googleEvents = [],
+  showGoogleEvents = true,
   selectedMobileDay,
   onSelectMobileDay,
   onRequestAddBlock,
+  workShift,
+  onEditWorkShift,
 }) => {
   const [timeSnapshot, setTimeSnapshot] = useState(readCurrentTimeSnapshot);
   const [internalMobileDay, setInternalMobileDay] = useState<DayOfWeek>(
     () => readCurrentTimeSnapshot().todayDay
   );
+  const [showEarlyMorning, setShowEarlyMorning] = useState(false);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -98,7 +131,9 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
     }
   };
 
-  const timelineStartMinutes = START_HOUR * 60;
+  const activeStartHour = showEarlyMorning ? FULL_START_HOUR : FOCUSED_START_HOUR;
+  const totalHours = END_HOUR - activeStartHour;
+  const timelineStartMinutes = activeStartHour * 60;
   const timelineEndMinutes = END_HOUR * 60;
   const isCurrentTimeVisible =
     currentMinutes >= timelineStartMinutes && currentMinutes <= timelineEndMinutes;
@@ -138,20 +173,131 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
     }
   };
 
-  const hoursArray = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
+  const hoursArray = Array.from({ length: totalHours + 1 }, (_, i) => activeStartHour + i);
 
-  // Detect any conflicting blocks across the week for clear feedback
-  const conflictingBlocks = blocks.filter((block) =>
-    blocks.some((other) => checkBlockCollision(block, other))
+  // Expand overnight blocks into clean same-day [00:00, 24:00] segments
+  const expandedLocalSegments = expandCalendarBlocksToSegments(blocks);
+
+  // Deduplicate Google Calendar events already mirrored onto a local block via googleEventId (or recurringEventId)
+  const syncedGoogleIds = new Set(
+    blocks.map((b) => b.googleEventId).filter((id): id is string => Boolean(id))
   );
-  const conflictingDays = Array.from(new Set(conflictingBlocks.map((b) => b.day)));
+  const externalGoogleEvents = showGoogleEvents
+    ? googleEvents.filter((ev) => !isGoogleEventMirroredByIds(ev, syncedGoogleIds))
+    : [];
+  const timedExternalGoogle = externalGoogleEvents.filter((ev) => !ev.isAllDay);
+  const allDayExternalGoogle = externalGoogleEvents.filter((ev) => ev.isAllDay);
 
-  const activeMobileDayCount = blocks.filter((b) => b.day === activeMobileDay).length;
+  const allTimedIntervals: TimelineCollisionEntry[] = [
+    ...expandedLocalSegments.map((seg) => ({
+      id: seg.segmentId,
+      parentId: seg.block.id,
+      day: seg.day,
+      startTime: seg.startTime,
+      endTime: seg.endTime,
+    })),
+    ...timedExternalGoogle.map((ev) => ({
+      id: `gcal-${ev.id}-${ev.dateIso}`,
+      parentId: `gcal-${ev.id}`,
+      day: ev.day,
+      startTime: ev.startTime,
+      endTime: ev.endTime,
+    })),
+  ];
+
+  // Detect any conflicting intervals across the 24h week (local or Google-direct, even when madrugada is folded)
+  const conflictingEntries = allTimedIntervals.filter((entry) =>
+    allTimedIntervals.some((other) => checkIntervalCollision(entry, other))
+  );
+  const conflictingDays = Array.from(new Set(conflictingEntries.map((s) => s.day)));
+
+  const earlyMorningCount =
+    expandedLocalSegments.filter((seg) => parseTimeToMinutes(seg.startTime) < 6 * 60).length +
+    timedExternalGoogle.filter((ev) => parseTimeToMinutes(ev.startTime) < 6 * 60).length;
+
+  const countDayItems = (day: DayOfWeek) =>
+    expandedLocalSegments.filter((seg) => seg.day === day).length +
+    externalGoogleEvents.filter((ev) => ev.day === day).length;
+
+  const activeMobileDayCount = countDayItems(activeMobileDay);
 
   return (
     <div className="space-y-3">
+      {/* Night Shift Summary Chip & Focused 06:00–24:00 vs Expand Dawn 00:00–06:00 Bar */}
+      {(workShift?.enabled || earlyMorningCount > 0) && (
+        <div className="rounded-[14px] border border-[var(--line)] bg-[var(--surface-2)] px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--ink)] min-w-0">
+            <span className="t-badge t-badge-ok">
+              <Moon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span className="t-num">
+                {workShift?.enabled
+                  ? `${workShift.title}: ${workShift.startTime}–${workShift.endTime}`
+                  : 'Bloques de madrugada'}
+              </span>
+            </span>
+            {workShift?.enabled && (
+              <span className="text-[var(--muted)]">
+                {workShift.restDay ? (
+                  <>
+                    Descanso:{' '}
+                    <strong className="text-[var(--ink)] font-medium">
+                      noche de {workShift.restDay}
+                    </strong>{' '}
+                    <span className="t-num">
+                      (sin entrada {workShift.startTime} → {getNextDayOfWeek(workShift.restDay)}{' '}
+                      {workShift.endTime})
+                    </span>
+                  </>
+                ) : (
+                  'Turno diario (7 días/semana)'
+                )}
+              </span>
+            )}
+            {!workShift?.enabled && earlyMorningCount > 0 && (
+              <span className="text-[var(--muted)] t-num">
+                {earlyMorningCount} {earlyMorningCount === 1 ? 'bloque' : 'bloques'} entre 00:00 y 06:00
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onEditWorkShift && (
+              <button
+                type="button"
+                onClick={onEditWorkShift}
+                className="t-btn t-btn-ghost text-[13px] px-3 min-h-[44px]"
+              >
+                <Briefcase className="w-3.5 h-3.5 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Editar turno</span>
+              </button>
+            )}
+            <button
+              type="button"
+              aria-pressed={showEarlyMorning}
+              onClick={() => setShowEarlyMorning((prev) => !prev)}
+              className={`min-h-[44px] px-3 py-1.5 rounded-[10px] border text-[13px] font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors ${
+                showEarlyMorning
+                  ? 'border-[var(--action)] bg-[color-mix(in_oklab,var(--action)_10%,var(--surface))] text-[var(--action)]'
+                  : 'border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--action)]'
+              }`}
+            >
+              {showEarlyMorning ? (
+                <ChevronUp className="w-4 h-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-4 h-4 shrink-0" aria-hidden="true" />
+              )}
+              <span>
+                {showEarlyMorning
+                  ? 'Vista enfocada (06:00–24:00)'
+                  : `Ver madrugada (00:00–06:00)${earlyMorningCount > 0 ? ` · ${earlyMorningCount}` : ''}`}
+              </span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Schedule Conflict Notice */}
-      {conflictingBlocks.length > 0 && (
+      {conflictingEntries.length > 0 && (
         <div
           role="status"
           className="rounded-[14px] border border-[color-mix(in_oklab,var(--danger)_36%,var(--line))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--surface))] px-4 py-3 flex items-start gap-3"
@@ -165,8 +311,11 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
               Conflicto de horario detectado:{' '}
             </span>
             <span>
-              Tienes {conflictingBlocks.length} bloques que se cruzan en{' '}
-              <span className="font-medium">{conflictingDays.join(', ')}</span>. Revisa los bloques
+              Tienes{' '}
+              {conflictingEntries.length === 1
+                ? '1 bloque que se cruza'
+                : `${conflictingEntries.length} bloques que se cruzan`}{' '}
+              en <span className="font-medium">{conflictingDays.join(', ')}</span>. Revisa los bloques
               resaltados en rojo.
             </span>
           </div>
@@ -183,7 +332,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           {DAYS_OF_WEEK.map(({ day, short }) => {
             const isSelected = day === activeMobileDay;
             const isToday = day === todayDay;
-            const dayCount = blocks.filter((b) => b.day === day).length;
+            const dayCount = countDayItems(day);
 
             return (
               <button
@@ -234,7 +383,7 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
               type="button"
               onClick={() => onRequestAddBlock(activeMobileDay)}
               className="t-btn t-btn-ghost text-[13px] px-3"
-              style={{ minHeight: '38px', paddingInline: '12px' }}
+              style={{ minHeight: '44px', paddingInline: '12px' }}
             >
               <Plus className="w-4 h-4 text-[var(--action)]" />
               <span>Agregar aquí</span>
@@ -256,7 +405,8 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           {DAYS_OF_WEEK.map(({ day, short }) => {
             const isToday = day === todayDay;
             const isMobileActive = day === activeMobileDay;
-            const count = blocks.filter((b) => b.day === day).length;
+            const count = countDayItems(day);
+            const dayAllDayGoogle = allDayExternalGoogle.filter((ev) => ev.day === day);
 
             return (
               <div
@@ -285,15 +435,29 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                 <span className="text-[13px] text-[var(--muted)] t-num block mt-0.5">
                   {count} {count === 1 ? 'bloque' : 'bloques'}
                 </span>
+                {dayAllDayGoogle.length > 0 && (
+                  <div className="mt-1.5 flex flex-col gap-1">
+                    {dayAllDayGoogle.map((ev) => (
+                      <div
+                        key={`gcal-allday-${ev.id}-${ev.dateIso}`}
+                        className="inline-flex items-center justify-center gap-1 rounded-md border border-dashed border-[color-mix(in_oklab,var(--ok)_55%,var(--line))] bg-[color-mix(in_oklab,var(--ok)_10%,var(--surface))] px-1.5 py-0.5 text-[13px] text-[var(--ink)]"
+                        title={`${ev.title} (Todo el día en Google Calendar)`}
+                      >
+                        <CalendarCheck2 className="w-3 h-3 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                        <span className="truncate max-w-[110px]">{ev.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Timeline Body (07:00 to 22:00) */}
+        {/* Timeline Body */}
         <div
           className="grid grid-cols-[58px_minmax(0,1fr)] md:grid-cols-[64px_repeat(7,minmax(0,1fr))] relative"
-          style={{ height: `${TOTAL_HOURS * HOUR_HEIGHT}px` }}
+          style={{ height: `${totalHours * HOUR_HEIGHT}px` }}
         >
           {/* Horizontal Hour Hairlines */}
           <div className="absolute inset-0 pointer-events-none z-0" aria-hidden="true">
@@ -323,9 +487,90 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
           {DAYS_OF_WEEK.map(({ day }) => {
             const isToday = day === todayDay;
             const isMobileActive = day === activeMobileDay;
-            const dayBlocks = blocks
-              .filter((b) => b.day === day)
+            const daySegments = expandedLocalSegments
+              .filter((seg) => seg.day === day)
               .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            const dayGoogleTimed = timedExternalGoogle
+              .filter((ev) => ev.day === day)
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+            type UnifiedTimelineItem =
+              | {
+                  kind: 'local';
+                  id: string;
+                  parentId: string;
+                  day: DayOfWeek;
+                  startTime: string;
+                  endTime: string;
+                  segment: ExpandedBlockSegment;
+                }
+              | {
+                  kind: 'google';
+                  id: string;
+                  parentId: string;
+                  day: DayOfWeek;
+                  startTime: string;
+                  endTime: string;
+                  event: GoogleCalendarEvent;
+                };
+
+            const unifiedDayIntervals: UnifiedTimelineItem[] = [
+              ...daySegments.map((seg) => ({
+                kind: 'local' as const,
+                id: seg.segmentId,
+                parentId: seg.block.id,
+                day: seg.day,
+                startTime: seg.startTime,
+                endTime: seg.endTime,
+                segment: seg,
+              })),
+              ...dayGoogleTimed.map((ev) => ({
+                kind: 'google' as const,
+                id: `gcal-${ev.id}-${ev.dateIso}`,
+                parentId: `gcal-${ev.id}`,
+                day: ev.day,
+                startTime: ev.startTime,
+                endTime: ev.endTime,
+                event: ev,
+              })),
+            ].sort((a, b) => a.startTime.localeCompare(b.startTime) || a.endTime.localeCompare(b.endTime));
+
+            // Filter strictly within visible [timelineStartMinutes, timelineEndMinutes] before lane placement
+            // so collapsed madrugada (00:00-06:00) blocks never leak a stub at 06:00-06:30.
+            const visibleDayIntervals = unifiedDayIntervals.filter((item) => {
+              const rawStart = parseTimeToMinutes(item.startTime);
+              const rawEnd = parseTimeToMinutes(item.endTime);
+              return rawEnd > timelineStartMinutes && rawStart < timelineEndMinutes;
+            });
+
+            // Compute side-by-side lane placement for colliding items so overlapping events stay readable
+            const placedIntervals = (() => {
+              const laneEnds: number[] = [];
+              const initial = visibleDayIntervals.map((item) => {
+                const rawStart = parseTimeToMinutes(item.startTime);
+                const rawEnd = parseTimeToMinutes(item.endTime);
+                const s = Math.max(timelineStartMinutes, Math.min(timelineEndMinutes - 30, rawStart));
+                const e = Math.min(timelineEndMinutes, Math.max(s + 30, rawEnd));
+                let lane = laneEnds.findIndex((endVal) => endVal <= s);
+                if (lane === -1) {
+                  lane = laneEnds.length;
+                  laneEnds.push(e);
+                } else {
+                  laneEnds[lane] = e;
+                }
+                return { item, s, e, lane };
+              });
+
+              return initial.map((entry) => {
+                const overlappingPeers = initial.filter(
+                  (other) => other.s < entry.e && entry.s < other.e
+                );
+                const maxLane = overlappingPeers.reduce((mx, o) => Math.max(mx, o.lane), 0);
+                const laneCount = Math.max(1, Math.min(3, maxLane + 1));
+                const laneIndex = Math.min(entry.lane, laneCount - 1);
+                return { ...entry, laneCount, laneIndex };
+              });
+            })();
 
             return (
               <div
@@ -348,46 +593,152 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                   </div>
                 )}
 
-                {/* Positioned Blocks */}
-                {dayBlocks.map((block, index) => {
-                  const startMin = timeToMinutes(block.startTime);
-                  const endMin = timeToMinutes(block.endTime);
-
-                  const clampedStart = Math.max(
-                    timelineStartMinutes,
-                    Math.min(timelineEndMinutes - 30, startMin)
-                  );
-                  const clampedEnd = Math.min(
-                    timelineEndMinutes,
-                    Math.max(clampedStart + 30, endMin)
-                  );
-
-                  const collidingEarlierCount = dayBlocks
-                    .slice(0, index)
-                    .filter((prev) => checkBlockCollision(block, prev)).length;
-                  const hasConflict = dayBlocks.some((other) =>
-                    checkBlockCollision(block, other)
+                {/* Positioned Local + Google Calendar Items */}
+                {placedIntervals.map(({ item, s: clampedStart, e: clampedEnd, laneCount, laneIndex }) => {
+                  const hasConflict = unifiedDayIntervals.some((other) =>
+                    checkIntervalCollision(item, other)
                   );
 
                   const topPx = ((clampedStart - timelineStartMinutes) / 60) * HOUR_HEIGHT;
                   const rawHeightPx = ((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT;
                   const heightPx = Math.max(44, rawHeightPx - 3);
-                  const leftOffsetPx = 4 + Math.min(collidingEarlierCount, 2) * 10;
+                  const widthPercent = 100 / laneCount;
+                  const leftPercent = laneIndex * widthPercent;
 
+                  if (item.kind === 'google') {
+                    const ev = item.event;
+                    const isGoogleGym = isStudentOsGymGoogleEvent(ev);
+                    const isRecurring = Boolean(ev.recurringEventId);
+                    const hasAlarm = Boolean(ev.reminderMinutes && ev.reminderMinutes.length > 0);
+                    const cardToneClass = hasConflict
+                      ? 'border-solid bg-[color-mix(in_oklab,var(--danger)_12%,var(--surface))] border-[var(--danger)]'
+                      : isGoogleGym
+                      ? 'border-solid bg-[color-mix(in_oklab,var(--gym)_10%,var(--surface))] border-[color-mix(in_oklab,var(--gym)_45%,var(--line-strong))]'
+                      : 'border-dashed bg-[color-mix(in_oklab,var(--ok)_10%,var(--surface))] border-[color-mix(in_oklab,var(--ok)_58%,var(--line-strong))]';
+                    const accentColorClass = hasConflict
+                      ? 'text-[var(--danger)]'
+                      : isGoogleGym
+                      ? 'text-[var(--gym)]'
+                      : 'text-[var(--ok)]';
+                    const GoogleCardIcon = isGoogleGym ? Dumbbell : CalendarCheck2;
+
+                    return (
+                      <div
+                        key={item.id}
+                        data-google-gym-card={isGoogleGym ? 'true' : undefined}
+                        style={{
+                          top: `${topPx + 1}px`,
+                          height: `${heightPx}px`,
+                          left: `calc(${leftPercent}% + 3px)`,
+                          width: `calc(${widthPercent}% - 6px)`,
+                          zIndex: 11 + laneIndex,
+                        }}
+                        className={`group absolute rounded-[12px] border ${
+                          laneCount > 1 ? 'px-1.5' : 'px-2'
+                        } py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 flex flex-col justify-between overflow-hidden ${cardToneClass}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-1 min-w-0">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <GoogleCardIcon
+                                className={`w-3.5 h-3.5 shrink-0 ${accentColorClass}`}
+                                aria-hidden="true"
+                              />
+                              <span className={`t-num text-[13px] font-medium ${accentColorClass} truncate`}>
+                                {heightPx < 52 || laneCount > 1
+                                  ? ev.startTime
+                                  : `${ev.startTime}–${ev.endTime}`}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              {ev.htmlLink && (
+                                <a
+                                  href={ev.htmlLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  aria-label={`Abrir en Google Calendar: ${ev.title}`}
+                                  title="Abrir en Google Calendar"
+                                  className="p-0.5 rounded-[6px] text-[var(--muted)] hover:text-[var(--ink)] shrink-0"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                                </a>
+                              )}
+                              {onDeleteGoogleEvent && isGoogleGym && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void onDeleteGoogleEvent(ev);
+                                  }}
+                                  aria-label={`Eliminar de Google Calendar: ${ev.title}`}
+                                  title="Eliminar de Google Calendar"
+                                  className="inline-flex md:hidden md:group-hover:inline-flex md:group-focus-within:inline-flex p-0.5 rounded-[6px] text-[var(--muted)] hover:text-[var(--danger)] shrink-0 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <h4 className="text-[13px] font-medium text-[var(--ink)] leading-snug line-clamp-2 mt-0.5">
+                            {ev.title}
+                          </h4>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-1 text-[13px] text-[var(--muted)] mt-1 min-w-0 overflow-hidden">
+                          <span
+                            className="inline-flex items-center gap-1 rounded px-1 py-0 text-[13px] font-medium border border-[color-mix(in_oklab,var(--ok)_40%,var(--line))] bg-[var(--surface)] text-[var(--ok)] truncate"
+                            title={isRecurring ? 'Serie recurrente semanal en Google Calendar' : 'Google Calendar'}
+                          >
+                            <span>{laneCount >= 3 ? 'G' : 'Google'}</span>
+                            {isRecurring && laneCount < 3 && (
+                              <Repeat className="w-3 h-3 shrink-0" aria-hidden="true" />
+                            )}
+                          </span>
+                          {hasAlarm && (
+                            <span
+                              className={`inline-flex items-center gap-0.5 shrink-0 ${accentColorClass}`}
+                              title={formatReminderSummary(ev.reminderMinutes)}
+                            >
+                              <Bell className="w-3 h-3 shrink-0" aria-hidden="true" />
+                              <span className="t-num">{ev.reminderMinutes?.[0]}m</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const segment = item.segment;
+                  const block = segment.block;
                   const styles = getCategoryStyles(block.category);
                   const Icon = styles.icon;
+                  const hasAlarm = Boolean(
+                    block.reminderMinutes && block.reminderMinutes.length > 0
+                  );
+                  const displayTimeCompact =
+                    heightPx < 52 || laneCount > 1
+                      ? segment.startTime
+                      : segment.segmentRole === 'overnight_start'
+                      ? `${block.startTime}–${block.endTime} (+1d)`
+                      : segment.segmentRole === 'overnight_continuation'
+                      ? `00:00–${segment.endTime} (turno ${segment.originDay.slice(0, 3)})`
+                      : `${segment.startTime}–${segment.endTime}`;
 
                   return (
                     <div
-                      key={block.id}
+                      key={segment.segmentId}
                       style={{
                         top: `${topPx + 1}px`,
                         height: `${heightPx}px`,
-                        left: `${leftOffsetPx}px`,
-                        right: '4px',
-                        zIndex: 10 + collidingEarlierCount,
+                        left: `calc(${leftPercent}% + 3px)`,
+                        width: `calc(${widthPercent}% - 6px)`,
+                        zIndex: 10 + laneIndex,
                       }}
-                      className={`group absolute rounded-[12px] border px-2.5 py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 hover:shadow-md flex flex-col justify-between overflow-hidden ${
+                      className={`group absolute rounded-[12px] border ${
+                        laneCount > 1 ? 'px-1.5' : 'px-2.5'
+                      } py-1.5 transition-shadow duration-150 hover:!z-30 focus-within:!z-30 hover:shadow-md flex flex-col justify-between overflow-hidden ${
                         hasConflict
                           ? 'bg-[color-mix(in_oklab,var(--danger)_14%,var(--surface))] border-[var(--danger)] ring-1 ring-[var(--danger)]/30'
                           : styles.surfaceClass
@@ -395,14 +746,14 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                     >
                       <div className="min-w-0">
                         {/* Top Row: Time, Inline Title (for 30m blocks), Conflict Badge, Delete Button */}
-                        <div className="flex items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center justify-between gap-1 min-w-0">
+                          <div className="flex items-center gap-1 min-w-0">
                             <span
-                              className={`t-num text-[13px] font-medium shrink-0 ${
+                              className={`t-num text-[13px] font-medium truncate ${
                                 hasConflict ? 'text-[var(--danger)]' : styles.accentText
                               }`}
                             >
-                              {heightPx < 52 ? block.startTime : `${block.startTime}–${block.endTime}`}
+                              {displayTimeCompact}
                             </span>
                             {heightPx < 52 && (
                               <span className="text-[13px] font-medium text-[var(--ink)] truncate">
@@ -411,14 +762,34 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-0.5 shrink-0">
                             {hasConflict && (
                               <span
                                 title="Conflicto de horario: se cruza con otra actividad este día"
                                 className="inline-flex items-center gap-1 text-[13px] font-medium text-[var(--danger)]"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                <span className="md:hidden xl:inline">Cruce</span>
+                                {laneCount === 1 && (
+                                  <span className="md:hidden xl:inline">Cruce</span>
+                                )}
+                              </span>
+                            )}
+
+                            {hasAlarm && !hasConflict && (
+                              <span
+                                title={formatReminderSummary(block.reminderMinutes)}
+                                className="inline-flex items-center gap-0.5 text-[13px] text-[var(--action)]"
+                              >
+                                <Bell className="w-3 h-3 shrink-0" aria-hidden="true" />
+                              </span>
+                            )}
+
+                            {block.googleEventId && (
+                              <span
+                                title="Sincronizado con Google Calendar"
+                                className="inline-flex items-center text-[var(--ok)]"
+                              >
+                                <CalendarCheck2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                               </span>
                             )}
 
@@ -450,11 +821,22 @@ export const CalendarTimelineGrid: React.FC<CalendarTimelineGridProps> = ({
                         )}
                       </div>
 
-                      {/* Optional Location when block is tall enough */}
-                      {block.location && heightPx >= 96 && (
-                        <div className="flex items-center gap-1 text-[13px] text-[var(--muted)] truncate mt-1">
-                          <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                          <span className="truncate">{block.location}</span>
+                      {/* Optional Location / Reminder Summary when block is tall enough */}
+                      {(block.location || hasAlarm) && heightPx >= 96 && (
+                        <div className="flex items-center justify-between gap-2 text-[13px] text-[var(--muted)] truncate mt-1">
+                          {block.location ? (
+                            <span className="flex items-center gap-1 truncate min-w-0">
+                              <MapPin className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{block.location}</span>
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          {hasAlarm && (
+                            <span className="t-num shrink-0 text-[var(--action)]">
+                              {block.reminderMinutes?.[0]}m antes
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

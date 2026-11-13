@@ -1,4 +1,5 @@
 import type { CalendarBlock, DayOfWeek } from '../types';
+import { isOvernightTimeRange } from './workSchedule';
 
 const DAY_OFFSETS: Record<DayOfWeek, number> = {
   Lunes: 0,
@@ -74,8 +75,14 @@ export function generateICSContent(blocks: CalendarBlock[], calendarTitle = 'Stu
     const eventDate = new Date(monday);
     eventDate.setDate(monday.getDate() + dayOffset);
 
+    const endDate = new Date(eventDate);
+    if (block.endTime.trim() === '24:00' || isOvernightTimeRange(block.startTime, block.endTime)) {
+      endDate.setDate(endDate.getDate() + 1);
+    }
+    const normalizedEnd = block.endTime.trim() === '24:00' ? '00:00' : block.endTime;
+
     const dtStart = formatICSDateTime(eventDate, block.startTime);
-    const dtEnd = formatICSDateTime(eventDate, block.endTime);
+    const dtEnd = formatICSDateTime(endDate, normalizedEnd);
     const summary = sanitizeText(block.title);
     const category = sanitizeText(block.category.toUpperCase());
     const location = block.location ? sanitizeText(block.location) : '';

@@ -22,14 +22,32 @@ export const initialData: AppState = {
           title: 'MongoDB Sharding Explained in 10 Minutes',
           url: 'https://www.youtube.com/watch?v=QAqKPkWbU_0',
           type: 'youtube',
+          category: 'cursos',
           notes: 'Excelente explicación visual del router mongos y shard keys.'
         },
         {
           id: 'res-2',
-          title: 'AWS Well-Architected Reliability Pillar',
-          url: 'https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/',
+          title: 'Claude Code CLI & Artifacts Workflow',
+          url: 'https://www.tiktok.com/@mateo/video/7300000001',
+          type: 'tiktok',
+          category: 'ia_claude',
+          notes: 'Tips de atajos en terminal y prompts rápidos para debugging.'
+        },
+        {
+          id: 'res-3',
+          title: 'Antigravity 2.0 & Gemini 2.0 Flash SDK',
+          url: 'https://docs.gemini.google.com/antigravity',
           type: 'documentacion',
-          notes: 'Lectura obligatoria para el quiz de cloud.'
+          category: 'ia_gemini',
+          notes: 'Arquitectura de subagentes y llamadas a herramientas.'
+        },
+        {
+          id: 'res-4',
+          title: '3 Tips de Arquitectura Hexagonal en 60s',
+          url: 'https://www.instagram.com/reel/DC_HexagonalArch',
+          type: 'instagram',
+          category: 'reels_instagram',
+          notes: 'Resumen visual de desacople de puertos y adaptadores.'
         }
       ],
       gymReflection: 'Subí a 75 kg en press de banca plano manteniendo 8 repeticiones sólidas con buena retracción escapular. El descanso de 90 segundos ayudó bastante.',
@@ -100,8 +118,38 @@ export const initialData: AppState = {
           sets: 4,
           reps: '8-10 reps',
           weightKg: 75,
+          personalRecordKg: 80,
           completedSets: [true, true, true, false],
-          notes: 'Controlar bajada de 2 seg',
+          notes: 'Controlar bajada de 2 seg y retracción escapular',
+          history: [
+            { date: '2026-10-14', weightKg: 70, reps: '10 reps' },
+            { date: '2026-10-21', weightKg: 72.5, reps: '8 reps' },
+            { date: '2026-10-28', weightKg: 75, reps: '8 reps' },
+          ],
+          technique: {
+            videoUrl: '/videos/bench-press-technique.mp4',
+            posterUrl: '/bench-press-poster.jpg',
+            muscleGroups: ['Pectoral Mayor', 'Tríceps Braquial', 'Deltoides Anterior'],
+            setupCues: [
+              'Ojos directamente debajo de la barra olímpica.',
+              'Pies firmemente plantados en el suelo generando leg drive.',
+              'Retracción y depresión escapular (juntar omóplatos contra el banco).',
+              'Agarre prono simétrico a 1.5 veces el ancho de hombros.',
+            ],
+            executionCues: [
+              'Desbloquear la barra y estabilizarla sobre el pecho superior.',
+              'Fase excéntrica (bajada): 2 a 3 segundos en trayectoria diagonal hacia el esternón.',
+              'Pausa de 0.5 seg rozando el pecho sin rebotar en la caja torácica.',
+              'Fase concéntrica (subida): Empuje explosivo manteniendo codos a 45-60 grados respecto al torso.',
+            ],
+            breathingCues: 'Inhala hondo y bloquea el abdomen (Valsalva) antes de bajar. Exhala al superar el punto de estancamiento (sticking point) en la subida.',
+            commonMistakes: [
+              'Rebotar la barra en las costillas.',
+              'Separar los glúteos del banco durante el empuje.',
+              'Abrir los codos a 90 grados (riesgo articular para el hombro).',
+              'Perder la tensión de las escápulas en la parte alta.',
+            ],
+          },
         },
         {
           id: 'ex-2',

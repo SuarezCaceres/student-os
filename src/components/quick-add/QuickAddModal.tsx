@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, CalendarCheck2 } from 'lucide-react';
 import type {
   AppState,
   UniversityAssignment,
@@ -12,11 +12,14 @@ import type {
   AssignmentType,
   LearningResource,
   ResourceType,
+  ResourceCategory,
 } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
 import { ModalShell } from '../common/ModalShell';
 import { SegmentedControl } from '../common/SegmentedControl';
 import type { SegmentOption } from '../common/SegmentedControl';
+import { ReminderPresetPicker } from '../calendar/ReminderPresetPicker';
+import { DEFAULT_BLOCK_REMINDER_MINUTES } from '../../utils/reminderPresets';
 
 export type QuickAddTab = 'university' | 'gym' | 'kanban' | 'calendar' | 'learning';
 
@@ -30,6 +33,7 @@ export interface QuickAddModalProps {
   onAddCalendarBlock: (block: CalendarBlock) => void;
   onAddLearningResource?: (resource: LearningResource, week?: number) => void;
   initialTab?: QuickAddTab;
+  isGoogleConnected?: boolean;
 }
 
 const COMMON_COURSES = [
@@ -72,6 +76,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   onAddCalendarBlock,
   onAddLearningResource,
   initialTab,
+  isGoogleConnected = false,
 }) => {
   const [activeTab, setActiveTab] = useState<QuickAddTab>(initialTab);
 
@@ -102,10 +107,15 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   const [calStart, setCalStart] = useState('09:00');
   const [calEnd, setCalEnd] = useState('11:00');
   const [calCategory, setCalCategory] = useState<Category>('universidad');
+  const [calReminderMinutes, setCalReminderMinutes] = useState<number[]>(
+    DEFAULT_BLOCK_REMINDER_MINUTES
+  );
+  const [calSyncGoogle, setCalSyncGoogle] = useState<boolean>(Boolean(isGoogleConnected));
 
   // Learning Resource Form
   const [resTitle, setResTitle] = useState('');
   const [resType, setResType] = useState<ResourceType>('youtube');
+  const [resCategory, setResCategory] = useState<ResourceCategory>('general');
   const [resUrl, setResUrl] = useState('');
   const [resNotes, setResNotes] = useState('');
   const [resWeek, setResWeek] = useState(state.currentAcademicWeek);
@@ -182,6 +192,8 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
       endTime: calEnd,
       title: calTitle.trim(),
       category: calCategory,
+      reminderMinutes: calReminderMinutes,
+      syncWithGoogle: Boolean(isGoogleConnected && calSyncGoogle),
     };
 
     onAddCalendarBlock(newBlock);
@@ -198,6 +210,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
       id: `res-${Date.now()}`,
       title: resTitle.trim(),
       type: resType,
+      category: resCategory,
       url: resUrl.trim() || undefined,
       notes: resNotes.trim() || undefined,
     };
@@ -209,6 +222,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
     setResTitle('');
     setResUrl('');
     setResNotes('');
+    setResCategory('general');
     onClose();
   };
 
@@ -604,6 +618,33 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             </select>
           </div>
 
+          <div className="pt-2 border-t border-[var(--line)] space-y-3">
+            <ReminderPresetPicker
+              compact
+              value={calReminderMinutes}
+              onChange={setCalReminderMinutes}
+              label="Aviso en Google Calendar"
+              helperText="Se crea una alarma nativa en tu calendario de Google."
+            />
+
+            {isGoogleConnected && (
+              <label
+                htmlFor="qa-cal-sync-google"
+                className="min-h-[44px] flex items-center gap-2.5 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink)] cursor-pointer hover:border-[var(--action)] transition-colors"
+              >
+                <input
+                  id="qa-cal-sync-google"
+                  type="checkbox"
+                  checked={calSyncGoogle}
+                  onChange={(e) => setCalSyncGoogle(e.target.checked)}
+                  className="w-4 h-4 accent-[var(--action)] shrink-0 cursor-pointer"
+                />
+                <CalendarCheck2 className="w-4 h-4 text-[var(--ok)] shrink-0" aria-hidden="true" />
+                <span>Guardar también en Google Calendar (con alarma)</span>
+              </label>
+            )}
+          </div>
+
           <button type="submit" className="t-btn t-btn-primary w-full mt-2">
             <Check className="w-4 h-4" />
             <span>Agendar bloque</span>
@@ -630,10 +671,10 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
             <div>
               <label htmlFor="qa-res-type" className="t-label">
-                Tipo de recurso
+                Plataforma / Formato
               </label>
               <select
                 id="qa-res-type"
@@ -641,11 +682,34 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
                 onChange={(e) => setResType(e.target.value as ResourceType)}
                 className="t-input"
               >
-                <option value="youtube">Video de YouTube</option>
+                <option value="youtube">YouTube</option>
+                <option value="tiktok">TikTok</option>
+                <option value="instagram">Instagram Reel</option>
                 <option value="documentacion">Documentación</option>
                 <option value="articulo">Artículo o blog</option>
                 <option value="libro">Libro o PDF</option>
                 <option value="texto">Nota rápida</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="qa-res-category" className="t-label">
+                Categoría Temática
+              </label>
+              <select
+                id="qa-res-category"
+                value={resCategory}
+                onChange={(e) => setResCategory(e.target.value as ResourceCategory)}
+                className="t-input font-sans"
+              >
+                <option value="general">📚 General / Software</option>
+                <option value="ia_claude">🤖 IA en Claude</option>
+                <option value="ia_gemini">💎 IA en Gemini</option>
+                <option value="skills">⚡ Skills & Agentes</option>
+                <option value="video_gen">🎬 Generación de Videos</option>
+                <option value="reels_instagram">📱 Reels de Instagram</option>
+                <option value="cursos">🎓 Cursos</option>
+                <option value="conferencias">🎙️ Conferencias</option>
               </select>
             </div>
 
@@ -675,9 +739,32 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
             <input
               id="qa-res-url"
               type="url"
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="https://www.instagram.com/reel/... o https://www.tiktok.com/@..."
               value={resUrl}
-              onChange={(e) => setResUrl(e.target.value)}
+              onChange={(e) => {
+                const url = e.target.value;
+                setResUrl(url);
+                const lower = url.toLowerCase();
+                if (lower.includes('tiktok.com') || lower.includes('vt.tiktok.com')) {
+                  setResType('tiktok');
+                } else if (lower.includes('instagram.com/reel') || lower.includes('instagram.com/p/') || lower.includes('instagram.com/reels') || lower.includes('instagr.am')) {
+                  setResType('instagram');
+                  setResCategory('reels_instagram');
+                } else if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+                  setResType('youtube');
+                }
+                if (lower.includes('claude') || lower.includes('anthropic')) {
+                  setResCategory('ia_claude');
+                } else if (lower.includes('gemini') || lower.includes('antigravity')) {
+                  setResCategory('ia_gemini');
+                } else if (lower.includes('skill') || lower.includes('mcp')) {
+                  setResCategory('skills');
+                } else if (lower.includes('sora') || lower.includes('runway') || lower.includes('video')) {
+                  setResCategory('video_gen');
+                } else if (lower.includes('reel') || lower.includes('instagram')) {
+                  setResCategory('reels_instagram');
+                }
+              }}
               className="t-input"
             />
           </div>
