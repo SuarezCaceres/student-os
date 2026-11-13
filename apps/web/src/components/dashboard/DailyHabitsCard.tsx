@@ -97,10 +97,10 @@ export const DailyHabitsCard: React.FC<DailyHabitsCardProps> = ({
 
   useEffect(() => {
     if (!needsDateRollover) return;
-    if (onHabitsChange) {
-      onHabitsChange(activeHabits);
-      return;
-    }
+    // Con estado controlado (App) el reinicio diario es solo de visualizacion: se persiste al primer cambio
+    // real (`saveHabits` ya sella `lastUpdatedDate`). Persistirlo al montar crearia una edicion "de hoy a cero"
+    // que, en un dispositivo con datos de ayer, pisaria por ultima-edicion-gana los habitos de hoy de otro dispositivo.
+    if (onHabitsChange) return;
     try {
       const raw = localStorage.getItem('student_os_state_v1');
       if (raw) {
