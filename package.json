@@ -16,6 +16,6 @@
     "build": "npm run build -w @student-os/shared && npm run build -w @student-os/api && npm run build -w @student-os/web",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "prepare": "npm run build -w @student-os/shared"
+    "prepare": "npm run build -w @student-os/shared && npm run prisma:generate -w @student-os/api"
   }
 }

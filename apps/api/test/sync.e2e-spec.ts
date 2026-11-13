@@ -183,9 +183,9 @@ describe('Sync API (e2e, guard real + repositorios en memoria)', () => {
     it('un cuerpo de mas de 1 MB (limite global de app.setup) se rechaza y no escribe nada', async () => {
       const changes = Array.from({ length: 40 }, (_, i) => kanbanRecord(`huge${i}`, at(-1), 'x'.repeat(30 * 1024)));
       const res = await push(tokenA, { changes });
-      // DEUDA (fuera de mi alcance, common/all-exceptions.filter.ts de API-CORE): el error de body-parser no es una
-      // HttpException, asi que hoy responde 500 generico en vez de 413. Se acepta cualquiera de los dos.
-      expect([413, 500]).toContain(res.status);
+      // body-parser lanza un error 413 que no es HttpException: el filtro global lo debe respetar (no 500).
+      expect(res.status).toBe(413);
+      expect(JSON.stringify(res.body)).not.toMatch(/stack|node_modules/i);
       const pulled = await pull(tokenA, '?limit=1000').expect(200);
       expect(pulled.body.records.find((r: { id: string }) => r.id.startsWith('huge'))).toBeUndefined();
     });
