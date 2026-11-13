@@ -6,6 +6,40 @@ import {
   isStudentOsGymMetadata,
   isStudentOsWorkShiftMetadata,
 } from '../utils/gymScheduleFilter';
+import {
+  GOOGLE_CLOUD_ACCESS_TOKEN,
+  captureGoogleRedirectResult,
+  disconnectGoogleCloud,
+  forgetGoogleCloudState,
+  getGoogleCloudStatus,
+  googleCloudFetch,
+  isGoogleCloudMode,
+  isGoogleCloudReauthRequired,
+  isGoogleCloudToken,
+  resolveGoogleCloudMode,
+  startGoogleCloudConnect,
+  type GoogleCloudStatus,
+} from './googleCloud';
+
+/*
+ * FACHADA de Google Calendar.
+ *
+ * Todas las firmas exportadas (y su semantica: `auth_missing | partial | error | ok`) se mantienen. Hay dos
+ * transportes y la logica es una sola:
+ *  - Modo GIS (la app desplegada hoy, sin nube): el token de 1 hora vive en el navegador y se llama a Google directo.
+ *  - Modo NUBE (`VITE_API_URL` + Supabase configurados y sesion iniciada): el refresh token vive cifrado en el
+ *    servidor; el "token" que circula por estas funciones es `GOOGLE_CLOUD_ACCESS_TOKEN` (un marcador, no un secreto)
+ *    y `googleFetch` enruta las llamadas por la API. El navegador jamas ve tokens de Google.
+ * Solo se pueden AGREGAR exports (hay una prueba que congela las firmas).
+ */
+export {
+  GOOGLE_CLOUD_ACCESS_TOKEN,
+  consumeGoogleRedirectResult,
+  isGoogleCloudMode,
+  isGoogleCloudToken,
+  resolveGoogleCloudMode,
+} from './googleCloud';
+export type { GoogleCloudStatus, GoogleRedirectResult } from './googleCloud';
 
 export const GOOGLE_CLIENT_ID_STORAGE_KEY = 'student_os_gcal_client_id';
 export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
@@ -184,6 +218,30 @@ function saveStoredMeta(meta: GoogleCalendarMeta): void {
 }
 
 /**
+ * Unico punto por el que pasan las llamadas a Calendar API v3. `relativePath` es relativo a `/calendar/v3/`
+ * (`calendars/primary/events?...`, `freeBusy`). Con el marcador de nube va por la API de StudentOS; con un token
+ * de GIS va directo a Google con exactamente las mismas URLs y cabeceras de siempre.
+ */
+async function googleFetch(
+  accessToken: string,
+  relativePath: string,
+  init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: string } = {}
+): Promise<Response> {
+  if (isGoogleCloudToken(accessToken)) {
+    return googleCloudFetch(relativePath, init);
+  }
+  const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
+  if (init.body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
+  return fetch(`${GOOGLE_CALENDAR_API_BASE}/${relativePath}`, {
+    ...(init.method ? { method: init.method } : {}),
+    headers,
+    ...(init.body !== undefined ? { body: init.body } : {}),
+  });
+}
+
+/**
  * Checks whether VITE_GOOGLE_CLIENT_ID is configured via environment variables.
  */
 export function hasEnvGoogleClientId(): boolean {
@@ -237,6 +295,14 @@ export function getStoredGoogleMeta(): GoogleCalendarMeta {
  * Returns an active in-memory or sessionStorage access token if not expired.
  */
 export function getStoredAccessToken(): string | null {
+  // Modo nube: la sesion de Google vive en el servidor y no caduca a la hora. Se considera activa si la ultima
+  // consulta dijo "conectado" y la API no ha pedido reautorizar.
+  if (isGoogleCloudMode()) {
+    return getStoredGoogleMeta().connected && !isGoogleCloudReauthRequired()
+      ? GOOGLE_CLOUD_ACCESS_TOKEN
+      : null;
+  }
+
   const safetyBufferMs = 30_000;
   if (inMemoryToken && inMemoryToken.expiresAt > Date.now() + safetyBufferMs) {
     return inMemoryToken.accessToken;
@@ -267,6 +333,8 @@ export function getStoredAccessToken(): string | null {
  */
 export function isGoogleCalendarReady(clientIdOverride?: string): boolean {
   if (typeof window === 'undefined') return false;
+  // En modo nube las credenciales de Google las tiene el servidor: no hace falta un Client ID en el navegador.
+  if (isGoogleCloudMode()) return true;
   const resolved = (clientIdOverride ?? '').trim() || getConfiguredGoogleClientId();
   return Boolean(resolved);
 }
@@ -356,6 +424,15 @@ async function ensureGoogleIdentityScriptLoaded(): Promise<GoogleOAuth2Api> {
 
 export async function fetchGoogleUserProfile(accessToken: string): Promise<GoogleUserProfile> {
   if (!accessToken.trim()) return {};
+  if (isGoogleCloudToken(accessToken)) {
+    // El servidor ya guardo el email de la cuenta conectada; el navegador no tiene (ni necesita) un token de Google.
+    try {
+      const status = await getGoogleCloudStatus();
+      return status.email ? { email: status.email } : {};
+    } catch {
+      return {};
+    }
+  }
   try {
     const response = await fetch(GOOGLE_USERINFO_URL, {
       headers: {
@@ -383,11 +460,7 @@ async function fetchPrimaryCalendarMetadata(
   accessToken: string
 ): Promise<{ email?: string; calendarName?: string }> {
   try {
-    const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/calendars/primary`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
+    const response = await googleFetch(accessToken, 'calendars/primary');
     if (!response.ok) return {};
     const data = (await response.json()) as { id?: string; summary?: string };
     const email = typeof data.id === 'string' && data.id.includes('@') ? data.id : undefined;
@@ -485,6 +558,10 @@ export async function signInWithGoogleAccount(
   clientIdOverride?: string,
   options?: { prompt?: string }
 ): Promise<GoogleCalendarConnectionResult> {
+  if (await resolveGoogleCloudMode()) {
+    return connectViaCloud();
+  }
+
   const customId = clientIdOverride?.trim();
   if (customId) {
     saveCustomGoogleClientId(customId);
@@ -546,6 +623,10 @@ export async function connectGoogleCalendar(
  * Silently restores an active Google access token if the user already connected previously.
  */
 export async function trySilentGoogleReconnect(): Promise<string | null> {
+  if (await resolveGoogleCloudMode()) {
+    return restoreCloudSession();
+  }
+
   const cached = getStoredAccessToken();
   if (cached) return cached;
 
@@ -571,13 +652,117 @@ export function disconnectGoogleCalendar(accessToken?: string): void {
   clearStoredToken();
   saveStoredMeta({ connected: false });
 
-  if (tokenToRevoke) {
+  // Modo nube: esto solo olvida el estado LOCAL (App lo llama al cerrar sesion). La conexion persistente del servidor
+  // se conserva a proposito para no pedir permisos de nuevo; revocarla es `disconnectGoogleCalendarCloud()`.
+  forgetGoogleCloudState();
+
+  if (tokenToRevoke && !isGoogleCloudToken(tokenToRevoke)) {
     try {
       getGoogleOAuth2()?.revoke(tokenToRevoke, () => {});
     } catch {
       // Ignore revoke errors when offline or script unloaded
     }
   }
+}
+
+// --- Modo nube (sync persistente) ----------------------------------------------------------
+
+export interface GoogleCloudConnectionState {
+  /** Metadatos para pintar la UI (tambien quedan en localStorage como siempre). */
+  meta: GoogleCalendarMeta;
+  /** Marcador de nube si se puede usar ya; `null` si falta conectar o reautorizar. */
+  accessToken: string | null;
+  /** Google revoco o caduco el permiso: hay que volver a autorizar. */
+  needsReauth: boolean;
+  /** El servidor tiene credenciales de Google; si es `false`, conectar no funcionara. */
+  serverConfigured: boolean;
+}
+
+/** Refleja el estado del servidor en la meta local (la que ya leen App y los modales). */
+function applyCloudStatusToMeta(status: GoogleCloudStatus): GoogleCalendarMeta {
+  const previous = getStoredGoogleMeta();
+  const meta: GoogleCalendarMeta = status.connected
+    ? {
+        ...previous,
+        connected: true,
+        email: status.email ?? previous.email,
+        connectedAt: status.connectedAt ?? previous.connectedAt,
+      }
+    : { connected: false };
+  saveStoredMeta(meta);
+  return meta;
+}
+
+/** Equivalente nube de "recuperar la sesion en silencio": consulta al servidor, no a Google. */
+async function restoreCloudSession(): Promise<string | null> {
+  try {
+    const status = await getGoogleCloudStatus();
+    applyCloudStatusToMeta(status);
+    return status.connected && !status.needsReauth ? GOOGLE_CLOUD_ACCESS_TOKEN : null;
+  } catch {
+    // Sin red o servidor dormido: no se pierde la conexion por un fallo transitorio; la siguiente llamada lo dira.
+    return getStoredGoogleMeta().connected && !isGoogleCloudReauthRequired() ? GOOGLE_CLOUD_ACCESS_TOKEN : null;
+  }
+}
+
+/**
+ * "Conectar" en modo nube: si el servidor ya tiene la conexion la devuelve al instante; si no, navega a Google y la
+ * promesa NO se resuelve (la pagina se abandona; al volver llega `?google=connected`).
+ */
+async function connectViaCloud(): Promise<GoogleCalendarConnectionResult> {
+  const status = await getGoogleCloudStatus({ force: true });
+  if (status.connected && !status.needsReauth) {
+    const meta = applyCloudStatusToMeta(status);
+    const calendar = await fetchPrimaryCalendarMetadata(GOOGLE_CLOUD_ACCESS_TOKEN);
+    const fullMeta: GoogleCalendarMeta = { ...meta, calendarName: calendar.calendarName ?? meta.calendarName };
+    saveStoredMeta(fullMeta);
+    return {
+      accessToken: GOOGLE_CLOUD_ACCESS_TOKEN,
+      expiresAt: Date.now() + 3_600_000,
+      meta: fullMeta,
+      user: { email: status.email ?? undefined },
+    };
+  }
+  if (!status.configured) {
+    throw new Error('El servidor aún no tiene configurada la conexión con Google Calendar.');
+  }
+  await startGoogleCloudConnect();
+  return new Promise<GoogleCalendarConnectionResult>(() => {});
+}
+
+/**
+ * Consulta al servidor el estado de la conexion persistente y actualiza la meta local. Devuelve `null` si el modo
+ * nube no esta activo (entonces se usa el flujo GIS de siempre).
+ */
+export async function refreshGoogleCloudConnection(
+  options: { force?: boolean } = {}
+): Promise<GoogleCloudConnectionState | null> {
+  if (!(await resolveGoogleCloudMode())) return null;
+  const status = await getGoogleCloudStatus({ force: options.force ?? true });
+  const meta = applyCloudStatusToMeta(status);
+  return {
+    meta,
+    accessToken: status.connected && !status.needsReauth ? GOOGLE_CLOUD_ACCESS_TOKEN : null,
+    needsReauth: status.connected && status.needsReauth,
+    serverConfigured: status.configured,
+  };
+}
+
+/** Inicia el consentimiento de Google en el servidor (PKCE) y navega a el. Solo modo nube. */
+export async function beginGoogleCloudConnect(): Promise<void> {
+  await startGoogleCloudConnect();
+}
+
+/**
+ * Desconexion REAL en modo nube: el servidor revoca el acceso en Google y borra el secreto. `revoked: false` indica que
+ * Google no confirmo la revocacion (el secreto se borro igual). Distinto de `disconnectGoogleCalendar`, que solo
+ * olvida el estado local.
+ */
+export async function disconnectGoogleCalendarCloud(): Promise<{ revoked: boolean }> {
+  const result = await disconnectGoogleCloud();
+  clearStoredToken();
+  saveStoredMeta({ connected: false });
+  return { revoked: result.revoked };
 }
 
 function parseLocalDateParts(dateIso: string): { year: number; month: number; day: number } {
@@ -696,13 +881,9 @@ export async function fetchGoogleEventsAndBusyForWeek(
     maxResults: '250',
   });
 
-  const response = await fetch(
-    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events?${query.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+  const response = await googleFetch(
+    accessToken,
+    `calendars/primary/events?${query.toString()}`
   );
 
   if (!response.ok) {
@@ -908,12 +1089,8 @@ export async function fetchGoogleBusyIntervalsForWeek(
     0
   );
 
-  const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}/freeBusy`, {
+  const response = await googleFetch(accessToken, 'freeBusy', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({
       timeMin: weekStartLocal.toISOString(),
       timeMax: weekEndLocal.toISOString(),
@@ -1147,15 +1324,11 @@ export async function upsertGoogleGymEvent(
 
   const attemptRequest = async (method: 'POST' | 'PATCH', targetEventId?: string) => {
     const endpoint = targetEventId
-      ? `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(targetEventId)}`
-      : `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events`;
+      ? `calendars/primary/events/${encodeURIComponent(targetEventId)}`
+      : `calendars/primary/events`;
 
-    return fetch(endpoint, {
+    return googleFetch(accessToken, endpoint, {
       method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify(payload),
     });
   };
@@ -1198,14 +1371,10 @@ export const upsertGoogleCalendarEvent = upsertGoogleGymEvent;
 export async function deleteGoogleGymEvent(accessToken: string, eventId: string): Promise<void> {
   if (!accessToken.trim() || !eventId.trim()) return;
 
-  const response = await fetch(
-    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
-    {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+  const response = await googleFetch(
+    accessToken,
+    `calendars/primary/events/${encodeURIComponent(eventId)}`,
+    { method: 'DELETE' }
   );
 
   if (response.ok || response.status === 404 || response.status === 410) {
@@ -1253,13 +1422,9 @@ async function fetchSingleGoogleEvent(
   accessToken: string,
   eventId: string
 ): Promise<RawGoogleEventItem | null> {
-  const response = await fetch(
-    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+  const response = await googleFetch(
+    accessToken,
+    `calendars/primary/events/${encodeURIComponent(eventId)}`
   );
   if (response.status === 404 || response.status === 410) {
     return null;
@@ -1280,14 +1445,11 @@ async function patchGoogleEventRecurrence(
   eventId: string,
   recurrence: string[]
 ): Promise<void> {
-  const response = await fetch(
-    `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+  const response = await googleFetch(
+    accessToken,
+    `calendars/primary/events/${encodeURIComponent(eventId)}`,
     {
       method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
       body: JSON.stringify({ recurrence }),
     }
   );
@@ -1393,13 +1555,9 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
   const seenListedIds = new Set<string>();
 
   try {
-    const listResp = await fetch(
-      `${GOOGLE_CALENDAR_API_BASE}/calendars/primary/events?${query.toString()}`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+    const listResp = await googleFetch(
+      accessToken,
+      `calendars/primary/events?${query.toString()}`
     );
 
     if (!listResp.ok) {
@@ -1737,4 +1895,11 @@ export async function upsertWorkShiftRecurringSeries(
     studentOsCategory: 'trabajo',
     recurrence,
   });
+}
+
+// Al volver del consentimiento de Google (modo nube) la API agrega `?google=connected|error` a la URL. Se captura al
+// cargar el modulo (antes de que React lea la meta): se limpia la URL y, si salio bien, se marca la conexion para que
+// la sincronizacion automatica de App la detecte sin tocar nada. Sin nube configurada esto no hace nada.
+if (captureGoogleRedirectResult()?.status === 'connected') {
+  saveStoredMeta({ ...getStoredGoogleMeta(), connected: true, connectedAt: new Date().toISOString() });
 }

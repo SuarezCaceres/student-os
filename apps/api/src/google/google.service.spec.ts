@@ -29,6 +29,9 @@ const listEvents = (h: GoogleHarness, userId: string) =>
 describe('GoogleService (con servidor falso de Google)', () => {
   let h: GoogleHarness;
 
+  // Los logs esperados (intercambio rechazado, secreto ilegible...) no deben ensuciar la salida de las pruebas.
+  beforeAll(() => Logger.overrideLogger(false));
+
   beforeEach(async () => {
     h = await createGoogleHarness();
   });
