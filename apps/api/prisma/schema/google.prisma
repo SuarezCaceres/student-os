@@ -1,3 +1,41 @@
-// Agente GOOGLE rellena este archivo (modelos de google). No editar base.prisma ni otros .prisma.
-// Convencion: columna plana `userId String @db.Uuid` + @@index([userId, ...]); SIN @relation hacia Profile
-// (una relacion obligaria a editar base.prisma). Mapea con @@map("snake_case"). No generes migraciones.
+// GOOGLE (Ola 3). Modelos del sync persistente de Google Calendar. No editar base.prisma ni otros .prisma.
+// Convencion: columna plana `userId String @db.Uuid`, SIN @relation hacia Profile (obligaria a editar base.prisma).
+// No se generan migraciones: las crea el Integrador.
+
+/// Conexion de Google Calendar de un usuario (como mucho una). El refresh token NUNCA se guarda en claro:
+/// `refreshTokenEnc` es un blob AES-256-GCM `v<keyVersion>.<iv>.<tag>.<ciphertext>` (base64url) con IV aleatorio
+/// por registro y el `userId` como datos autenticados adicionales (un blob copiado a otra fila no descifra).
+/// El access token vive solo en memoria del proceso. El navegador jamas ve nada de esto.
+model GoogleConnection {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @db.Uuid
+  refreshTokenEnc String
+  /// Version de la clave de cifrado con la que se genero `refreshTokenEnc` (rotacion de claves).
+  keyVersion      Int      @default(1)
+  /// Scopes concedidos, separados por espacio (los que devolvio Google, no los pedidos).
+  scopes          String
+  /// Email de la cuenta de Google conectada (puede diferir del email del login de StudentOS).
+  accountEmail    String?
+  connectedAt     DateTime @default(now()) @db.Timestamptz(3)
+  /// `true` cuando Google devolvio invalid_grant (revocado/caducado) o el blob no se pudo descifrar.
+  needsReauth     Boolean  @default(false)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  @@map("google_connections")
+}
+
+/// Estado transitorio del flujo OAuth con PKCE (TTL corto). `id` es el nonce que viaja dentro del `state`
+/// firmado con HMAC. El verifier se guarda cifrado y la fila se borra al usarse (un solo uso).
+model GoogleOAuthState {
+  id               String   @id
+  userId           String   @db.Uuid
+  codeVerifierEnc  String
+  /// Origen + ruta de la web a la que volver (ya validado contra WEB_ORIGINS al crearlo).
+  redirectTo       String
+  expiresAt        DateTime @db.Timestamptz(3)
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("google_oauth_states")
+}
