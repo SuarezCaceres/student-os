@@ -122,6 +122,7 @@ export interface DailyHabits {
   targetSleepHours: number;
   pomodorosDone: number;
   targetPomodoros: number;
+  lastUpdatedDate?: string;
 }
 
 export type ResourceType = 'youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';

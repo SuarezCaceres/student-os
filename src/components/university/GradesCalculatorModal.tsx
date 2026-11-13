@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { UniversityAssignment } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { calculateOverallGpa, getGpaBadge } from '../../utils/academicStats';
 import { ModalShell } from '../common/ModalShell';
 
 interface GradesCalculatorModalProps {
@@ -16,27 +17,6 @@ interface GradesCalculatorModalProps {
   onClose: () => void;
   assignments: UniversityAssignment[];
   onSaveGrades: (updatedAssignments: UniversityAssignment[]) => void;
-}
-
-interface GpaBadgeInfo {
-  label: string;
-  className: string;
-}
-
-function getGpaBadge(gpa: number | null): GpaBadgeInfo {
-  if (gpa === null) {
-    return { label: 'Sin notas aún', className: 't-badge' };
-  }
-  if (gpa >= 17) {
-    return { label: 'Sobresaliente', className: 't-badge t-badge-ok' };
-  }
-  if (gpa >= 14) {
-    return { label: 'Aprobado tranquilo', className: 't-badge t-badge-ok' };
-  }
-  if (gpa >= 11) {
-    return { label: 'Ajustado', className: 't-badge t-badge-warn' };
-  }
-  return { label: 'En riesgo', className: 't-badge t-badge-danger' };
 }
 
 interface GradesCalculatorDialogProps {
@@ -118,19 +98,7 @@ const GradesCalculatorDialog: React.FC<GradesCalculatorDialogProps> = ({
     };
   };
 
-  let overallWeightedSum = 0;
-  let overallWeightGraded = 0;
-
-  draftAssignments.forEach((a) => {
-    const weight = a.weightPercentage || 0;
-    if (a.gradeObtained !== undefined) {
-      overallWeightedSum += a.gradeObtained * weight;
-      overallWeightGraded += weight;
-    }
-  });
-
-  const overallGpa =
-    overallWeightGraded > 0 ? overallWeightedSum / overallWeightGraded : null;
+  const overallGpa = calculateOverallGpa(draftAssignments);
   const overallBadge = getGpaBadge(overallGpa);
 
   const handleSaveAll = () => {

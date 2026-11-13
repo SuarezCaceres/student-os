@@ -13,6 +13,8 @@ import type {
   UniversityAssignment,
 } from '../../types';
 import { triggerConfetti } from '../../utils/confetti';
+import { getAssignmentUrgency } from '../../utils/academicStats';
+import { getLocalIsoDate } from '../../utils/gymAttendance';
 import { SectionHeader } from '../common/SectionHeader';
 import { SegmentedControl } from '../common/SegmentedControl';
 import { AssignmentDetailModal } from './AssignmentDetailModal';
@@ -36,24 +38,6 @@ const TYPE_LABEL: Record<AssignmentType, string> = {
   examen: 'Examen',
 };
 
-function getInitialTodayUtcMs(): number {
-  const now = new Date();
-  return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function parseIsoDateUtcMs(dateStr: string): number | null {
-  if (!dateStr) return null;
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return null;
-  const year = Number(parts[0]);
-  const month = Number(parts[1]);
-  const day = Number(parts[2]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return null;
-  }
-  return Date.UTC(year, month - 1, day);
-}
-
 export const UniversityView: React.FC<UniversityViewProps> = ({
   assignments,
   currentWeek,
@@ -62,7 +46,7 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
   onAddAssignment,
   onUpdateAssignment,
 }) => {
-  const [todayUtcMs] = useState<number>(getInitialTodayUtcMs);
+  const [todayIso] = useState<string>(() => getLocalIsoDate());
   const [weekFilter, setWeekFilter] = useState<WeekScope>('upcoming');
   const [filterCourse, setFilterCourse] = useState<string>('todos');
   const [filterStatus, setFilterStatus] = useState<string>('todos');
@@ -109,12 +93,6 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     return true;
   });
 
-  const getDaysDiff = (dateStr: string): number | null => {
-    const targetUtcMs = parseIsoDateUtcMs(dateStr);
-    if (targetUtcMs === null) return null;
-    return Math.round((targetUtcMs - todayUtcMs) / 86_400_000);
-  };
-
   const handleQuickAddForWeek = (weekNum: number, e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const title = (quickTitleByWeek[weekNum] || '').trim();
@@ -144,49 +122,9 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
     triggerConfetti();
   };
 
-  const renderDueBadge = (assignment: UniversityAssignment, daysDiff: number | null) => {
-    if (assignment.status === 'entregado') {
-      return <span className="t-badge t-badge-ok">Entregada</span>;
-    }
-
-    if (daysDiff === null) {
-      return (
-        <span className="t-badge">
-          {assignment.status === 'en_progreso' ? 'En progreso' : 'Pendiente'}
-        </span>
-      );
-    }
-
-    if (daysDiff < 0) {
-      const lateDays = Math.abs(daysDiff);
-      return (
-        <span className="t-badge t-badge-danger t-num">
-          Vencida hace {lateDays} {lateDays === 1 ? 'día' : 'días'}
-        </span>
-      );
-    }
-
-    if (daysDiff === 0) {
-      return <span className="t-badge t-badge-danger">Vence hoy</span>;
-    }
-
-    if (daysDiff === 1) {
-      return <span className="t-badge t-badge-warn">Vence mañana</span>;
-    }
-
-    if (daysDiff <= 3) {
-      return <span className="t-badge t-badge-warn t-num">En {daysDiff} días</span>;
-    }
-
-    if (assignment.status === 'en_progreso') {
-      return (
-        <span className="t-badge t-badge-accent t-num">
-          En progreso · {daysDiff} días
-        </span>
-      );
-    }
-
-    return <span className="t-badge t-num">En {daysDiff} días</span>;
+  const renderDueBadge = (assignment: UniversityAssignment) => {
+    const urgency = getAssignmentUrgency(assignment.dueDate, assignment.status, todayIso);
+    return <span className={urgency.badgeClass}>{urgency.label}</span>;
   };
 
   const renderGradeBadge = (grade: number | undefined) => {
@@ -399,7 +337,6 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
               ) : (
                 <div className="pt-4">
                   {weekAssignments.map((assignment) => {
-                    const daysDiff = getDaysDiff(assignment.dueDate);
                     const isDone = assignment.status === 'entregado';
                     const rubricDone = assignment.rubricCriteria
                       ? assignment.rubricCriteria.filter((c) => c.done).length
@@ -513,7 +450,7 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
                         <div className="flex flex-wrap items-center justify-between md:justify-end gap-2 pl-9 md:pl-0 shrink-0">
                           <div className="flex flex-wrap items-center gap-2">
                             {renderGradeBadge(assignment.gradeObtained)}
-                            {renderDueBadge(assignment, daysDiff)}
+                            {renderDueBadge(assignment)}
                           </div>
 
                           <div className="flex items-center gap-1">
