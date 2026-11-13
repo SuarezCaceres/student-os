@@ -72,7 +72,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
   private clientMessage(exception: unknown): string | string[] {
     if (!(exception instanceof HttpException)) {
-      return GENERIC_SERVER_MESSAGE;
+      const exposedStatus = exposedClientStatus(exception);
+      return exposedStatus ? (CLIENT_ERROR_MESSAGES[exposedStatus] ?? 'Solicitud invalida') : GENERIC_SERVER_MESSAGE;
     }
     const payload = exception.getResponse();
     if (typeof payload === 'string') {

@@ -185,6 +185,7 @@ describe('Sync API (e2e, guard real + repositorios en memoria)', () => {
       const res = await push(tokenA, { changes });
       // body-parser lanza un error 413 que no es HttpException: el filtro global lo debe respetar (no 500).
       expect(res.status).toBe(413);
+      expect(res.body.message).toBe('La solicitud es demasiado grande');
       expect(JSON.stringify(res.body)).not.toMatch(/stack|node_modules/i);
       const pulled = await pull(tokenA, '?limit=1000').expect(200);
       expect(pulled.body.records.find((r: { id: string }) => r.id.startsWith('huge'))).toBeUndefined();
