@@ -119,7 +119,7 @@ async function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   log('apagando...');
-  for (const [name, child] of [...children]) {
+  for (const [name, child] of Array.from(children)) {
     log(`deteniendo ${name} (PID ${child.pid})`);
     killTree(child.pid);
   }
