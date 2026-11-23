@@ -1,6 +1,6 @@
 # Stack del backend
 
-> Borrador de la Fase 1 (deducido del código el 2026-11-23). Pendiente de confirmar por el humano.
+> Fase 3 (2026-11-23): despliegue (Vercel + Render + Supabase), mapa de pruebas y pre-commit **confirmados por el humano**; el resto se dedujo del código.
 
 | Aspecto              | Elección                                                      | Versión   |
 |----------------------|---------------------------------------------------------------|-----------|

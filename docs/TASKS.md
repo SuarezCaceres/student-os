@@ -11,7 +11,6 @@
 ### Adopción del harness
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy `.claude/skills` es una copia sin versionar.
 - [ ] Borrar la funcionalidad de ejemplo de `docs/features.json` y poblarla (Fase 6)
-- [ ] Crear `apps/web/AGENTS.md` y `apps/api/AGENTS.md` locales (el instalador no copia `apps/`) (Fase 3)
 - [ ] Escribir los ADRs de decisiones no obvias (Fase 4)
 
 ### Producción (acciones del humano, necesitan credenciales)
@@ -40,6 +39,8 @@
 - [ ] Enlace simbólico de skills · Windows exige Modo desarrollador o administrador · que el humano lo active
 
 ## Hecho
+- 2026-11-23 · Fase 3: `AGENTS.md` locales de `apps/web`, `apps/api` y `packages/shared`; mapa de pruebas adaptado en `rules/testing.md`; zonas intocables en `AGENTS.md` y `PROJECT.md`
+- 2026-11-23 · Fase 2: `PROJECT.md` (producto público, prototipo, alcance y glosario)
 - 2026-11-23 · PR #6 `integration/backend → main` fusionado; Root Directory de Vercel = `apps/web`; lint del harness E2E corregido
 - 2026-11-23 · Harness instalado en `chore/adopt-agent-harness` (Fase 0)
 - 2026-11-23 · Fase 1: `stack/*`, `ARCHITECTURE.md`, comandos de `AGENTS.md`, `scripts/check.sh` e `init.sh` rellenados; `check.sh` pasa completo

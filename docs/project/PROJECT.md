@@ -27,9 +27,10 @@
 ## Zonas protegidas (no tocar sin permiso explícito)
 El agente pregunta antes de modificar:
 - **Borrado y exportación de cuenta** (`apps/api/src/public/`, `common/account-deletion.ts`): son obligaciones de privacidad y requisito de la verificación de Google.
-- **Importador y migración del primer inicio** (`apps/web/src/sync/`, componente del importador): si fallan pueden pisar datos de un usuario.
+- **Importador y migración del primer inicio** (`apps/web/src/components/auth/SyncGate.tsx`, `components/sync/SyncProvider.tsx`, `apps/web/src/sync/`): si fallan pueden pisar datos de un usuario.
+- **Claves de Google:** `GOOGLE_CLIENT_SECRET` y `GOOGLE_TOKEN_ENC_KEY`. Rotar la clave de cifrado deja ilegibles los refresh tokens ya guardados (`apps/api/src/google/token-cipher.ts`).
 
-Elegiste no proteger de forma explícita el modo local ni la integración con Google; aun así, cualquier cambio en el cifrado del refresh token o en el flujo OAuth pasa por `docs/rules/security.md`.
+No marcaste de forma explícita el modo local, Supabase de producción ni los deploys de Vercel/Render; aun así, «cualquier cosa que toque producción» sigue exigiendo tu permiso (`AGENTS.md` → Autonomía).
 
 ## Glosario
 | Término | Significado en este proyecto |

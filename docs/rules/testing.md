@@ -5,9 +5,11 @@ Mandan sobre cualquier skill de pruebas de terceros.
 ## Qué probar
 | Tipo        | Qué cubre                                  | Dónde vive                                  |
 |-------------|--------------------------------------------|---------------------------------------------|
-| Unitarias   | Funciones, servicios y componentes aislados | Junto al código (`*.test.*` / `test_*.py`)  |
-| Integración | Endpoints con la BD de pruebas              | `tests/integration/`                        |
-| E2E         | Flujos completos de usuario en el navegador | `tests/e2e/`                                |
+| Unitarias   | Funciones, servicios y componentes aislados | Junto al código: web y shared `*.test.ts(x)` (Vitest), api `*.spec.ts` (Jest) |
+| Integración | Endpoints del API con Postgres embebido     | `apps/api/test/*.e2e-spec.ts` (+ `helpers/`) — `npm run test:e2e -w @student-os/api` |
+| E2E         | Flujos completos de usuario en el navegador, con Supabase y Google simulados | `apps/web/e2e/*.spec.ts` (Playwright) y harness en `apps/api/test/e2e-harness/` — `npm run test:e2e -w @student-os/web` |
+
+> Mapa adaptado al proyecto (decisión del humano, 2026-11-23): se conservan las carpetas existentes en vez de mover las pruebas a `tests/`.
 
 - Cada funcionalidad nueva lleva unitarias para su lógica, al menos una de integración por endpoint nuevo y al menos una E2E por cada criterio de aceptación visible para el usuario.
 - Cada bug corregido lleva una prueba que fallaba antes del fix.

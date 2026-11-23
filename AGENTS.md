@@ -36,6 +36,7 @@ scripts/          verificación y utilidades
 | Entender cómo encaja todo          | `docs/project/ARCHITECTURE.md`                                |
 | Tocar el frontend                  | `docs/stack/frontend.md`, `docs/rules/frontend.md`            |
 | Tocar el backend                   | `docs/stack/backend.md`, `docs/rules/backend.md`              |
+| Cambiar el contrato web↔api        | `packages/shared/AGENTS.md`                                   |
 | Escribir o ejecutar pruebas        | `docs/rules/testing.md`                                       |
 | Manejar datos sensibles, auth o API| `docs/rules/security.md`                                      |
 | Hacer commits, ramas o PRs         | `docs/rules/general.md`                                       |
@@ -84,7 +85,7 @@ Los cambios pequeños (un bugfix o una errata) pueden saltarse la spec y el plan
 
 ## Autonomía
 - **Sin preguntar:** leer, editar, ejecutar pruebas, crear ramas, hacer commits en ramas y abrir PRs.
-- **Pregunta antes de:** añadir o quitar dependencias, crear migraciones de BD, modificar `docs/rules/`, borrar archivos que no creaste tú y cualquier cosa que toque producción.
+- **Pregunta antes de:** añadir o quitar dependencias, crear migraciones de BD, modificar `docs/rules/`, borrar archivos que no creaste tú, tocar el borrado/exportación de cuenta o el importador del primer inicio, cambiar `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY` o el cifrado del token (rotar la clave deja ilegibles los tokens guardados) y cualquier cosa que toque producción.
 - **Nunca:** push o merge a `main`, leer o commitear `.env` o secretos, borrar o desactivar pruebas para que pasen, usar `--no-verify`.
 
 ## Reglas de oro
