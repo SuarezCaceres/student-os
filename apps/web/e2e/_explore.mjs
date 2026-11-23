@@ -1,0 +1,17 @@
+import { chromium } from '@playwright/test';
+const ctl = async (p, init) => (await fetch('http://127.0.0.1:54343' + p, init)).json();
+const s = await ctl('/session?user=explorer-gym-' + Date.now());
+const browser = await chromium.launch({ channel: 'chrome' });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 } });
+await ctx.addInitScript(([k, v]) => { if (!localStorage.getItem('__seeded')) { localStorage.setItem(k, v); localStorage.setItem('__seeded','1'); } }, [s.storageKey, JSON.stringify(s.session)]);
+const page = await ctx.newPage();
+await page.goto('http://localhost:5293/');
+await page.getByRole('button', { name: 'Subir mis datos' }).click();
+const out = process.argv[2];
+await page.getByRole('navigation', { name: 'Navegación principal' }).getByText('Gym', { exact: true }).click();
+await page.waitForTimeout(1000);
+await page.getByRole('button', { name: 'Agregar ejercicio' }).first().click();
+await page.waitForTimeout(800);
+await page.screenshot({ path: out + '/d-gym-add.png' });
+console.log(await page.evaluate(() => [...document.querySelectorAll('input,select,textarea,button')].filter(e => e.offsetParent).map(e => `${e.tagName} type=${e.type} name=${e.name} placeholder=${e.placeholder} aria=${e.getAttribute('aria-label')} text=${(e.innerText||'').slice(0,30)}`).join('\n')));
+await browser.close();
