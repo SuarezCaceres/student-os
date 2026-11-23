@@ -315,6 +315,14 @@ student-os/
 
 ---
 
+## ☁️ 6.9 Integración Backend (rama `integration/backend`)
+- **Estado:** Olas 0–3 y QA-E2E (Ola 4) fusionadas en `integration/backend`. Los worktrees de agentes fueron cerrados; las ramas `feat/be-*` quedan como historial.
+- **E2E:** suite Playwright en `apps/web/e2e` (sin nube, login Google PKCE, importador, dos dispositivos PC `1440x960` + móvil `390x844`) sobre un harness con Supabase y Google falsos en `apps/api/test/e2e-harness`. Evidencia en `docs/qa/evidence`. `apps/web/e2e/.results/` y `docs/qa/artifacts/` están en `.gitignore` porque contienen rutas locales.
+- **Verificación tras la fusión:** `npm run build` sin errores, `npm run lint` solo con avisos preexistentes, tests `361` (api) + `288` (web) + `35` (shared) en verde.
+- **Pendiente de producción (acción manual del dueño):** migración a `student-os-prod`, variables de producción en Vercel y Render, PR final `integration/backend → main` y ping programado contra la pausa de Supabase a los 7 días.
+
+---
+
 ## 🚀 7. Verificación del Sistema (v2.15.0)
 - **Compilación de Producción:** `npm run build` (`tsc -b && vite build`) con `0` errores (`dist/assets/index-*.js` y `dist/assets/index-*.css` generados en `555ms`).
 - **Linter Estático:** `npx oxlint` con `0` advertencias y `0` errores sobre los 8 archivos creados/modificados (`src/types/index.ts`, `src/utils/academicStats.ts`, `src/components/layout/StatsHero.tsx`, `src/components/dashboard/OverviewBento.tsx`, `src/components/dashboard/DailyHabitsCard.tsx`, `src/components/university/UniversityView.tsx`, `src/components/university/GradesCalculatorModal.tsx`, `src/App.tsx`).

@@ -103,6 +103,25 @@ npm run build
 npm run preview
 ```
 
+### Monorepo, nube y pruebas E2E
+
+El proyecto es un monorepo (`apps/web`, `apps/api`, `packages/shared`). Sin sesión en la nube la app funciona 100 % en `localStorage`; al iniciar sesión se sincroniza con la API (NestJS + Supabase) y Google Calendar se conecta de forma persistente.
+
+```bash
+npm run dev:web      # frontend
+npm run dev:api      # API NestJS
+npm run build        # shared + api + web
+npm run lint && npm test
+```
+
+**Pruebas E2E (Playwright)** contra un stack local con Supabase y Google simulados (`apps/api/test/e2e-harness`):
+
+```bash
+npm run test:e2e -w @student-os/web
+```
+
+Cubren modo sin nube, login con Google, decisión del importador y sincronización entre PC y móvil. La evidencia de QA está en `docs/qa/evidence`.
+
 ---
 
 ## 🛠️ Tecnologías

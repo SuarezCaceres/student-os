@@ -41,3 +41,7 @@ dist-ssr
 # Claude Code worktrees
 .claude/
 .playwright-mcp/
+
+# Artefactos de ejecución de Playwright (contienen rutas locales)
+apps/web/e2e/.results/
+docs/qa/artifacts/

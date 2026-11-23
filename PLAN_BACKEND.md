@@ -245,8 +245,9 @@ npx prisma migrate dev --name wave-<n> --schema apps/api/prisma/schema
 
 | Ola | Estado |
 | :--- | :--- |
-| Ola 0 — Preparación y despliegue | Pendiente (`procede`) |
-| Ola 1 — INFRA ∥ API-CORE ∥ CONTRACT | Pendiente |
-| Ola 2 — SYNC-API ∥ SYNC-WEB | Pendiente |
-| Ola 3 — KANBAN-UNI ∥ GYM ∥ CALENDAR ∥ GOOGLE ∥ PUBLIC | Pendiente |
-| Ola 4 — QA-E2E y producción | Pendiente |
+| Ola 0 — Preparación y despliegue | Hecha |
+| Ola 1 — INFRA ∥ API-CORE ∥ CONTRACT | Hecha (fusionada) |
+| Ola 2 — SYNC-API ∥ SYNC-WEB | Hecha (fusionada) |
+| Ola 3 — KANBAN-UNI ∥ GYM ∥ CALENDAR ∥ GOOGLE ∥ PUBLIC | Hecha (fusionada) |
+| Ola 4 — QA-E2E | Hecha (fusionada en `integration/backend`) |
+| Ola 4 — Producción (`student-os-prod`, variables en Vercel/Render, PR final a `main`, ping anti-pausa de Supabase) | Pendiente |
