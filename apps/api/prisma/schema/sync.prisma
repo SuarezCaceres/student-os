@@ -1,0 +1,37 @@
+// SYNC-API (Ola 2). Modelos del motor de sync. Convencion: columna plana `userId @db.Uuid`, SIN @relation
+// hacia Profile (obligaria a editar base.prisma). No generes migraciones: las crea el Integrador.
+
+/// Un registro de sync por (usuario, coleccion, id del cliente). El servidor es la fuente de verdad.
+/// - `updatedAt`: fecha de la ultima edicion segun el CLIENTE (ya saneada: nunca > ahora + 5 min). Solo sirve
+///   para decidir "ultima edicion gana"; JAMAS se usa como cursor.
+/// - `seq`: contador monotonico POR USUARIO asignado por el servidor en cada escritura; es la base del cursor
+///   de `GET /sync/pull`. Ver `UserSyncState` y docs/agent-notes/SYNC-API.md.
+/// - `data`: JSON validado con los esquemas de @student-os/shared; `null` en tombstones (`deletedAt` no nulo).
+model SyncItem {
+  userId          String    @db.Uuid
+  collection      String
+  id              String
+  data            Json?
+  updatedAt       DateTime  @db.Timestamptz(3)
+  deletedAt       DateTime? @db.Timestamptz(3)
+  rev             Int
+  seq             BigInt
+  serverUpdatedAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@id([userId, collection, id])
+  // (userId, seq): unico (un seq por escritura dentro de un usuario) y sirve de indice del cursor.
+  @@unique([userId, seq])
+  @@index([userId, collection])
+  @@map("sync_records")
+}
+
+/// Estado de sync por usuario. `seqCounter` es el ultimo `seq` asignado. Cada push hace upsert de esta fila al
+/// empezar la transaccion: el bloqueo de fila SERIALIZA los pushes del mismo usuario y garantiza que los `seq`
+/// se confirmen (commit) en orden creciente, sin huecos visibles para un lector concurrente.
+model UserSyncState {
+  userId     String    @id @db.Uuid
+  seqCounter BigInt    @default(0)
+  lastSyncAt DateTime? @db.Timestamptz(3)
+
+  @@map("user_sync_state")
+}

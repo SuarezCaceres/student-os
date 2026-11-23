@@ -1,0 +1,27 @@
+// Esquema base de StudentOS (API-CORE). Multi-archivo: Prisma lee TODA la carpeta prisma/schema/.
+// Solo existe UN generator y UN datasource (aqui). Los demas archivos (<modulo>.prisma) solo
+// declaran modelos/enums de su modulo. NO generes migraciones: las genera el Integrador.
+//
+// prismaSchemaFolder es GA desde Prisma 6.7, por eso no hace falta previewFeatures.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // DATABASE_URL: pooler de Supabase (6543, ?pgbouncer=true) para la app.
+  url       = env("DATABASE_URL")
+  // DIRECT_URL: conexion directa (5432) para migraciones / db push.
+  directUrl = env("DIRECT_URL")
+}
+
+/// Perfil minimo. `id` = `sub` del JWT de Supabase (auth.users.id), por eso NO se autogenera.
+/// Los modelos de otros modulos referencian a Profile con `userId String` + relacion a Profile.
+model Profile {
+  id        String   @id @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("profiles")
+}

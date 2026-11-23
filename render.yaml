@@ -1,0 +1,46 @@
+# Render Blueprint de la API de StudentOS.
+#
+# UBICACION: raiz del repo (Render solo lee `render.yaml` desde aqui). Es un monorepo: se construye
+# desde la raiz, sin `rootDir`.
+#
+# Alternativa sin Blueprint: crear un "Web Service" a mano con los mismos valores
+# (sin Root Directory; Build/Start Command como abajo, Health Check Path = /health).
+
+services:
+  - type: web
+    name: student-os-api
+    runtime: node
+    plan: free
+    # region: elige la MISMA region que el proyecto Supabase para minimizar latencia a la BD.
+    # Monorepo: se construye desde la raiz del repo (sin rootDir).
+    # Instala (incluyendo devDependencies: nest-cli/typescript/prisma hacen falta para compilar),
+    # genera el cliente Prisma y compila. NO ejecuta migraciones: las aplica el Integrador a mano.
+    buildCommand: npm ci --include=dev && npm run build -w @student-os/shared && npm run prisma:generate -w @student-os/api && npm run build -w @student-os/api
+    startCommand: npm run start -w @student-os/api
+    healthCheckPath: /health
+    # No despliega solo en cada push: los despliegues a produccion los aprueba el usuario.
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      # PORT lo inyecta Render (10000 por defecto); no lo declares.
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
+      # --- Secretos / especificos del entorno: se pegan en el panel de Render (nunca en el repo) ---
+      - key: DATABASE_URL # pooler Supabase, puerto 6543, ...?pgbouncer=true
+        sync: false
+      - key: DIRECT_URL # conexion directa, puerto 5432
+        sync: false
+      - key: SUPABASE_URL # https://<ref>.supabase.co
+        sync: false
+      - key: WEB_ORIGINS # https://<tu-app>.vercel.app (lista separada por comas)
+        sync: false
+      # Ola 3 (agente GOOGLE). Opcionales hasta entonces.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_TOKEN_ENC_KEY
+        sync: false

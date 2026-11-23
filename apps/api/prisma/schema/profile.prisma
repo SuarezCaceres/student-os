@@ -1,0 +1,12 @@
+// SYNC-API (Ola 2). Perfil de usuario.
+//
+// El modelo `Profile` (tabla `profiles`: id = sub del JWT, createdAt, updatedAt) vive en base.prisma (API-CORE) y
+// no se edita. `ProfileService.ensure(userId)` lo crea con upsert en la primera peticion autenticada.
+//
+// - `email` NO se persiste: lo posee Supabase Auth y llega en el JWT (`@CurrentUser()`), asi nunca se desincroniza.
+// - `lastSyncAt` vive en `UserSyncState` (sync.prisma), junto al contador de cursor, porque se actualiza en la
+//   misma transaccion del push.
+// - Las preferencias del estudiante (nombre, carrera, tema...) NO van aqui: viajan por la coleccion de sync
+//   `profile` (registro singleton), igual que el resto del estado.
+//
+// Este archivo queda sin modelos a proposito (un archivo .prisma solo con comentarios es valido).
