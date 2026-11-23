@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
     "test:e2e": "jest --config test/jest-e2e.json",
+    "e2e:stack": "node test/e2e-harness/stack.mjs",
     "prisma:validate": "prisma validate",
     "prisma:generate": "prisma generate"
   },
