@@ -23,7 +23,7 @@ Despliegue: web en **Vercel** (Root Directory `apps/web`), API en **Render** (`r
 | Pruebas     | `apps/api/test/`, `apps/web/e2e/` | Integración del API (Postgres embebido) y E2E (Supabase y Google simulados en `apps/api/test/e2e-harness/`) |
 
 ## Modos de funcionamiento
-- **Local (sin cuenta):** `useLocalStorage` guarda todo el `AppState` en el navegador. Es el comportamiento original y debe seguir funcionando sin red ni backend.
+- **Local (sin cuenta):** `useLocalStorage` guarda todo el `AppState` en el navegador. Es el comportamiento original y hoy funciona sin red ni backend.
 - **Nube (con sesión):** `useSyncedAppState` envuelve el `AppState` por *slices*, calcula diferencias por `id`, las encola en IndexedDB y las envía en segundo plano; al abrir o recuperar el foco hace *pull*. Un importador decide qué hacer con los datos locales en el primer inicio de sesión.
 
 ## Contrato y sync

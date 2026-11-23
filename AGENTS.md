@@ -5,7 +5,8 @@
 > No crees `CLAUDE.md` ni `GEMINI.md`: si existen, algunas herramientas ignoran este archivo.
 
 ## Qué es este proyecto
-StudentOS: hub personal para un estudiante universitario (Kanban, entregas por semanas, gym, horario, hábitos y Google Calendar). Funciona 100 % local sin cuenta y sincroniza entre dispositivos al iniciar sesión. *(Borrador; se confirma en la Fase 2.)*
+StudentOS: hub web para estudiantes universitarios (Kanban, entregas por semanas, gym, horario, hábitos y Google Calendar). Objetivo: producto público; estado: **prototipo**. Funciona sin cuenta en local y sincroniza entre dispositivos al iniciar sesión.
+**Zonas protegidas (pregunta antes de tocar):** borrado/exportación de cuenta y el importador del primer inicio.
 
 Más detalle: `docs/project/PROJECT.md` · Arquitectura: `docs/project/ARCHITECTURE.md`
 
