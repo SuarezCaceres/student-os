@@ -1,25 +1,53 @@
 # Arquitectura
 
-<!-- RELLENAR. Mantenlo como un mapa: qué piezas hay y cómo se hablan, no el detalle del código. -->
+> Borrador de la Fase 1 (deducido del código y de `docs/agent-notes/` el 2026-11-23). Pendiente de confirmar.
 
 ## Vista general
 ```
-[Navegador] → apps/web → (HTTP/JSON) → apps/api → [Base de datos]
-                                            ↘ [Servicios externos]
+                       ┌─────────────── localStorage + IndexedDB (modo local, sin cuenta)
+[Navegador] apps/web ──┤
+ (React, Vite)         └─ con sesión ─▶ cola de sync ─(HTTP/JSON + JWT)─▶ apps/api (NestJS) ─▶ [Postgres/Supabase]
+        │                                                                      │
+        └── Supabase Auth (login con Google, PKCE) ─ emite el JWT              └─▶ Google Calendar v3 (refresh token cifrado)
+                              ▲
+              packages/shared (esquemas zod + tipos): contrato único de web y api
 ```
+Despliegue: web en **Vercel** (Root Directory `apps/web`), API en **Render** (`render.yaml`, free, cold start aceptado), datos y auth en **Supabase**.
 
 ## Piezas
-| Pieza       | Ubicación    | Responsabilidad |
-|-------------|--------------|-----------------|
-| Frontend    | `apps/web/`  |                 |
-| Backend/API | `apps/api/`  |                 |
-| Compartido  | `packages/`  | Tipos y contratos compartidos entre web y api |
+| Pieza       | Ubicación          | Responsabilidad |
+|-------------|--------------------|-----------------|
+| Frontend    | `apps/web/`        | UI de los módulos (Resumen, Kanban, Universidad, Gym, Calendario, Aprendizaje, hábitos), modo local, login, motor de sync y fachada de Google Calendar |
+| Backend/API | `apps/api/`        | Verifica el JWT de Supabase, almacena y sirve registros de sync, guarda el refresh token de Google, exporta/borra cuenta, throttling y cabeceras de seguridad |
+| Compartido  | `packages/shared/` | Esquemas zod y tipos: `AppState`, colecciones de sync, Kanban, Universidad, Gym, Calendario, hábitos, perfil, turnos |
+| Pruebas     | `apps/api/test/`, `apps/web/e2e/` | Integración del API (Postgres embebido) y E2E (Supabase y Google simulados en `apps/api/test/e2e-harness/`) |
 
-## Contratos
-Dónde se define la API (OpenAPI, tipos compartidos, etc.) y cómo se mantiene sincronizada.
+## Modos de funcionamiento
+- **Local (sin cuenta):** `useLocalStorage` guarda todo el `AppState` en el navegador. Es el comportamiento original y debe seguir funcionando sin red ni backend.
+- **Nube (con sesión):** `useSyncedAppState` envuelve el `AppState` por *slices*, calcula diferencias por `id`, las encola en IndexedDB y las envía en segundo plano; al abrir o recuperar el foco hace *pull*. Un importador decide qué hacer con los datos locales en el primer inicio de sesión.
+
+## Contrato y sync
+- **Contrato:** `packages/shared` define los esquemas zod. `COLLECTIONS = profile, kanban, university, learning, gym, calendar`; cada registro de sync se valida contra el esquema de su colección.
+- **Endpoints de sync:** `GET /sync/pull?since=<cursor>` y `POST /sync/push`. El `userId` sale **siempre** del JWT, nunca del cuerpo.
+- **Cursor:** contador `seq` por usuario asignado por el servidor (no `now()` ni `SEQUENCE`), para no saltarse escrituras concurrentes.
+- **Conflictos:** última edición gana (`apps/api/src/sync/sync-logic.ts`, lógica pura); los borrados son *tombstones*.
+- **Adaptadores web:** `apps/web/src/sync/adapters/{kanban,university,learning,gym,calendar,profile}.ts` traducen cada slice de `AppState` a registros.
+- **Nota:** los módulos `kanban`, `university`, `gym` y `calendar` de `apps/api/src/` son hoy controladores vacíos (6 líneas); todo el dato de dominio viaja por el `/sync` genérico. Ver «Deuda» en `docs/TASKS.md`.
+
+## Google Calendar
+Con la nube activa, el servidor guarda el *refresh token* cifrado (AES-256-GCM, clave `GOOGLE_TOKEN_ENC_KEY`) y hace de proxy hacia Calendar v3 (`/google/*`: connect con PKCE, callback, status, disconnect y operaciones de eventos). Sin nube, la web usa GIS en el navegador (token de 1 hora). Detalle en `docs/agent-notes/GOOGLE.md`.
 
 ## Datos
-Base de datos, modelo principal y dónde viven las migraciones.
+- **BD:** PostgreSQL (Supabase). Esquema Prisma dividido en `apps/api/prisma/schema/*.prisma`; modelos actuales: `Profile`, `SyncItem`, `UserSyncState`, `GoogleConnection`, `GoogleOAuthState`.
+- **Migraciones:** `apps/api/prisma/migrations/` (SQL versionado) + `rls-baseline.sql`. Se aplican **a mano** contra Supabase; `render.yaml` no las ejecuta.
+- **Seguridad de datos:** RLS en Supabase para los secretos, logs con redacción de PII, borrado de cuenta que elimina sync, estado, perfil y el token de Google.
+
+## Entornos y variables
+- **Web (`.env.example` raíz):** `VITE_API_URL`, `VITE_GOOGLE_CLIENT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`.
+- **API (`apps/api/.env.example`):** `NODE_ENV`, `PORT`, `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_JWT_AUDIENCE`, `WEB_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY`.
+- Producción (`student-os-prod`) pendiente; ver `docs/TASKS.md`.
 
 ## Decisiones relevantes
-Enlaza los ADRs de `docs/decisions/` que expliquen esta arquitectura.
+- `docs/decisions/0001-agents-md-como-indice-unico.md`.
+- Pendientes de escribir (Fase 4): sync con cursor por `seq` y LWW, modo local sin cuenta como requisito, refresh token cifrado en servidor, E2E con servicios simulados.
+- Historial previo en `docs/agent-notes/*.md`, `PLAN_BACKEND.md` y `memories.md`.

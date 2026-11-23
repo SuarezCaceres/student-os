@@ -1,33 +1,54 @@
 # Stack del frontend
 
-<!-- RELLENAR con la skill init-stack. Esto cambia en cada proyecto; las reglas generales están en docs/rules/frontend.md. -->
+> Borrador de la Fase 1 (deducido del código el 2026-11-23). Pendiente de confirmar por el humano.
 
-| Aspecto            | Elección | Versión |
-|--------------------|----------|---------|
-| Lenguaje           |          |         |
-| Framework          |          |         |
-| Estilos / UI       |          |         |
-| Estado             |          |         |
-| Cliente HTTP       |          |         |
-| Pruebas unitarias  |          |         |
-| Pruebas E2E        |          |         |
-| Gestor de paquetes |          |         |
+| Aspecto            | Elección                                                        | Versión          |
+|--------------------|-----------------------------------------------------------------|------------------|
+| Lenguaje           | TypeScript                                                      | ~7.0.2           |
+| Framework          | React                                                           | ^19.3            |
+| Bundler            | Vite (+ `@vitejs/plugin-react`)                                 | ^8.3             |
+| Estilos / UI       | Tailwind CSS v4 (`@tailwindcss/vite`), `clsx`, `tailwind-merge`, `lucide-react`, `canvas-confetti` | ^4.3 |
+| Estado             | Estado de la app en un único `AppState` (`useLocalStorage` en modo local, `useSyncedAppState` en modo nube) + `syncStore` | — |
+| Persistencia local | `localStorage` + IndexedDB (`idb-keyval`)                        | ^6.3             |
+| Cliente HTTP / BD  | `src/services/api.ts` (API propia) y `@supabase/supabase-js` (auth) | ^2.119       |
+| Validación         | `zod` + tipos de `@student-os/shared`                           | ^4.6             |
+| Linter             | oxlint (`.oxlintrc.json` en la raíz)                            | ^1.90            |
+| Pruebas unitarias  | Vitest + Testing Library + jsdom + fake-indexeddb               | ^5.1             |
+| Pruebas E2E        | Playwright (`apps/web/e2e`, stack simulado)                     | ^1.65            |
+| Gestor de paquetes | npm workspaces (Node >= 20; CI en 20, Render en 22)             | npm 11           |
+| Despliegue         | Vercel, **Root Directory `apps/web`** (config en `apps/web/vercel.json`) | —       |
 
 ## Comandos
-| Acción        | Comando |
-|---------------|---------|
-| Desarrollo    |         |
-| Build         |         |
-| Lint          |         |
-| Tipos         |         |
-| Pruebas       |         |
+Se ejecutan desde la raíz del repo.
+
+| Acción        | Comando                                              |
+|---------------|------------------------------------------------------|
+| Desarrollo    | `npm run dev:web` (Vite en `http://localhost:5173`)  |
+| Build         | `npm run build -w @student-os/web` (`tsc -b && vite build`) |
+| Lint          | `npm run lint -w @student-os/web`                    |
+| Tipos         | `npm exec -w @student-os/web -- tsc -b`              |
+| Pruebas       | `npm run test -w @student-os/web` (Vitest)           |
+| E2E           | `npm run test:e2e -w @student-os/web` (levanta el stack simulado, ~2 min; la primera vez: `npx playwright install chromium`) |
+| Stack simulado a mano | `npm run e2e:stack -w @student-os/web`       |
 
 ## Estructura de carpetas en `apps/web/`
 ```
-<!-- p. ej.: src/features/<feature>/ , src/shared/ui/ , src/lib/api/ -->
+src/
+  components/     UI por módulo: account, auth, calendar, common, dashboard, gym, kanban,
+                  landing, layout, learning, legal, quick-add, sync, university
+  hooks/          useLocalStorage, useSyncedAppState
+  services/       api.ts, supabase.ts, googleCalendar.ts, googleCloud.ts
+  sync/           motor de sincronización: engine, syncStore, cola en IndexedDB, backup,
+                  leader, hash; adapters/ (kanban, university, learning, gym, calendar, profile)
+  types/  utils/  data/  assets/
+e2e/              pruebas Playwright (01-nocloud … 04-two-devices) y support/harness
 ```
+`src/App.tsx` concentra el `AppState` y el cableado: solo se edita con cuidado (ver `docs/project/ARCHITECTURE.md`).
 
 ## Skills de terceros instaladas
-| Skill | Para qué | Fuente |
-|-------|----------|--------|
-|       |          |        |
+| Skill                      | Para qué                                   | Fuente |
+|----------------------------|--------------------------------------------|--------|
+| `design-taste-frontend`    | Diseño visual no genérico                  | `.agents/skills/` (pendiente de asignar en Fase 5) |
+| `frontend-design`          | Dirección estética y tipografía            | `.agents/skills/` (Fase 5) |
+| `ui-ux-pro-max`            | Guías de UI/UX, accesibilidad y paletas    | `.agents/skills/` (Fase 5) |
+| `playwright-best-practices`| Técnica de pruebas E2E                     | `.agents/skills/` (Fase 5) |

@@ -100,7 +100,7 @@ Archivos: «Skills de terceros» de `frontend-proyecto`, `backend-proyecto`, `pr
 ### Fase 6 · Memoria y backlog → `features.json`, `TASKS.md`, `specs/`
 Preguntas:
 - Confirmar el inventario de funcionalidades **hechas** (kanban, universidad, gym, calendario, Google, sync, cuenta pública) y las **pendientes**.
-- Prioridad de lo pendiente. Candidatas que ya detecté: producción (`student-os-prod`, variables, ping anti-pausa de Supabase), rama `feat/overview-summary` sin fusionar, bundle web de ~1 MB, avisos de lint, verificación de Google.
+- Prioridad de lo pendiente. Candidatas que ya detecté: producción (`student-os-prod`, variables, ping anti-pausa de Supabase), ramas remotas ya fusionadas por borrar (`feat/overview-summary` entró con squash en el PR #5), BUG-01 del logout, bundle web de ~1 MB, avisos de lint, verificación de Google.
 - Bugs conocidos y deuda técnica.
 - Qué hago con `memories.md`: archivarlo en `docs/references/` como historial y dejar de actualizarlo, o mantenerlo vivo.
 

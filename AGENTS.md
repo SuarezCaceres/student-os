@@ -5,16 +5,18 @@
 > No crees `CLAUDE.md` ni `GEMINI.md`: si existen, algunas herramientas ignoran este archivo.
 
 ## Qué es este proyecto
-<!-- RELLENAR: 2–3 líneas. Qué hace, para quién y en qué estado está. -->
+StudentOS: hub personal para un estudiante universitario (Kanban, entregas por semanas, gym, horario, hábitos y Google Calendar). Funciona 100 % local sin cuenta y sincroniza entre dispositivos al iniciar sesión. *(Borrador; se confirma en la Fase 2.)*
 
 Más detalle: `docs/project/PROJECT.md` · Arquitectura: `docs/project/ARCHITECTURE.md`
 
 ## Estructura del repo
+Monorepo npm workspaces.
 ```
-apps/web/         frontend
-apps/api/         backend
-packages/         código compartido (tipos, utilidades)
-tests/            pruebas de integración y E2E (las unitarias van junto al código)
+apps/web/         frontend React + Vite (@student-os/web)
+apps/api/         backend NestJS + Prisma (@student-os/api)
+packages/shared/  esquemas zod y tipos compartidos (@student-os/shared)
+apps/api/test/    integración del API y harness E2E (Supabase/Google simulados)
+apps/web/e2e/     pruebas E2E Playwright (las unitarias van junto al código)
 docs/             contexto, reglas, specs, decisiones y progreso
 .agents/skills/   skills del proyecto (Claude Code las ve vía .claude/skills)
 scripts/          verificación y utilidades
@@ -52,14 +54,16 @@ scripts/          verificación y utilidades
 | `revisor`          | Antes de abrir un PR: evaluar el trabajo contra la spec       |
 
 ## Comandos
-<!-- RELLENAR con la skill init-stack o a mano -->
+Siempre desde la raíz. Detalle por área en `docs/stack/`.
 | Acción                      | Comando                     |
 |-----------------------------|-----------------------------|
 | Preparar el entorno         | `./init.sh`                 |
 | Verificación completa       | `./scripts/check.sh`        |
 | Verificación rápida (sin E2E)| `./scripts/check.sh --rapido` |
-| Frontend en desarrollo      | <!-- RELLENAR -->           |
-| Backend en desarrollo       | <!-- RELLENAR -->           |
+| Frontend en desarrollo      | `npm run dev:web`           |
+| Backend en desarrollo       | `npm run dev:api`           |
+| Build de todo               | `npm run build`             |
+| E2E (Playwright, ~2 min)    | `npm run test:e2e -w @student-os/web` |
 
 ## Flujo de trabajo: spec → plan → código
 Toda funcionalidad nueva sigue la skill `spec-plan-code`:

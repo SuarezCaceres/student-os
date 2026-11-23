@@ -7,11 +7,13 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 # ── RELLENAR según el stack (la skill init-stack lo completa) ──────────────
-LINT_CMD=""          # p. ej.: "npm run lint"
-TYPECHECK_CMD=""     # p. ej.: "npm run typecheck"   |  "mypy ."
-TEST_UNIT_CMD=""     # p. ej.: "npm run test:unit"   |  "pytest tests/unit"
-TEST_INT_CMD=""      # p. ej.: "npm run test:int"    |  "pytest tests/integration"
-TEST_E2E_CMD=""      # p. ej.: "npx playwright test"
+# Monorepo npm workspaces: shared (@student-os/shared), api (@student-os/api), web (@student-os/web).
+# Comandos verificados el 2026-11-23. Deben coincidir con docs/stack/*.md y la tabla de AGENTS.md.
+LINT_CMD="npm run lint"
+TYPECHECK_CMD="npm run typecheck -w @student-os/shared && npm run typecheck -w @student-os/api && npm exec -w @student-os/web -- tsc -b"
+TEST_UNIT_CMD="npm test"
+TEST_INT_CMD="npm run test:e2e -w @student-os/api"      # API contra Postgres embebido (embedded-postgres)
+TEST_E2E_CMD="npm run test:e2e -w @student-os/web"      # Playwright contra Supabase/Google simulados (~2 min)
 # ──────────────────────────────────────────────────────────────────────────
 
 RAPIDO=false

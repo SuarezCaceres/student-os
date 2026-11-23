@@ -22,12 +22,16 @@ if [ ! -f .env ] && [ -f .env.example ]; then
 fi
 
 # ── RELLENAR según el stack (la skill init-stack lo completa) ──────────────
-# echo "▶ Instalando dependencias"
-#   p. ej.: npm install  |  pnpm install  |  pip install -r requirements.txt
-# echo "▶ Levantando servicios (BD, etc.)"
-#   p. ej.: docker compose up -d
-# echo "▶ Migraciones / datos de prueba"
-#   p. ej.: npm run db:migrate && npm run db:seed
+if [ ! -d node_modules ]; then
+  echo "▶ Instalando dependencias (npm ci; el script prepare compila shared y genera el cliente Prisma)"
+  npm ci
+else
+  echo "▶ Dependencias ya instaladas (si cambió package-lock.json, ejecuta: npm ci)"
+fi
+# No hay servicios que levantar: las pruebas de integración usan Postgres embebido y las E2E,
+# Supabase y Google simulados (apps/api/test/e2e-harness).
+# Migraciones: NO se aplican aquí. Las de producción son manuales (ver docs/rules/backend.md).
+# Para las E2E la primera vez:  npx playwright install chromium
 # ──────────────────────────────────────────────────────────────────────────
 
 echo "✔ Entorno listo"
