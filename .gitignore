@@ -1,5 +1,4 @@
-# Agent skills and runtime
-.agents/
+# Runtime local de agentes (las skills de .agents/ y la config de .claude/ SÍ se versionan)
 .impeccable/
 logs
 *.log
@@ -38,10 +37,21 @@ dist-ssr
 *.sln
 *.sw?
 
-# Claude Code worktrees
-.claude/
+# Claude Code: solo lo local
+.claude/worktrees/
+.claude/settings.local.json
 .playwright-mcp/
 
 # Artefactos de ejecución de Playwright (contienen rutas locales)
 apps/web/e2e/.results/
 docs/qa/artifacts/
+
+# Añadido por el harness
+build/
+.next/
+coverage/
+__pycache__/
+.venv/
+test-results/
+playwright-report/
+Thumbs.db

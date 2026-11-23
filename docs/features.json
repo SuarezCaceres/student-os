@@ -1,0 +1,14 @@
+{
+  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho.",
+  "features": [
+    {
+      "id": "001",
+      "nombre": "ejemplo-borrar-al-empezar",
+      "spec": "docs/specs/001-ejemplo-borrar-al-empezar/spec.md",
+      "estado": "pendiente",
+      "criterios": [
+        { "id": "C1", "descripcion": "Describe aquí un comportamiento comprobable", "pasa": false }
+      ]
+    }
+  ]
+}
