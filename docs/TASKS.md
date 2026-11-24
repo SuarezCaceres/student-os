@@ -9,6 +9,30 @@
 
 ## Pendiente
 
+### ⭐ Pedidos por el humano (2026-11-23) · van antes que el resto
+
+#### P1 · Poder decir «no voy al gimnasio» sin rellenar nada del gym
+Objetivo del humano: que completar la información del gimnasio **no sea obligatorio**. Tiene que haber un botón/opción visible para indicar que no se va al gym (y que la app deje de pedir esos datos).
+- **Dónde mirar:** `apps/web/src/components/dashboard/DailyHabitsCard.tsx`, `GymTracker`, `apps/web/src/utils/gym*.ts` (horario, asistencia, sincronización con Calendar) y `apps/web/src/sync/adapters/gym.ts`.
+- **Falta:**
+  - **Decisión del humano (2026-11-23):** la opción **oculta todo el módulo de gym** (dashboard, calendario y hábitos) y se puede reactivar desde ajustes.
+  - [ ] Que sin datos de gym no se publiquen bloques de gym en Google Calendar ni se calcule asistencia.
+  - [ ] Que la elección se guarde por usuario (sync) y se pueda revertir.
+  - [ ] Pruebas unitarias y E2E.
+- [x] Spec escrita en `docs/specs/011-gym-opcional/spec.md` (rama `feat/011-gym-opcional`, creada desde la 009 porque ambas tocan `App.tsx`). **A la espera de tu aprobación**; tiene 3 preguntas abiertas al final
+
+#### P2 · Quehaceres cotidianos en la pantalla principal con meta diaria, motivación e historial
+Objetivo del humano: en la pantalla principal, una lista de tareas cotidianas (tender la cama, darle de comer al perro, sacarlo a pasear, caminar 15 minutos, ir al mercado…) con una **meta diaria** (ejemplo: 5 quehaceres = «eres lo máximo», 10 = «sigue así») que dé motivación; el resultado de cada día se **guarda en un historial** para ver qué días rindió más o menos; y una opción **«hoy no puedo / estoy agobiado»** que también se registra.
+- **Relación con lo existente:** ya hay `DailyHabitsCard` (hábitos diarios, con `localStorage` directo, ver M2). Decidir si los quehaceres lo amplían o son otra tarjeta.
+- **Decisiones del humano (2026-11-23):**
+  - Quehaceres: **lista base editable** (con ejemplos) **y** el usuario puede crear los suyos.
+  - Frecuencia: **cada quehacer elige sus días de la semana** (p. ej. mercado solo el sábado).
+  - Meta diaria: **niveles por cantidad**; por defecto 5 = «¡Eres lo máximo!» y 10 = «¡Sigue así!», con umbrales y mensajes editables.
+  - «Hoy no puedo / estoy agobiado»: **día de descanso que no penaliza**; se guarda como «día difícil» en el historial, sin contar como fallo, con mensaje amable.
+  - Historial: **gráfica semanal** para ver en qué día de la semana se hace más. Todo se guarda por usuario (sync).
+- **Falta:** confirmar con el humano la spec antes de implementar.
+- [ ] Escribir la spec en `docs/specs/012-quehaceres-diarios/spec.md` (espera tu aprobación)
+
 ### 🔴 Alto
 
 #### A1 · ⭐ IMPORTANTE · Login con Google para cualquier usuario y Calendar vinculado automáticamente (funcionalidad 009)
