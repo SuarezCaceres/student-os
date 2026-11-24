@@ -17,7 +17,7 @@
 
 ### 2. Verificación de la app en Google (funcionalidad 008)
 - [ ] Completar `docs/google-verification-checklist.md` en Google Cloud Console (lo hace el humano)
-- [ ] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md`
+- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (borrador, espera tu aprobación)
 
 ### 3. BUG-01
 - [ ] Al cerrar sesión con la nube activa, `App.tsx` (efecto ~línea 202) re-adopta la sesión de Supabase mientras `signOut()` sigue en vuelo y el usuario no vuelve a la landing. Lo cubre `apps/web/e2e/02-login.spec.ts` (2c) con `test.fail`; al arreglarlo, quita esa marca y marca `pasa: true` en el criterio C4 de la funcionalidad 002.

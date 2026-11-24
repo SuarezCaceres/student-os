@@ -88,10 +88,25 @@
       "id": "008",
       "nombre": "verificacion-de-la-app-en-google",
       "spec": "docs/specs/008-verificacion-app-google/spec.md",
-      "estado": "pendiente",
+      "estado": "spec",
       "criterios": [
         { "id": "C1", "descripcion": "Todos los puntos de docs/google-verification-checklist.md estan completados", "pasa": false },
-        { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false }
+        { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false },
+        { "id": "C3", "descripcion": "Dado el dominio de produccion, la home, /legal/privacidad.html y /legal/terminos.html responden 200 sin sesion y el dominio figura verificado en Search Console con la cuenta propietaria del proyecto de Google Cloud", "pasa": false },
+        { "id": "C4", "descripcion": "Las paginas de apps/web/public/legal no contienen los marcadores [NOMBRE DEL RESPONSABLE], [CORREO DE CONTACTO] ni [PAIS O JURISDICCION] (test que lee los HTML)", "pasa": false },
+        { "id": "C5", "descripcion": "La politica de privacidad lista exactamente los permisos que pide la app, no menciona profile si no se pide, no dice que Calendar sea opcional ni que se desconecte desde la app, explica como retirar el acceso, conserva la declaracion de uso limitado y enlaza a la politica de datos de Google", "pasa": false },
+        { "id": "C6", "descripcion": "Un visitante sin sesion ve en la home los enlaces a privacidad y terminos (LegalLinks) y un texto que explica la app y el uso de datos de Google con el mismo nombre que la pantalla de consentimiento", "pasa": false },
+        { "id": "C7", "descripcion": "La consola de Google tiene nombre StudentOS, logotipo valido, correos de asistencia y contacto, dominio autorizado, URLs de inicio/privacidad/terminos, tipo External, estado In production y los scopes declarados de C8 (capturas)", "pasa": false },
+        { "id": "C8", "descripcion": "Los scopes de GOOGLE_SCOPES coinciden exactamente con los declarados en la consola y una prueba falla si se cambian sin actualizar la lista de scopes verificados, avisando de que obliga a reverificar", "pasa": false },
+        { "id": "C9", "descripcion": "Existe una tabla endpoint-scope minimo con enlace a la referencia oficial, cada scope declarado tiene un endpoint que lo necesita y la consola confirma que los scopes de Calendar son sensibles y no restringidos (sin CASA)", "pasa": false },
+        { "id": "C10", "descripcion": "El cliente OAuth de produccion solo tiene URIs de redireccion HTTPS y exactas, incluido el callback de la API y el de Supabase Auth", "pasa": false },
+        { "id": "C11", "descripcion": "Hay un texto de justificacion en ingles por permiso y cada afirmacion tiene respaldo en el codigo, el ADR 0005 o las pruebas", "pasa": false },
+        { "id": "C12", "descripcion": "Cada paso del guion del video corresponde a algo que existe en la app tras la 009 y cada permiso se ve usado al menos una vez", "pasa": false },
+        { "id": "C13", "descripcion": "El video esta en YouTube como No listado, grabado en el dominio de produccion con una cuenta ajena al desarrollador, con el client_id visible y narracion o subtitulos en ingles; su URL esta anotada en docs/PROGRESS.md", "pasa": false },
+        { "id": "C14", "descripcion": "Con la app en In production sin verificar, una cuenta ajena entra y su conexion de Calendar sigue viva pasados mas de 7 dias", "pasa": false },
+        { "id": "C15", "descripcion": "En produccion, GET /account/export y DELETE /account funcionan con una cuenta real y el borrado revoca el token en Google", "pasa": false },
+        { "id": "C16", "descripcion": "El envio queda registrado en docs/PROGRESS.md (fecha, dominio, URLs, video) y existe un registro de rondas con Google actualizado con cada correo", "pasa": false },
+        { "id": "C17", "descripcion": "Cada cambio pedido por Google se responde en el mismo hilo y los que tocan el repo pasan por un PR enlazado a esta spec", "pasa": false }
       ]
     }
   ]
