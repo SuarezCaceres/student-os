@@ -7,6 +7,7 @@
  *   weightHistory              -> kind 'weightEntry'    id = weightEntryRecordId(date) (1 por fecha)
  *   gymAttendanceLogs          -> kind 'attendanceLog'  id = log.id
  *   dismissedGymScheduleAlerts -> kind 'dismissedAlert' id = dismissedAlertRecordId(date); value = date
+ *   gymDisabled                -> kind 'preference'     id = GYM_PREFERENCE_RECORD_ID (singleton); solo existe si el gym esta desactivado
  *
  * Solo aditivo tras la Ola 1: edita únicamente este archivo.
  */
@@ -153,7 +154,12 @@ export type DismissedGymScheduleAlert = z.infer<typeof DismissedGymScheduleAlert
 
 // --- Registros de sync de la colección `gym` -------------------------------
 
+/** Preferencia del usuario sobre el modulo de gym (`gymDisabled` en AppState). Ausente = gym activo. */
+export const GymPreferenceSchema = z.object({ disabled: z.boolean() });
+export type GymPreference = z.infer<typeof GymPreferenceSchema>;
+
 export const GYM_PROFILE_RECORD_ID = 'gym-profile';
+export const GYM_PREFERENCE_RECORD_ID = 'gym-preference';
 export const weightEntryRecordId = (date: string): string => `weight-${date}`;
 export const dismissedAlertRecordId = (date: string): string => `dismissed-${date}`;
 
@@ -163,6 +169,7 @@ export const GYM_RECORD_KINDS = [
   'weightEntry',
   'attendanceLog',
   'dismissedAlert',
+  'preference',
 ] as const;
 export type GymRecordKind = (typeof GYM_RECORD_KINDS)[number];
 
@@ -173,5 +180,6 @@ export const GymRecordDataSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('weightEntry'), value: WeightHistoryEntrySchema }),
   z.object({ kind: z.literal('attendanceLog'), value: GymAttendanceLogSchema }),
   z.object({ kind: z.literal('dismissedAlert'), value: DismissedGymScheduleAlertSchema }),
+  z.object({ kind: z.literal('preference'), value: GymPreferenceSchema }),
 ]);
 export type GymRecordData = z.infer<typeof GymRecordDataSchema>;

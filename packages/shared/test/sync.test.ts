@@ -3,6 +3,7 @@ import {
   COLLECTIONS,
   COLLECTION_DATA_SCHEMA,
   DAILY_HABITS_RECORD_ID,
+  GYM_PREFERENCE_RECORD_ID,
   GYM_PROFILE_RECORD_ID,
   MAX_PUSH_CHANGES,
   PROFILE_RECORD_ID,
@@ -168,6 +169,15 @@ describe('SyncRecord: rechazo de datos inválidos', () => {
     if (!result.success) {
       expect(result.error.issues.some((i) => i.path[0] === 'data' && i.path[1] === 'status')).toBe(true);
     }
+  });
+
+  it('acepta la preferencia de gym (spec 011) y rechaza un valor mal formado', () => {
+    const ok = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: { disabled: true } });
+    expect(SyncRecordSchema.safeParse(ok).success).toBe(true);
+    const bad = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: { disabled: 'si' } });
+    expect(SyncRecordSchema.safeParse(bad).success).toBe(false);
+    const missing = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: {} });
+    expect(SyncRecordSchema.safeParse(missing).success).toBe(false);
   });
 
   it('rechaza `kind` desconocido y falta de `kind` en gym/calendar', () => {

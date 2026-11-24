@@ -125,7 +125,9 @@ describe('compatibilidad de tipos con src/types/index.ts', () => {
       'calendarBlocks',
       'universityAssignments',
     ];
-    expect([...APP_STATE_FIELDS].sort()).toEqual([...legacyKeys].sort());
+    // Campos que nacieron despues del tipo legacy (solo aditivos, opcionales).
+    const addedSinceLegacy = ['gymDisabled'];
+    expect([...APP_STATE_FIELDS].sort()).toEqual([...legacyKeys, ...addedSinceLegacy].sort());
   });
 });
 
@@ -157,6 +159,7 @@ describe('APP_STATE_TO_COLLECTION', () => {
       weightHistory: 'gym',
       gymAttendanceLogs: 'gym',
       dismissedGymScheduleAlerts: 'gym',
+      gymDisabled: 'gym',
       calendarBlocks: 'calendar',
       workShift: 'calendar',
       dailyHabits: 'calendar',
