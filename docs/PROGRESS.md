@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/011-gym-opcional
+- **Hecho:** specs 011 (gym opcional) y 012 (quehaceres diarios) y plan de ambas; la 011 aprobada y los pasos 1 a 7 de su plan hechos: contrato (`gymDisabled` y registro `preference` de la colección `gym`), adaptador de sync, prueba de aislamiento del API, estado en `App.tsx`, navegación y resumen sin gym, botón «No voy al gimnasio» (asistente, pestaña y tarjeta del resumen), «Reactivar» en el resumen y la E2E `05-gym-opcional`. Sin migración ni dependencias nuevas.
+- **Verificación:** `./scripts/check.sh` completo pasa (20 E2E, 152 de integración del API, unitarias). C5 queda **sin marcar**: la parte de ocultar bloques de gym está probada, pero no hay una prueba que demuestre que no se publica nada de gym en Google Calendar (hoy solo se garantiza porque la interfaz queda oculta).
+- **Pendiente:** paso 8 de la 011 (revisión con `revisor`, PR). Se **fusiona después de la 009** (la rama sale de ella). La 012 espera la aprobación de su plan.
+- **Problemas:** `main` local está desfasado respecto a `origin/main`; ramifiqué desde ahí por error y lo deshice. Esta rama vive en el worktree `../student-os-011`.
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (pasos 5b a 8)
 - **Hecho:** 5b `1ac122c` (sin botones Conectar/Desvincular), 5c `1d477f1` (importador retirado; el motor descarta lo ajeno y, con la nube vacía, sube el estado de una cuenta nueva), 5d (transporte de Google Identity Services, `googleCalendar.gis.test.ts` y la prueba de firmas actualizada, que ahora vigila que lo retirado no vuelva), 5e (`useLocalStorage` y `localStorage` directo fuera; `clearLegacyLocalData`; estado de cuenta nueva = partida sin bloques de ejemplo y con el nombre de Google), aviso en el modal de que los datos locales se eliminan, E2E `05-calendario` (C7, C8), ADR 0007 y documentación (001 `obsoleta`, 009 `revision`).
 - **Fallos reales que cazaron las pruebas:** (1) en el primer acceso de un dispositivo los eventos de Google tardaban hasta 45 s en aparecer porque la carga inicial se decidía antes de saber que Calendar estaba vinculado (corregido en `App.tsx`); (2) la nube vacía sin subir el estado dejaba dos dispositivos con datos distintos.
