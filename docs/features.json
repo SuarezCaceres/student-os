@@ -139,7 +139,7 @@
         { "id": "C2", "descripcion": "Sin perfil de gym, la pestana Gym y la tarjeta de gym del resumen tambien ofrecen 'No voy al gimnasio'", "pasa": true },
         { "id": "C3", "descripcion": "Al pulsar 'No voy al gimnasio', la pestana Gym desaparece de la navegacion y no se abre ningun asistente ni modal de gym", "pasa": true },
         { "id": "C4", "descripcion": "Con el gym desactivado, el resumen no muestra la tarjeta de gym, el acceso rapido 'anadir gym' ni avisos de horario de gym pendiente", "pasa": true },
-        { "id": "C5", "descripcion": "Con el gym desactivado, el calendario y los habitos no muestran bloques ni contadores de gym y no se publica ningun evento de gym en Google Calendar", "pasa": false },
+        { "id": "C5", "descripcion": "Con el gym desactivado, el calendario y los habitos no muestran bloques ni contadores de gym y no se publica ningun evento de gym en Google Calendar", "pasa": true },
         { "id": "C6", "descripcion": "Con el gym desactivado, el resumen muestra 'Gym desactivado - Reactivar' y al usarlo vuelven la pestana, la tarjeta y los bloques de gym", "pasa": true },
         { "id": "C7", "descripcion": "Desactivar y reactivar el gym conserva intactos el perfil, las rutinas y la asistencia", "pasa": true },
         { "id": "C8", "descripcion": "El gym desactivado se conserva al cerrar sesion, volver a entrar y entrar desde otro dispositivo", "pasa": true },

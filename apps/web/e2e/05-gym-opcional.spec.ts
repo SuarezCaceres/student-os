@@ -150,9 +150,17 @@ test.describe('5. gym opcional', () => {
     });
     expect(seeded.status, seeded.text).toBeLessThan(300);
 
+    // Eventos que ya estan en el Google Calendar de la cuenta: uno normal y uno de gym de StudentOS.
+    const today = (hour: number, summary: string, id: string) => {
+      const start = new Date();
+      start.setHours(hour, 0, 0, 0);
+      return { id, summary, start: { dateTime: start.toISOString() }, end: { dateTime: new Date(start.getTime() + 3_600_000).toISOString() } };
+    };
+    await control('/google/seed', { email, event: today(9, 'Parcial E2E de Calculo', 'e2e-parcial') });
+    await control('/google/seed', { email, event: today(17, 'Gym: Pecho E2E', 'e2e-gym') });
     const before = (await control<{ paths: string[] }>('/google/state?email=' + encodeURIComponent(email))).paths.length;
 
-    // Login real con Google (Calendar queda vinculado solo) y recorrido por todas las pestanas.
+    // Login real con Google (Calendar queda vinculado solo) y recorrido por las pestanas.
     const context = await newContext(browser);
     const page = await context.newPage();
     const tap = new PageTap(page);
@@ -165,18 +173,24 @@ test.describe('5. gym opcional', () => {
       .toMatchObject({ connected: true });
     await waitSynced(page, 40_000);
     await expect(gymTab(page)).toHaveCount(0);
-    for (const tab of ['Kanban', 'Universidad', 'Horario', 'Aprendizaje', 'Resumen'] as const) await openTab(page, tab);
-    await openTab(page, 'Horario');
-    await page.waitForTimeout(3_000);
 
-    // Calendar esta realmente vinculado (la API hablo con Google al enlazar) y, aun asi, la app no escribe en el calendario.
-    // Nota: en esta base la web aun no lee el calendario de Google durante la prueba; tras rebasar sobre la 009 (E2E de
-    // calendario) conviene exigir tambien una lectura `GET /calendar/v3/` para que la prueba sea mas estricta.
+    // La app SI lee el calendario (se ve el evento normal) pero oculta el evento de gym.
+    await openTab(page, 'Horario');
+    await expect(page.getByText('Parcial E2E de Calculo').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Gym: Pecho E2E')).toHaveCount(0);
+    for (const tab of ['Kanban', 'Universidad', 'Aprendizaje', 'Resumen'] as const) await openTab(page, tab);
+
+    // Y no escribe nada en Google: ni crea ni modifica eventos.
     const after = (await control<{ paths: string[] }>('/google/state?email=' + encodeURIComponent(email))).paths.slice(before);
-    expect(after.some((p) => p.startsWith('POST /token')), 'Calendar quedo vinculado: ' + JSON.stringify(after)).toBe(true);
-    expect(after.filter((p) => p.startsWith('POST /calendar/v3/') || p.startsWith('PATCH /calendar/v3/'))).toEqual([]);
+    expect(after.some((p) => p.startsWith('GET /calendar/v3/')), 'la app leyo el calendario de Google: ' + JSON.stringify(after)).toBe(true);
+    expect(after.filter((p) => p.startsWith('POST /calendar/v3/') || p.startsWith('PATCH /calendar/v3/') || p.startsWith('DELETE /calendar/v3/'))).toEqual([]);
     const events = await control<Array<{ summary?: string }>>('/google/events?email=' + encodeURIComponent(email));
-    expect(events.filter((e) => /gym|entrenamiento/i.test(e.summary ?? ''))).toEqual([]);
+    expect(events.map((e) => e.summary).sort()).toEqual(['Gym: Pecho E2E', 'Parcial E2E de Calculo']);
+
+    // Control positivo: al reactivar el gym, el evento de gym vuelve a mostrarse.
+    await page.getByRole('button', { name: 'Reactivar' }).click();
+    await openTab(page, 'Horario');
+    await expect(page.getByText('Gym: Pecho E2E').first()).toBeVisible({ timeout: 15_000 });
     expect(tap.pageErrors).toEqual([]);
     await context.close();
   });
