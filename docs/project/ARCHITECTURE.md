@@ -48,6 +48,10 @@ Con la nube activa, el servidor guarda el *refresh token* cifrado (AES-256-GCM, 
 - Producción (`student-os-prod`) pendiente; ver `docs/TASKS.md`.
 
 ## Decisiones relevantes
-- `docs/decisions/0001-agents-md-como-indice-unico.md`.
-- Pendientes de escribir (Fase 4): sync con cursor por `seq` y LWW, modo local sin cuenta como requisito, refresh token cifrado en servidor, E2E con servicios simulados.
+- `docs/decisions/0001-agents-md-como-indice-unico.md`: `AGENTS.md` como índice único.
+- `docs/decisions/0003-sync-con-cursor-por-seq-y-ultima-edicion-gana.md`: protocolo de sync.
+- `docs/decisions/0004-modo-local-sin-cuenta-y-modo-nube.md`: los dos modos y el importador.
+- `docs/decisions/0005-refresh-token-de-google-cifrado-en-el-servidor.md`: token de Google en el servidor.
+- `docs/decisions/0006-pruebas-e2e-con-supabase-y-google-simulados.md`: estrategia de E2E.
+- Reservado: `0002` para la adopción del harness (Fase 7).
 - Historial previo en `docs/agent-notes/*.md`, `PLAN_BACKEND.md` y `memories.md`.

@@ -11,7 +11,8 @@
 ### Adopción del harness
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy `.claude/skills` es una copia sin versionar.
 - [ ] Borrar la funcionalidad de ejemplo de `docs/features.json` y poblarla (Fase 6)
-- [ ] Escribir los ADRs de decisiones no obvias (Fase 4)
+- [ ] Unificar `memories.md` (exige leerlo antes de cada commit y pide commits en inglés) con la regla de commits en español de `rules/general.md`: la skill `github-workflow-standards` y `memories.md` siguen diciendo «imperativo en inglés» (Fase 5/6)
+- [ ] Las `docs/rules/` (`backend`, `frontend`) aún no incluyen convenciones observadas del código (Fase 4, pendiente de tu confirmación)
 
 ### Producción (acciones del humano, necesitan credenciales)
 - [ ] Migrar la base a `student-os-prod` y aplicar `apps/api/prisma/migrations/` a mano
@@ -27,6 +28,7 @@
 ### Deuda técnica
 - [ ] `./scripts/check.sh` (E2E) reescribe los JPG versionados de `docs/qa/evidence/`, lo que ensucia el árbol de git. Dirigir la salida a una carpeta ignorada o dejar de versionar esas imágenes.
 - [ ] Los módulos `kanban`, `university`, `gym` y `calendar` de `apps/api/src/` son controladores vacíos de 6 líneas (el dato viaja por `/sync`). Decidir: eliminarlos o rellenarlos.
+- [ ] `AuthModal`, `BackupModal`, `DailyHabitsCard` y `GymTracker` leen o escriben `localStorage` directamente en vez de usar `AppState`/el sync: en modo nube ese estado no se sincroniza. Revisar cuál es intencional.
 - [ ] Bundle web de ~1 MB (`index-*.js`, aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).
 - [ ] Versiones de Node dispares: `engines >=20`, CI en 20, Render en 22, Vercel en 26.x. Unificarlas.
@@ -39,6 +41,7 @@
 - [ ] Enlace simbólico de skills · Windows exige Modo desarrollador o administrador · que el humano lo active
 
 ## Hecho
+- 2026-11-23 · Fase 4 (parcial): `rules/general.md` (commits en español, PR por la skill), `rules/security.md` (reglas de StudentOS), `rules/testing.md` (`test.fail` con bug en TASKS y lección aprendida) y ADRs 0003–0006
 - 2026-11-23 · Fase 3: `AGENTS.md` locales de `apps/web`, `apps/api` y `packages/shared`; mapa de pruebas adaptado en `rules/testing.md`; zonas intocables en `AGENTS.md` y `PROJECT.md`
 - 2026-11-23 · Fase 2: `PROJECT.md` (producto público, prototipo, alcance y glosario)
 - 2026-11-23 · PR #6 `integration/backend → main` fusionado; Root Directory de Vercel = `apps/web`; lint del harness E2E corregido

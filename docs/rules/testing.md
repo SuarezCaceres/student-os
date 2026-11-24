@@ -26,8 +26,13 @@ Mandan sobre cualquier skill de pruebas de terceros.
 - Dar por terminada una tarea sin haber ejecutado `./scripts/check.sh`.
 - Escribir pruebas que solo comprueban que «no lanza error».
 
+## Fallos conocidos (`test.fail`)
+- Una prueba puede marcarse como fallo conocido (`test.fail` en Playwright, `it.failing`/`test.failing` en Jest o Vitest) **solo si existe un bug con su id en `docs/TASKS.md`**, y el nombre o el motivo de la marca cita ese id (p. ej. `BUG-01`).
+- Al corregir el bug, quita la marca en el mismo cambio y mueve la tarea a «Hecho». Si la prueba pasa estando marcada, el runner avisa: no lo ignores.
+- Marcar una prueba así no es «saltarla»: la aserción sigue activa y debe describir el comportamiento correcto.
+
 ## Pruebas inestables (flaky)
 - Si una prueba falla de forma intermitente, no la reintentes hasta que pase: regístrala en `docs/TASKS.md` y avisa.
 
 ## Lecciones aprendidas
-<!-- AAAA-MM-DD · Qué pasó → Qué hacer en su lugar. -->
+- 2026-11-23 · Se informó «lint sin errores» tras ver solo las últimas líneas de la salida (`| tail`), y el lint del API fallaba en el CI → Comprueba siempre el **código de salida** del comando (`echo $?`, `./scripts/check.sh`) y no concluyas a partir de un fragmento de la salida.
