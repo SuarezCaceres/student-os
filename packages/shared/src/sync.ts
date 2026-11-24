@@ -51,6 +51,9 @@ export const APP_STATE_TO_COLLECTION: Record<keyof AppState, Collection> = {
   calendarBlocks: 'calendar',
   workShift: 'calendar',
   dailyHabits: 'calendar',
+  chores: 'calendar',
+  choreDays: 'calendar',
+  choreSettings: 'calendar',
 };
 
 /** Esquema de `SyncRecord.data` por colección. */
