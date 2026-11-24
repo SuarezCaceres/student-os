@@ -23,7 +23,6 @@ vi.mock('../services/api', async (orig) => ({
   ...(await orig<typeof import('../services/api')>()),
   getApiClient: () => h.api,
 }));
-vi.mock('../sync/backup', () => ({ downloadBackup: vi.fn() }));
 
 const KEY = 'student_os_state_v1';
 const EMPTY = { ...initialData, kanbanItems: [] };

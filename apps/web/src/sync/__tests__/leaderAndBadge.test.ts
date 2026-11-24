@@ -82,9 +82,9 @@ describe('textos del indicador', () => {
 describe('dos pestanas del mismo navegador comparten cola: solo el lider sincroniza', () => {
   it('el relevo carga la cola persistida y no duplica subidas', async () => {
     const server = new FakeServer();
-    const tabA = createDevice({ server, initial: withTasks([task('t1')]) });
+    const tabA = createDevice({ server });
     await tabA.engine.start();
-    await tabA.engine.resolveDecision('upload');
+    tabA.edit((s) => ({ ...s, kanbanItems: [task('t1')] }));
     await tabA.engine.syncNow();
     tabA.edit((s) => ({ ...s, kanbanItems: [...s.kanbanItems, task('t2')] }));
     await tabA.engine.stop(); // la lider se cierra con un cambio aun en cola o subido

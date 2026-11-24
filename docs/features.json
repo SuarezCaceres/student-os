@@ -27,7 +27,7 @@
       "id": "003",
       "nombre": "importador-del-primer-inicio",
       "spec": null,
-      "estado": "hecho",
+      "estado": "obsoleta",
       "criterios": [
         { "id": "C1", "descripcion": "Con datos locales y nube vacia, ofrece subir, descarga un respaldo previo y sube (E2E 03-importer 3a)", "pasa": true },
         { "id": "C2", "descripcion": "Con datos distintos en local y nube, pregunta 'Usar la nube / Conservar este dispositivo' y 'Usar la nube' reemplaza lo local (E2E 3b)", "pasa": true },
@@ -110,10 +110,10 @@
         { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
         { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": true },
         { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": true },
-        { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": false },
+        { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": true },
         { "id": "C12", "descripcion": "Una cuenta de Google cualquiera, fuera de la lista de usuarios de prueba, entra en produccion sin la advertencia de app no verificada (requiere 007 y 008)", "pasa": false },
         { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": true },
-        { "id": "C14", "descripcion": "Los datos locales del prototipo que hubiera en el navegador no se suben a ninguna cuenta y se eliminan al iniciar sesion", "pasa": false }
+        { "id": "C14", "descripcion": "Los datos locales del prototipo que hubiera en el navegador no se suben a ninguna cuenta y se eliminan al iniciar sesion", "pasa": true }
       ]
     },
     {

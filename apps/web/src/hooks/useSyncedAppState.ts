@@ -3,10 +3,8 @@ import type { AppState } from '../types';
 import { getApiClient } from '../services/api';
 import { isSyncConfigured, useSupabaseSession } from '../services/supabase';
 import { syncAdapters } from '../sync/adapters';
-import { downloadBackup } from '../sync/backup';
 import { createSyncEngine, type SyncEngine } from '../sync/engine';
 import { stableStringify } from '../sync/hash';
-import { hasImportedBefore, markImported } from '../sync/importMarker';
 import { runAsLeader } from '../sync/leader';
 import { getDefaultSyncStorage } from '../sync/storage';
 import { syncStore } from '../sync/syncStore';
@@ -118,17 +116,14 @@ export function useSyncedAppState(a: AppState | string, b?: AppState): SyncedTup
             setStored(next);
           },
           isPristine: (s) => stableStringify(s) === stableStringify(initialRef.current),
-          saveBackup: downloadBackup,
-          hasImportedBefore: () => hasImportedBefore(userId),
-          markImported: () => markImported(userId),
+          // Spec 009: el estado local de otra cuenta o del prototipo no se sube ni se pregunta; se descarta.
+          initialState: () => initialRef.current,
         });
         engineRef.current = created;
         unsubscribeEngine = created.subscribe((status) => syncStore.publish(status));
         syncStore.publish(created.getStatus());
         syncStore.setController({
           syncNow: () => created.syncNow(),
-          resolveDecision: (choice) => created.resolveDecision(choice),
-          resume: () => created.resume(),
         });
         const detach = created.attachBrowserEvents();
         void created.start();

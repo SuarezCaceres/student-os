@@ -32,8 +32,9 @@ test.describe('2. login con sesion en la nube', () => {
     // Modo app (no landing): navbar principal y badge de sync.
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
-    await expect.poll(() => syncBadgeText(page), { timeout: 20_000 }).toMatch(/Falta elegir tus datos|Sincroniz/);
-    await expect(page.getByText('¿Subimos tus datos a la nube?')).toBeVisible();
+    await expect.poll(() => syncBadgeText(page), { timeout: 20_000 }).toMatch(/Sincroniz/);
+    // Ya no hay importador: no se pregunta que hacer con los datos (spec 009).
+    await expect(page.getByText('¿Subimos tus datos a la nube?')).toHaveCount(0);
     await evidence(page, '02-login-app-con-sesion');
 
     // La app hizo su primer pull autenticado y la API respondio 200 con el JWT del Supabase falso.
@@ -159,8 +160,6 @@ test.describe('2. login con sesion en la nube', () => {
     const page = await context.newPage();
     await gotoApp(page);
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible({ timeout: 30_000 });
-    // El importador (nube vacia + datos locales) bloquea la pantalla: "Ahora no" deja la sync en pausa.
-    await page.getByRole('button', { name: 'Ahora no' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
     await expect(page.getByRole('button', { name: /Continuar con Google/i }).first()).toBeVisible({ timeout: 8_000 });
@@ -175,7 +174,6 @@ test.describe('2. login con sesion en la nube', () => {
     const tap = new PageTap(page);
     await gotoApp(page);
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible({ timeout: 30_000 });
-    await page.getByRole('button', { name: 'Ahora no' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
     // Sin sesion de nube no queda indicador de sync ni nuevas llamadas autenticadas tras recargar.

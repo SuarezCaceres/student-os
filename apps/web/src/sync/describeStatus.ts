@@ -18,8 +18,6 @@ export function describeSyncStatus(
     };
   }
   if (status.waking) return { text: 'Despertando el servidor…', tone: 'neutral', icon: 'spinner' };
-  if (status.phase === 'awaiting-decision') return { text: 'Falta elegir tus datos', tone: 'warn', icon: 'alert' };
-  if (status.phase === 'paused') return { text: 'Sincronización en pausa', tone: 'neutral', icon: 'off' };
   if (status.phase === 'starting') return { text: 'Conectando…', tone: 'neutral', icon: 'spinner' };
   if (status.phase === 'error') {
     return {

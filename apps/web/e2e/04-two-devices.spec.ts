@@ -79,12 +79,11 @@ test.describe('4. PC y movil con el mismo usuario', () => {
     desktop = await dCtx.newPage();
     dTap = new PageTap(desktop);
     await gotoApp(desktop);
-    await expect(desktop.getByText('¿Subimos tus datos a la nube?')).toBeVisible({ timeout: 25_000 });
-    await desktop.getByRole('button', { name: 'Subir mis datos' }).click();
+    // Sin importador (spec 009): el primer dispositivo de una cuenta nueva sube su estado de partida solo.
     await waitSynced(desktop, 40_000);
     await expect.poll(async () => (await rowsOf(session.userId)).syncActiveRecords, { timeout: 15_000 }).toBeGreaterThan(10);
 
-    // El movil entra con los mismos datos de ejemplo: nube y local iguales => silencioso (sin modal).
+    // El movil entra con la misma cuenta: trae lo de la nube y reemplaza su estado local (sin dialogos).
     const mCtx = await newContext(browser, { session, viewport: VIEWPORTS.mobile, isMobile: true });
     mobile = await mCtx.newPage();
     mTap = new PageTap(mobile);

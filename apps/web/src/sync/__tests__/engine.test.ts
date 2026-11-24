@@ -16,15 +16,17 @@ import {
 const ISO = (ms: number) => new Date(ms).toISOString();
 
 describe('motor de sync: offline -> online', () => {
-  it('encola offline, converge al reconectar y no pierde cambios', async () => {
+  it('arranca sin red, el usuario edita y al reconectar sus ediciones se suben sin preguntar nada', async () => {
     const server = new FakeServer();
     const online = { value: false };
-    const a = createDevice({ server, online, initial: withTasks([task('t1')]) });
-    // Offline en el arranque: el importador no puede hablar con la nube todavia.
+    const a = createDevice({ server, online });
+    // Offline en el arranque: aun no se puede comparar con la nube.
     await a.engine.start();
     await a.engine.syncNow();
     expect(server.requests).toHaveLength(0);
     expect(a.engine.getStatus().phase).toBe('offline');
+    // El usuario sigue trabajando sin red: estas ediciones son suyas y no se pierden.
+    a.edit((s) => ({ ...s, kanbanItems: [task('t1')] }));
 
     online.value = true;
     // Simula el evento `online`.
@@ -34,15 +36,13 @@ describe('motor de sync: offline -> online', () => {
       { addEventListener: () => undefined, removeEventListener: () => undefined, visibilityState: 'visible' } as never,
     );
     listeners.online();
-    // Primer inicio con datos locales y nube vacia: pide confirmacion antes de subir nada.
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'), { timeout: 2000 });
-    expect(server.live()).toHaveLength(0);
-    await a.engine.resolveDecision('upload');
+    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('idle'), { timeout: 2000 });
     await a.engine.syncNow();
     expect(server.live().map((r) => r.id)).toEqual(['t1']);
+    expect(a.tasks().map((t) => t.id)).toEqual(['t1']);
   });
 
-  it('con sesion ya importada: ediciones offline se suben al volver la red', async () => {
+  it('con la sesion ya arrancada: ediciones offline se suben al volver la red', async () => {
     const server = new FakeServer();
     const online = { value: true };
     const a = createDevice({ server, online, initial: EMPTY_STATE });
@@ -89,9 +89,9 @@ describe('motor de sync: offline -> online', () => {
   it('un cambio hecho mientras el motor estaba apagado se detecta por diff al arrancar', async () => {
     const server = new FakeServer();
     const storage = createMemoryStorage();
-    const a = createDevice({ server, storage, initial: withTasks([task('t1')]) });
+    const a = createDevice({ server, storage });
     await a.start();
-    await a.engine.resolveDecision('upload');
+    a.edit((s) => ({ ...s, kanbanItems: [task('t1')] }));
     await a.engine.syncNow();
     await a.engine.stop();
 
@@ -391,7 +391,7 @@ describe('motor de sync: errores y lotes', () => {
   });
 });
 
-describe('importador de primer inicio de sesion', () => {
+describe('primera comparacion con la nube (spec 009: sin importador)', () => {
   const localData = withTasks([task('l1', 'Local 1'), task('l2', 'Local 2')]);
   const cloudRecord = (id: string, t: number) => ({
     id,
@@ -402,83 +402,66 @@ describe('importador de primer inicio de sesion', () => {
     rev: 1,
   });
 
-  it('local con datos + nube vacia: pide confirmar; subir hace respaldo y sube', async () => {
+  it('C14: datos locales ajenos o del prototipo + nube vacia: se descartan y NO se suben', async () => {
     const server = new FakeServer();
-    const a = createDevice({ server, initial: localData });
-    await a.engine.start();
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'));
-    const decision = a.engine.getStatus().decision!;
-    expect(decision.kind).toBe('upload');
-    expect(decision.local.total).toBe(2);
-    expect(server.live()).toHaveLength(0); // nada se sube sin confirmar
-
-    await a.engine.resolveDecision('upload');
-    await a.engine.syncNow();
-    expect(a.backups).toHaveLength(1);
-    expect(a.backups[0].kind).toBe('local');
-    expect(a.backups[0].state?.kanbanItems).toHaveLength(2);
-    expect(server.live().map((r) => r.id).sort()).toEqual(['l1', 'l2']);
-  });
-
-  it('"Ahora no" deja la sync en pausa sin tocar nada', async () => {
-    const server = new FakeServer();
-    const a = createDevice({ server, initial: localData });
-    await a.engine.start();
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'));
-    await a.engine.resolveDecision('skip');
-    expect(a.engine.getStatus().phase).toBe('paused');
-    a.edit((s) => ({ ...s, kanbanItems: [...s.kanbanItems, task('l3')] }));
-    await a.engine.syncNow();
-    expect(server.live()).toHaveLength(0);
-    expect(a.tasks()).toHaveLength(3);
-  });
-
-  it('si el respaldo falla, la operacion se cancela y no se cambia nada', async () => {
-    const server = new FakeServer();
-    server.put(cloudRecord('c1', Date.now()));
-    const a = createDevice({
-      server,
-      initial: localData,
-      engine: {
-        saveBackup: () => {
-          throw new Error('descarga bloqueada');
-        },
-      },
-    });
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    await a.engine.start();
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'));
-    await a.engine.resolveDecision('cloud');
-    expect(a.engine.getStatus().phase).toBe('awaiting-decision');
-    expect(a.tasks().map((t) => t.id)).toEqual(['l1', 'l2']);
-  });
-
-  it('ambos con datos: "Usar la nube" reemplaza lo local (con respaldo) sin subir nada', async () => {
-    const server = new FakeServer();
-    server.put(cloudRecord('c1', Date.now()));
-    const a = createDevice({ server, initial: localData });
-    await a.engine.start();
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'));
-    expect(a.engine.getStatus().decision?.kind).toBe('choose');
-    await a.engine.resolveDecision('cloud');
-    await a.engine.syncNow();
-    expect(a.tasks().map((t) => t.id)).toEqual(['c1']);
-    expect(a.backups.map((b) => b.kind)).toEqual(['local']);
-    expect(server.live().map((r) => r.id)).toEqual(['c1']);
+    const a = createDevice({ server, initial: localData, engine: { initialState: () => EMPTY_STATE } });
+    await a.start();
+    expect(a.engine.getStatus().phase).toBe('idle');
+    expect(a.tasks()).toEqual([]); // se descartaron
+    expect(server.live()).toHaveLength(0); // y nada se subio
+    expect(server.pushCount).toBe(0);
     expect(a.engine.getStatus().pending).toBe(0);
   });
 
-  it('ambos con datos: "Conservar lo de este dispositivo" reemplaza la nube (con 2 respaldos)', async () => {
+  it('C11/C14: datos locales ajenos + nube con datos: se descartan y se trae la nube sin preguntar', async () => {
     const server = new FakeServer();
     server.put(cloudRecord('c1', Date.now()));
-    const a = createDevice({ server, initial: localData });
-    await a.engine.start();
-    await vi.waitFor(() => expect(a.engine.getStatus().phase).toBe('awaiting-decision'));
-    await a.engine.resolveDecision('local');
+    const a = createDevice({ server, initial: localData, engine: { initialState: () => EMPTY_STATE } });
+    await a.start();
+    expect(a.tasks().map((t) => t.id)).toEqual(['c1']);
+    expect(server.live().map((r) => r.id)).toEqual(['c1']); // lo ajeno nunca llego a la nube
+    expect(a.engine.getStatus().pending).toBe(0);
+  });
+
+  it('el estado local NUNCA se descarta si este usuario ya tenia la sesion arrancada en este navegador', async () => {
+    const server = new FakeServer();
+    const storage = createMemoryStorage();
+    const first = createDevice({ server, storage });
+    await first.start();
+    first.edit((s) => ({ ...s, kanbanItems: [task('mio-1', 'Mio')] }));
+    await first.engine.syncNow();
+    await first.engine.stop();
+
+    // "Recarga": mismo usuario, mismo almacenamiento, estado local con sus datos.
+    const again = createDevice({ server, storage, initial: first.holder.current });
+    await again.start();
+    expect(again.tasks().map((t) => t.id)).toEqual(['mio-1']);
+    expect(server.live().map((r) => r.id)).toEqual(['mio-1']);
+  });
+
+  it('dos usuarios en el mismo navegador: los datos de A nunca llegan a la cuenta de B', async () => {
+    const serverA = new FakeServer();
+    const a = createDevice({ server: serverA, userId: 'user-A' });
+    await a.start();
+    a.edit((s) => ({ ...s, kanbanItems: [task('a-secreto', 'Solo de A')] }));
     await a.engine.syncNow();
-    expect(a.tasks().map((t) => t.id)).toEqual(['l1', 'l2']);
-    expect(a.backups.map((b) => b.kind).sort()).toEqual(['cloud', 'local']);
-    expect(server.live().map((r) => r.id).sort()).toEqual(['l1', 'l2']);
+    await a.engine.stop();
+    expect(serverA.live().map((r) => r.id)).toEqual(['a-secreto']);
+
+    // Entra B en el mismo navegador: el estado local sigue siendo el de A, pero B no tiene documento arrancado.
+    const serverB = new FakeServer();
+    const b = createDevice({
+      server: serverB,
+      storage: createMemoryStorage(),
+      userId: 'user-B',
+      initial: a.holder.current,
+      engine: { initialState: () => EMPTY_STATE },
+    });
+    await b.start();
+    expect(b.tasks()).toEqual([]);
+    expect(serverB.live()).toHaveLength(0);
+    expect(serverB.pushCount).toBe(0);
+    expect(b.engine.getStatus().pending).toBe(0);
   });
 
   it('estado de fabrica + nube con datos: aplica la nube sin preguntar', async () => {
@@ -486,27 +469,15 @@ describe('importador de primer inicio de sesion', () => {
     server.put(cloudRecord('c1', Date.now()));
     const a = createDevice({ server, initial: EMPTY_STATE });
     await a.start();
-    expect(a.engine.getStatus().decision).toBeNull();
     expect(a.tasks().map((t) => t.id)).toEqual(['c1']);
-    expect(a.backups).toHaveLength(0);
   });
 
-  it('datos locales iguales a la nube: no pregunta', async () => {
+  it('estado de fabrica + nube vacia: se adopta sin subir nada', async () => {
     const server = new FakeServer();
-    server.put({ id: 'l1', collection: 'kanban', data: task('l1', 'Local 1'), updatedAt: ISO(Date.now()), deletedAt: null, rev: 1 });
-    server.put({ id: 'l2', collection: 'kanban', data: task('l2', 'Local 2'), updatedAt: ISO(Date.now()), deletedAt: null, rev: 1 });
-    const a = createDevice({ server, initial: localData });
+    const a = createDevice({ server, initial: EMPTY_STATE });
     await a.start();
     expect(a.engine.getStatus().phase).toBe('idle');
-    expect(a.engine.getStatus().pending).toBe(0);
-  });
-
-  it('marca "ya importo": subir a una nube vacia no vuelve a preguntar', async () => {
-    const server = new FakeServer();
-    const a = createDevice({ server, initial: localData, engine: { hasImportedBefore: () => true } });
-    await a.start();
-    expect(a.engine.getStatus().decision).toBeNull();
-    expect(server.live()).toHaveLength(2);
+    expect(server.pushCount).toBe(0);
   });
 
   it('adaptadores stub (no emiten nada): el motor no hace nada ni pregunta', async () => {
@@ -523,9 +494,9 @@ describe('importador de primer inicio de sesion', () => {
   it('estado local reiniciado (localStorage borrado) no borra la nube', async () => {
     const server = new FakeServer();
     const storage = createMemoryStorage();
-    const a = createDevice({ server, storage, initial: withTasks([task('t1')]) });
+    const a = createDevice({ server, storage });
     await a.start();
-    await a.engine.resolveDecision('upload');
+    a.edit((s) => ({ ...s, kanbanItems: [task('t1')] }));
     await a.engine.syncNow();
     await a.engine.stop();
     expect(server.live()).toHaveLength(1);

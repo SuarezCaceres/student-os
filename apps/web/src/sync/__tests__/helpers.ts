@@ -6,7 +6,6 @@ import type { SyncAdapter } from '../adapterTypes';
 import { createSyncEngine, type SyncEngine, type SyncEngineDeps } from '../engine';
 import { stableStringify } from '../hash';
 import { createMemoryStorage, type SyncStorage } from '../storage';
-import type { SyncBackup } from '../types';
 
 export const EMPTY_STATE: AppState = { ...initialData, kanbanItems: [] };
 
@@ -164,7 +163,6 @@ export interface Device {
   engine: SyncEngine;
   storage: SyncStorage;
   holder: { current: AppState };
-  backups: SyncBackup[];
   edit: (fn: (state: AppState) => AppState) => void;
   start: () => Promise<void>;
   tasks: () => KanbanItem[];
@@ -173,7 +171,6 @@ export interface Device {
 export function createDevice(opts: DeviceOptions): Device {
   const holder = { current: opts.initial ?? EMPTY_STATE };
   const storage = opts.storage ?? createMemoryStorage();
-  const backups: SyncBackup[] = [];
   const api = opts.api ?? makeApi(opts.server, opts.token, opts.online ? { isOnline: () => opts.online!.value } : {});
   const engine = createSyncEngine({
     userId: opts.userId ?? 'user-1',
@@ -185,9 +182,10 @@ export function createDevice(opts: DeviceOptions): Device {
       holder.current = next;
     },
     isPristine: (s) => stableStringify(s) === stableStringify(EMPTY_STATE),
-    saveBackup: (b) => {
-      backups.push(b);
-    },
+    // Igual que el hook de produccion (spec 009): lo que habia en el navegador sin documento arrancado se descarta y
+    // se vuelve al estado de fabrica. Por defecto es el estado inicial del dispositivo; las pruebas de datos ajenos
+    // indican otro con `engine: { initialState }`.
+    initialState: () => opts.initial ?? EMPTY_STATE,
     now: opts.now,
     isOnline: opts.online ? () => opts.online!.value : () => true,
     options: { observeDebounceMs: 0, pushDebounceMs: 0, retryDelaysMs: [5, 5, 5], minPullIntervalMs: 0 },
@@ -197,7 +195,6 @@ export function createDevice(opts: DeviceOptions): Device {
     engine,
     storage,
     holder,
-    backups,
     edit: (fn) => {
       holder.current = fn(holder.current);
       engine.notifyLocalChange({ immediate: true });
