@@ -48,7 +48,7 @@ test.describe('3. primer acceso sin importador', () => {
     // Estado de una cuenta nueva: nombre de pila de su cuenta de Google y sin los bloques de horario de ejemplo.
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('student_os_state_v1') ?? '{}') as { studentName?: string; calendarBlocks?: Array<{ id: string }> });
     expect(stored.studentName).toBe('Usuario');
-    expect((stored.calendarBlocks ?? []).some((b) => /^cb-d+$/.test(b.id))).toBe(false);
+    expect((stored.calendarBlocks ?? []).some((b) => /^cb-\d+$/.test(b.id))).toBe(false);
     await evidence(page, '03-primer-acceso-directo');
     expect(tap.pageErrors).toEqual([]);
     expect(relevantConsoleErrors(tap)).toEqual([]);

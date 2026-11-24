@@ -10,6 +10,7 @@ import {
   WEB_ORIGIN,
   type GoogleHarness,
 } from '../../test/helpers/google-fixtures';
+import { GoogleApiClient } from './google-api.client';
 import { GoogleHttpException } from './google.errors';
 import { generatePkcePair } from './oauth-state';
 import { pkceVerifierAad, refreshTokenAad } from './token-cipher';
@@ -257,6 +258,23 @@ describe('GoogleService (con servidor falso de Google)', () => {
       const token = h.fake.issueRefreshToken('otra@gmail.example');
       expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, token))).toBe('google_account_mismatch');
       expect(await h.repo.getConnection(USER_A)).toBeNull();
+    });
+
+    it('falla cerrado: si la sesion no trae correo no se guarda nada', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL);
+      expect(await codeOf(h.service.linkFromLogin(USER_A, undefined, token))).toBe('google_account_mismatch');
+      expect(await h.repo.getConnection(USER_A)).toBeNull();
+    });
+
+    it('falla cerrado: si Google no confirma la cuenta responde error de Google y no guarda nada', async () => {
+      const spy = jest.spyOn(GoogleApiClient.prototype, 'fetchAccountEmail').mockResolvedValueOnce(null);
+      try {
+        const token = h.fake.issueRefreshToken(EMAIL);
+        expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, token))).toBe('google_upstream_error');
+        expect(await h.repo.getConnection(USER_A)).toBeNull();
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it('la comparacion del correo ignora mayusculas', async () => {

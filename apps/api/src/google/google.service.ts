@@ -258,8 +258,10 @@ export class GoogleService implements OnModuleInit {
       throw missingScopes();
     }
 
+    // Falla cerrado: sin poder confirmar la cuenta de Google no se guarda nada (la comprobacion no es opcional).
     const email = await this.client.fetchAccountEmail(tokens.access_token);
-    if (sessionEmail && email && sessionEmail.toLowerCase() !== email.toLowerCase()) {
+    if (!email) throw upstreamError();
+    if (!sessionEmail || sessionEmail.toLowerCase() !== email.toLowerCase()) {
       throw accountMismatch();
     }
 

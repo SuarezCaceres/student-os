@@ -60,6 +60,7 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 
 - [x] **M1 · BUG-01:** corregido en la spec 009 (`handleLogout` espera a `signOut()` antes de volver a la landing); la E2E 2c ya no lleva `test.fail`.
 - [x] **M2 · `localStorage` directo:** resuelto en la spec 009 (paso 5e): `AuthModal` se reescribió y `BackupModal`, `DailyHabitsCard` y `GymTracker` ya pasan siempre por `App`. Falta quitar la excepción de `docs/rules/frontend.md` (línea 24), que es una regla y necesita tu permiso.
+- [ ] **M6 · Reabrir sin red tras perder IndexedDB:** el motor descarta `localStorage` cuando el documento de sync de la cuenta no está arrancado en el navegador (regla de la spec 009). Si el navegador borró IndexedDB, o está en memoria (modo privado restrictivo), una recarga **sin red** muestra el estado de una cuenta nueva en vez de la última caché hasta recuperar la conexión. Valorar conservar la caché cuando `localStorage` guarda el id de la cuenta que está entrando.
 - [ ] **M3 · E2E en el CI:** el CI no ejecuta la E2E (solo build, lint y tests unitarios de los tres paquetes). Valorar un job de E2E.
 - [ ] **M4 · `.claude/settings.json`** deniega `Read(./.env.*)` y eso bloquea también leer `.env.example`, que el harness pide mantener al día. Decidir: listar solo los `.env` con secretos (`.env`, `.env.local`, `.env.production`…) o aceptar la limitación.
 - [ ] **M5 · Revisar lo deducido:** las convenciones «(observado)» de `docs/rules/backend.md` y `frontend.md`, el glosario de `PROJECT.md` y los ADRs 0004 a 0006 salen del código y de las notas de los agentes, no de una decisión tuya.
@@ -69,6 +70,7 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] El hook `.claude/hooks/guard.sh` da un falso positivo si el texto del comando contiene «git … push … main» (por ejemplo en el cuerpo de un PR). Afinar el regex.
 - [ ] **Volcar los cambios pendientes antes de cerrar sesión:** al cerrar sesión se limpia la cola de sync y lo que no se había subido se pierde. Intentar un `syncNow` con tiempo límite antes de `signOut`.
 - [ ] **Quitar `VITE_GOOGLE_CLIENT_ID`** de Vercel y de `.env.example` (la web ya no la usa; `.env.example` está bloqueado por el hook, ver M4).
+- [ ] **E2E y worktrees:** el harness E2E usa puertos fijos (54340-54343, 3100, 5293, 5294). Dos sesiones que lo ejecuten a la vez desde worktrees distintos se pisan (caídas a mitad de corrida y pruebas contra el código del otro worktree). Hacer los puertos configurables o detectar el conflicto con un mensaje claro.
 - [ ] Los módulos `kanban`, `university`, `gym` y `calendar` de `apps/api/src/` son controladores vacíos de 6 líneas (el dato viaja por `/sync`). Decidir: eliminarlos o rellenarlos.
 - [ ] Bundle web de ~1 MB (aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).
