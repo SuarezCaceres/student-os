@@ -219,6 +219,111 @@ describe('GoogleService (con servidor falso de Google)', () => {
     });
   });
 
+  describe('vinculacion al terminar el login (link-login, spec 009)', () => {
+    const EMAIL = 'ana@gmail.example';
+    const NO_EVENTS_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'];
+
+    it('C5: valida el token con Google, lo guarda CIFRADO y deja Calendar conectado sin pasos manuales', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL);
+      const status = await h.service.linkFromLogin(USER_A, EMAIL, token);
+
+      expect(status).toMatchObject({ configured: true, connected: true, needsReauth: false, email: EMAIL });
+      expect(status.scopes).toContain('https://www.googleapis.com/auth/calendar.events');
+      const stored = await h.repo.getConnection(USER_A);
+      expect(stored?.refreshTokenEnc.startsWith('v1.')).toBe(true);
+      expect(stored?.refreshTokenEnc).not.toContain(token);
+      // Ni el estado ni nada devuelto contiene el token.
+      expect(JSON.stringify(status)).not.toContain(token);
+      // El token guardado sirve de verdad: Calendar responde con el.
+      await expect(listEvents(h, USER_A)).resolves.toBeDefined();
+    });
+
+    it('el access token de la validacion se reutiliza: la primera llamada a Calendar no renueva otra vez', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL);
+      await h.service.linkFromLogin(USER_A, EMAIL, token);
+      const refreshesAfterLink = h.fake.counters.refreshes;
+      await listEvents(h, USER_A);
+      expect(h.fake.counters.refreshes).toBe(refreshesAfterLink);
+    });
+
+    it('C9: sin el permiso de eventos responde google_missing_scopes, revoca el token y NO guarda nada', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL, NO_EVENTS_SCOPES);
+      expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, token))).toBe('google_missing_scopes');
+      expect(await h.repo.getConnection(USER_A)).toBeNull();
+      expect(h.fake.counters.revokes).toBe(1);
+    });
+
+    it('la cuenta de Google debe ser la de la sesion: si no coincide, no se guarda nada', async () => {
+      const token = h.fake.issueRefreshToken('otra@gmail.example');
+      expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, token))).toBe('google_account_mismatch');
+      expect(await h.repo.getConnection(USER_A)).toBeNull();
+    });
+
+    it('la comparacion del correo ignora mayusculas', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL);
+      const status = await h.service.linkFromLogin(USER_A, 'ANA@Gmail.Example', token);
+      expect(status.connected).toBe(true);
+    });
+
+    it('un token que Google no reconoce responde 400 y no guarda nada', async () => {
+      expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, 'token-que-no-existe-en-google'))).toBe('google_bad_request');
+      expect(await h.repo.getConnection(USER_A)).toBeNull();
+    });
+
+    it('un token revocado en Google responde 400 y no guarda nada', async () => {
+      const token = h.fake.issueRefreshToken(EMAIL);
+      h.fake.revokeRefreshTokensOf(EMAIL);
+      expect(await codeOf(h.service.linkFromLogin(USER_A, EMAIL, token))).toBe('google_bad_request');
+      expect(await h.repo.getConnection(USER_A)).toBeNull();
+    });
+
+    it('iniciar sesion otra vez reemplaza el token anterior (un solo registro por usuario)', async () => {
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL));
+      const first = (await h.repo.getConnection(USER_A))?.refreshTokenEnc;
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL));
+      const second = (await h.repo.getConnection(USER_A))?.refreshTokenEnc;
+      expect(second).toBeTruthy();
+      expect(second).not.toBe(first);
+    });
+
+    it('limpia needsReauth: tras volver a entrar con Google todo vuelve a funcionar', async () => {
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL));
+      h.fake.revokeRefreshTokensOf(EMAIL);
+      h.fake.invalidateAccessTokens();
+      expect(await codeOf(listEvents(h, USER_A))).toBe('google_reauth_required');
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL));
+      expect((await h.service.getStatus(USER_A)).needsReauth).toBe(false);
+      await expect(listEvents(h, USER_A)).resolves.toBeDefined();
+    });
+
+    it('el vinculo es del usuario autenticado: no afecta a otro usuario', async () => {
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL));
+      expect((await h.service.getStatus(USER_B)).connected).toBe(false);
+    });
+
+    it('sin configuracion del servidor responde not_configured y nunca contacta a Google', async () => {
+      const unconfigured = await createGoogleHarness({ GOOGLE_CLIENT_SECRET: '' });
+      try {
+        expect(await codeOf(unconfigured.service.linkFromLogin(USER_A, EMAIL, 'cualquier-token-largo'))).toBe('google_not_configured');
+        expect(unconfigured.fake.calls.length).toBe(0);
+      } finally {
+        await unconfigured.close();
+      }
+    });
+
+    it('el token no aparece en los registros del servidor', async () => {
+      const lines: string[] = [];
+      const spies = (['log', 'warn', 'error', 'debug', 'verbose'] as const).map((m) =>
+        jest.spyOn(Logger.prototype, m).mockImplementation((...args: unknown[]) => void lines.push(args.map(String).join(' '))),
+      );
+      const token = h.fake.issueRefreshToken(EMAIL);
+      await h.service.linkFromLogin(USER_A, EMAIL, h.fake.issueRefreshToken(EMAIL, NO_EVENTS_SCOPES)).catch(() => undefined);
+      await h.service.linkFromLogin(USER_A, EMAIL, token);
+      spies.forEach((s) => s.mockRestore());
+      expect(lines.join('\n')).not.toContain(token);
+    });
+  });
+
   describe('access token en memoria', () => {
     beforeEach(async () => {
       await connectUser(h, USER_A, { email: 'ana@gmail.example' });

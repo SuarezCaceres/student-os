@@ -437,6 +437,82 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
     });
   });
 
+  describe('vinculacion al terminar el login (POST /google/link-login, spec 009)', () => {
+    const USER_D = '44444444-4444-4444-8444-444444444444';
+    const EMAIL_D = 'dani@example.com';
+    let tokenD: string;
+    const asD = () => ({ Authorization: `Bearer ${tokenD}` });
+
+    beforeAll(async () => {
+      tokenD = await jwks.sign({ sub: USER_D, email: EMAIL_D });
+    });
+
+    it('sin JWT responde 401 y no llega a Google', async () => {
+      const callsBefore = fake.calls.length;
+      await http().post('/google/link-login').send({ refreshToken: 'a-long-enough-token' }).expect(401);
+      expect(fake.calls.length).toBe(callsBefore);
+    });
+
+    it('cuerpo invalido -> 400 con lineas claras y sin eco del valor', async () => {
+      const res = await http().post('/google/link-login').set(asD()).send({ refreshToken: 'corto' }).expect(400);
+      expect(JSON.stringify(res.body)).toContain('refreshToken');
+      expect(JSON.stringify(res.body)).not.toContain('corto');
+      await http().post('/google/link-login').set(asD()).send({}).expect(400);
+    });
+
+    it('C5: vincula, cifra el refresh token en Postgres y Calendar queda conectado sin pulsar nada', async () => {
+      const realToken = fake.issueRefreshToken(EMAIL_D);
+      const res = await http().post('/google/link-login').set(asD()).send({ refreshToken: realToken }).expect(200);
+      expect(res.body).toMatchObject({ connected: true, needsReauth: false, email: EMAIL_D });
+      expect(JSON.stringify(res.body)).not.toContain(realToken);
+      expect(res.headers['cache-control']).toContain('no-store');
+
+      const row = await prisma.googleConnection.findUniqueOrThrow({ where: { userId: USER_D } });
+      expect(row.refreshTokenEnc).not.toContain(realToken);
+      expect(row.refreshTokenEnc).toMatch(/^v1\.[\w-]+\.[\w-]+\.[\w-]+$/);
+      expect(row.accountEmail).toBe(EMAIL_D);
+
+      const status = await http().get('/google/status').set(asD()).expect(200);
+      expect(status.body).toMatchObject({ connected: true, email: EMAIL_D });
+      // El token guardado sirve: el proxy de Calendar responde con el.
+      await http().get('/google/calendar/events').set(asD()).expect(200);
+    });
+
+    it('C9: sin el permiso de eventos responde 409 google_missing_scopes y no guarda nada', async () => {
+      const userE = '55555555-5555-4555-8555-555555555555';
+      const tokenE = await jwks.sign({ sub: userE, email: 'eva@example.com' });
+      const noEvents = fake.issueRefreshToken('eva@example.com', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly']);
+      const res = await http()
+        .post('/google/link-login')
+        .set({ Authorization: `Bearer ${tokenE}` })
+        .send({ refreshToken: noEvents })
+        .expect(409);
+      expect(res.body).toMatchObject({ code: 'google_missing_scopes' });
+      expect(await prisma.googleConnection.count({ where: { userId: userE } })).toBe(0);
+    });
+
+    it('un token de otra cuenta de Google responde 409 google_account_mismatch y no guarda nada', async () => {
+      const userF = '66666666-6666-4666-8666-666666666666';
+      const tokenF = await jwks.sign({ sub: userF, email: 'fer@example.com' });
+      const foreign = fake.issueRefreshToken('otra-persona@example.com');
+      const res = await http()
+        .post('/google/link-login')
+        .set({ Authorization: `Bearer ${tokenF}` })
+        .send({ refreshToken: foreign })
+        .expect(409);
+      expect(res.body).toMatchObject({ code: 'google_account_mismatch' });
+      expect(await prisma.googleConnection.count({ where: { userId: userF } })).toBe(0);
+    });
+
+    it('esta limitado a 5 intentos por minuto: el sexto recibe 429', async () => {
+      const ip = '203.0.113.88';
+      for (let i = 0; i < 5; i++) {
+        await http(ip).post('/google/link-login').set(asD()).send({ refreshToken: 'token-largo-invalido-x' }).expect(400);
+      }
+      await http(ip).post('/google/link-login').set(asD()).send({ refreshToken: 'token-largo-invalido-x' }).expect(429);
+    });
+  });
+
   describe('rate limit', () => {
     it('POST /google/connect esta limitado por IP (10/min): el intento 11 recibe 429', async () => {
       const ip = '203.0.113.77';

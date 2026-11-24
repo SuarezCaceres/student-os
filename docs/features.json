@@ -1,5 +1,5 @@
 {
-  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho. Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad (ver docs/TASKS.md): Alto = 009 (login para todos + Calendar automatico, marcado importante), 010 (entorno por usuario), 007 (produccion) y 008 (verificacion de Google); Medio y Bajo = bugs y deuda.",
+  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho | obsoleta (funcionalidad retirada o reemplazada por decision del humano; se conserva como historial). Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad (ver docs/TASKS.md): Alto = 009 (login para todos + Calendar automatico, marcado importante), 010 (entorno por usuario), 007 (produccion) y 008 (verificacion de Google); Medio y Bajo = bugs y deuda.",
   "features": [
     {
       "id": "001",
@@ -109,7 +109,7 @@
         { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": false },
         { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
         { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": false },
-        { "id": "C10", "descripcion": "El navegador nunca guarda ni recibe access token ni refresh token de Google", "pasa": false },
+        { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": false },
         { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": false },
         { "id": "C12", "descripcion": "Una cuenta de Google cualquiera, fuera de la lista de usuarios de prueba, entra en produccion sin la advertencia de app no verificada (requiere 007 y 008)", "pasa": false },
         { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": false },

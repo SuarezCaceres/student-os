@@ -18,7 +18,10 @@ import {
   REQUIRED_EVENTS_SCOPE,
 } from './google.constants';
 import {
+  accountMismatch,
   GoogleHttpException,
+  invalidProviderToken,
+  missingScopes,
   notConfigured,
   notConnected,
   reauthRequired,
@@ -220,6 +223,60 @@ export class GoogleService implements OnModuleInit {
       this.logger.error(`Fallo inesperado en el callback de Google (${error instanceof Error ? error.name : 'Error'})`);
       return withGoogleResult(fallbackBase, 'error', 'server');
     }
+  }
+
+  /**
+   * Vincula Calendar al terminar el LOGIN con Google (Supabase): la web entrega UNA vez el refresh token que Google
+   * dio en ese mismo consentimiento y el servidor lo valida, lo cifra y lo guarda. El usuario no pulsa ningun boton.
+   *
+   * Reglas (spec 009):
+   *  - El token solo vale si Google lo reconoce y se emitio para NUESTRO cliente OAuth (el proveedor Google de
+   *    Supabase debe usar el mismo client id/secret que este servidor).
+   *  - Si falta el permiso de eventos (consentimiento granular), se revoca y NO se guarda nada (C9).
+   *  - Si la cuenta de Google no es la de la sesion, no se guarda nada.
+   * El token jamas se registra en logs ni se devuelve en la respuesta.
+   */
+  async linkFromLogin(userId: string, sessionEmail: string | undefined, providerRefreshToken: string): Promise<GoogleStatus> {
+    if (!this.config.isConfigured) throw notConfigured();
+
+    let tokens;
+    try {
+      tokens = await this.client.refreshAccessToken(providerRefreshToken);
+    } catch (error) {
+      if (error instanceof GoogleOAuthError) {
+        this.logger.warn(`Vinculacion tras login rechazada por Google (${error.oauthError})`);
+        throw invalidProviderToken();
+      }
+      if (error instanceof GoogleNetworkError) throw upstreamError();
+      throw error;
+    }
+
+    const granted = (tokens.scope ?? '').split(/\s+/).filter(Boolean);
+    if (!granted.includes(REQUIRED_EVENTS_SCOPE)) {
+      // Sin el permiso de eventos la app no puede publicar gym ni turno: se revoca lo concedido y no se guarda nada.
+      await this.client.revokeToken(providerRefreshToken);
+      throw missingScopes();
+    }
+
+    const email = await this.client.fetchAccountEmail(tokens.access_token);
+    if (sessionEmail && email && sessionEmail.toLowerCase() !== email.toLowerCase()) {
+      throw accountMismatch();
+    }
+
+    const encrypted = this.config.cipher.encrypt(providerRefreshToken, refreshTokenAad(userId));
+    await this.repo.saveConnection({
+      userId,
+      refreshTokenEnc: encrypted.blob,
+      keyVersion: encrypted.keyVersion,
+      scopes: granted.join(' '),
+      accountEmail: email,
+      connectedAt: new Date(this.now()),
+    });
+    this.accessTokens.set(userId, {
+      token: tokens.access_token,
+      expiresAt: this.now() + tokens.expires_in * 1000,
+    });
+    return this.getStatus(userId);
   }
 
   async getStatus(userId: string): Promise<GoogleStatus> {

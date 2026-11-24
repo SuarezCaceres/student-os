@@ -45,6 +45,10 @@ export const GOOGLE_ERROR_CODES = {
   rateLimited: 'google_rate_limited',
   upstream: 'google_upstream_error',
   invalidReturnTo: 'google_invalid_return_to',
+  /** El usuario desmarco el permiso de eventos de Calendar en el consentimiento de Google (login). */
+  missingScopes: 'google_missing_scopes',
+  /** El refresh token entregado pertenece a otra cuenta de Google distinta de la del usuario autenticado. */
+  accountMismatch: 'google_account_mismatch',
 } as const;
 
 export type GoogleErrorCode = (typeof GOOGLE_ERROR_CODES)[keyof typeof GOOGLE_ERROR_CODES];

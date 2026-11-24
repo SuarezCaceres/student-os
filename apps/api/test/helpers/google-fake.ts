@@ -75,6 +75,11 @@ export interface FakeGoogle {
   /** Igual, pero solo para los refresh tokens de una cuenta. */
   revokeRefreshTokensOf(email: string): void;
   refreshTokensOf(email: string): string[];
+  /**
+   * Emite directamente un refresh token para una cuenta, como el que Supabase recibe de Google al iniciar sesion con
+   * `scopes` de Calendar (sin pasar por el flujo del API). Por defecto concede los 4 scopes de la app.
+   */
+  issueRefreshToken(email: string, grantedScopes?: string[]): string;
   /** Hace que las proximas N llamadas de Calendar devuelvan este estado/cuerpo. */
   failNextCalendar(status: number, body?: unknown, times?: number): void;
   eventsOf(email: string): FakeEvent[];
@@ -145,7 +150,7 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
   const counters = { codeExchanges: 0, refreshes: 0, revokes: 0 };
   const codes = new Map<string, CodeEntry>();
   const accessTokens = new Map<string, AccessEntry>();
-  const refreshTokens = new Map<string, { account: string; revoked: boolean }>();
+  const refreshTokens = new Map<string, { account: string; revoked: boolean; scope: string }>();
   const eventsByAccount = new Map<string, Map<string, FakeEvent>>();
   const deletedIds = new Set<string>();
   const failures: Array<{ status: number; body?: unknown }> = [];
@@ -205,7 +210,7 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
         if (verifierChallenge !== entry.challenge) return send(res, 400, { error: 'invalid_grant' });
         if (form.redirect_uri !== entry.redirectUri) return send(res, 400, { error: 'redirect_uri_mismatch' });
         const refreshToken = entry.includeRefresh ? `fake-rt-${++counter}-${b64u(randomBytes(8))}` : undefined;
-        if (refreshToken) refreshTokens.set(refreshToken, { account: entry.account, revoked: false });
+        if (refreshToken) refreshTokens.set(refreshToken, { account: entry.account, revoked: false, scope: entry.scope });
         const access = mintAccessToken(entry.account, refreshToken);
         return send(res, 200, {
           access_token: access.token,
@@ -220,7 +225,7 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
         const entry = refreshTokens.get(form.refresh_token);
         if (!entry || entry.revoked) return send(res, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
         const access = mintAccessToken(entry.account, form.refresh_token);
-        return send(res, 200, { access_token: access.token, expires_in: access.expiresIn, token_type: 'Bearer' });
+        return send(res, 200, { access_token: access.token, expires_in: access.expiresIn, scope: entry.scope, token_type: 'Bearer' });
       }
       return send(res, 400, { error: 'unsupported_grant_type' });
     }
@@ -371,6 +376,19 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
     },
     refreshTokensOf(email) {
       return [...refreshTokens.entries()].filter(([, entry]) => entry.account === email).map(([token]) => token);
+    },
+    issueRefreshToken(email, grantedScopes) {
+      const scope = (
+        grantedScopes ?? [
+          'openid',
+          'email',
+          'https://www.googleapis.com/auth/calendar.readonly',
+          'https://www.googleapis.com/auth/calendar.events',
+        ]
+      ).join(' ');
+      const token = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;
+      refreshTokens.set(token, { account: email, revoked: false, scope });
+      return token;
     },
     failNextCalendar(status, failureBody, times = 1) {
       for (let i = 0; i < times; i++) failures.push({ status, body: failureBody });

@@ -23,6 +23,7 @@ import {
   eventIdSchema,
   freeBusyBodySchema,
   instancesQuerySchema,
+  linkLoginBodySchema,
   listEventsQuerySchema,
   parseOrBadRequest,
 } from './google.schemas';
@@ -48,6 +49,23 @@ export class GoogleController {
   connect(@CurrentUser('id') userId: string, @Body() body: unknown): Promise<{ url: string }> {
     const { returnTo } = parseOrBadRequest(connectBodySchema, body);
     return this.google.startConnect(userId, returnTo);
+  }
+
+  /**
+   * Vincula Calendar al terminar el login con Google (spec 009): la web entrega una sola vez el refresh token que Google
+   * dio en el consentimiento del login. Limite bajo: solo se usa una vez por inicio de sesion.
+   */
+  @Post('link-login')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  linkLogin(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('email') email: string | undefined,
+    @Body() body: unknown,
+  ): Promise<GoogleStatus> {
+    const { refreshToken } = parseOrBadRequest(linkLoginBodySchema, body);
+    return this.google.linkFromLogin(userId, email, refreshToken);
   }
 
   /** Vuelta de Google. Siempre responde 302 a la web con `?google=connected` o `?google=error`. */
