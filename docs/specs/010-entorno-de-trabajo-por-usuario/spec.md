@@ -1,6 +1,6 @@
 # Spec · 010 · Entorno de trabajo por usuario
 
-> Estado: **borrador** (a la espera de aprobación del humano)
+> Estado: **aprobada** por el humano el 2026-11-24
 > Depende de la spec 009 (login solo con Google). La parte «dos cuentas reales» (C1) además necesita producción (007).
 
 ## Problema

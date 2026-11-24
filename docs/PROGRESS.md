@@ -13,7 +13,8 @@
 
 ## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (spec)
 - **Hecho:** spec 010 redactada (10 criterios; C3, C4 y C10 ya los cubren la 009 y las pruebas del API) y `features.json` en estado `spec`. Decisiones del humano: cuenta nueva **vacía con guía**, **subir antes de cerrar sesión** (con tiempo máximo y aviso sin red) y **avisar claro al llegar al límite** (5000 registros, 64 KB) sin subirlo.
-- **Pendiente:** que apruebes la spec (y respondas las 2 preguntas abiertas: textos de las guías y el tiempo máximo de 5 s); después `plan.md`. La rama parte de la 009 (PR #9, sin fusionar).
+- **Hecho también:** spec aprobada y `plan.md` escrito (7 pasos, sin migraciones ni dependencias; los cambios son solo de la web).
+- **Pendiente:** que apruebes el plan, en especial el permiso para añadir `flushPending` a `sync/syncStore.ts` (zona protegida), los textos de las guías y `career` por defecto. La rama parte de la 009 (PR #9, sin fusionar) y puede chocar con la 011 en `GymTracker`.
 - **Problemas:** C1 es manual y necesita producción (007) y la verificación de Google (008).
 
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (pasos 5b a 8)
