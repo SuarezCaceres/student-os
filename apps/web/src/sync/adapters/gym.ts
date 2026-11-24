@@ -1,4 +1,5 @@
 import {
+  GYM_PREFERENCE_RECORD_ID,
   GYM_PROFILE_RECORD_ID,
   GymRecordDataSchema,
   dismissedAlertRecordId,
@@ -27,11 +28,12 @@ import { stableStringify } from '../hash';
  *   weightHistory              -> 'weightEntry'    id = weight-<date>         (1 por fecha)
  *   gymAttendanceLogs          -> 'attendanceLog'  id = log.id                (att-<date>-<routineId>)
  *   dismissedGymScheduleAlerts -> 'dismissedAlert' id = dismissed-<date>      (semantica de conjunto)
+ *   gymDisabled                -> 'preference'     id = GYM_PREFERENCE_RECORD_ID (singleton; spec 011)
  *
  * Reglas de `apply` (funcion pura, inmutable e idempotente):
  *  - Devuelve el MISMO objeto de estado si ningun registro cambia nada (el motor no re-renderiza ni re-sube).
  *  - Tombstone (`deletedAt !== null`): elimina la entidad. Como un tombstone no lleva `data`, el tipo de entidad
- *    se deduce del id (`gym-profile`, `weight-*`, `dismissed-*`; el resto = rutina o log de asistencia).
+ *    se deduce del id (`gym-profile`, `gym-preference`, `weight-*`, `dismissed-*`; el resto = rutina o log de asistencia).
  *  - Registros vivos invalidos o con id incoherente con su valor se IGNORAN (nunca lanzan ni rompen el estado).
  *  - Orden determinista de listas: solo se reordena una lista cuando un registro la cambia realmente
  *    (rutinas por dia de la semana + id, pesos por fecha, asistencia por fecha + id, alertas por fecha).
@@ -79,7 +81,10 @@ const cmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** ids que ocupan el espacio de nombres de otros `kind`: una rutina/log con ese id no se puede sincronizar. */
 const isReservedId = (id: string): boolean =>
-  id === GYM_PROFILE_RECORD_ID || id.startsWith(WEIGHT_PREFIX) || id.startsWith(DISMISSED_PREFIX);
+  id === GYM_PROFILE_RECORD_ID ||
+  id === GYM_PREFERENCE_RECORD_ID ||
+  id.startsWith(WEIGHT_PREFIX) ||
+  id.startsWith(DISMISSED_PREFIX);
 
 const byteLength = (value: unknown): number => new TextEncoder().encode(JSON.stringify(value)).length;
 
@@ -129,6 +134,10 @@ function select(state: AppState): Array<Pick<SyncRecord, 'id' | 'data'>> {
   };
 
   if (isObject(state.gymProfile)) put(GYM_PROFILE_RECORD_ID, 'profile', state.gymProfile);
+  // `gymDisabled` ausente = gym activo: no se sube nada. `false` se sube para que reactivar llegue a otros dispositivos.
+  if (typeof state.gymDisabled === 'boolean') {
+    put(GYM_PREFERENCE_RECORD_ID, 'preference', { disabled: state.gymDisabled });
+  }
 
   for (const entry of asArray(state.weightHistory)) {
     if (!isObject(entry) || typeof entry.date !== 'string') continue;
@@ -215,6 +224,7 @@ type Op<T> = T | null; // null = borrar
 
 interface Plan {
   profile: { op: Op<UserGymProfile> } | null;
+  preference: { op: Op<boolean> } | null;
   routines: Map<string, Op<GymRoutine>>;
   weights: Map<string, Op<WeightHistoryEntry>>; // clave = fecha
   logs: Map<string, Op<GymAttendanceLog>>;
@@ -236,6 +246,7 @@ function latestPerId(records: SyncRecord[]): SyncRecord[] {
 function buildPlan(records: SyncRecord[]): Plan {
   const plan: Plan = {
     profile: null,
+    preference: null,
     routines: new Map(),
     weights: new Map(),
     logs: new Map(),
@@ -248,6 +259,7 @@ function buildPlan(records: SyncRecord[]): Plan {
 
     if (record.deletedAt !== null) {
       if (id === GYM_PROFILE_RECORD_ID) plan.profile = { op: null };
+      else if (id === GYM_PREFERENCE_RECORD_ID) plan.preference = { op: null };
       else if (id.startsWith(WEIGHT_PREFIX)) plan.weights.set(id.slice(WEIGHT_PREFIX.length), null);
       else if (id.startsWith(DISMISSED_PREFIX)) plan.dismissed.set(id.slice(DISMISSED_PREFIX.length), false);
       else {
@@ -272,6 +284,10 @@ function buildPlan(records: SyncRecord[]): Plan {
       case 'profile':
         if (id !== GYM_PROFILE_RECORD_ID) plan.invalid++;
         else plan.profile = { op: data.value as UserGymProfile };
+        break;
+      case 'preference':
+        if (id !== GYM_PREFERENCE_RECORD_ID) plan.invalid++;
+        else plan.preference = { op: data.value.disabled };
         break;
       case 'weightEntry':
         if (id !== weightEntryRecordId(data.value.date)) plan.invalid++;
@@ -358,6 +374,20 @@ function apply(state: AppState, records: SyncRecord[]): AppState {
       }
     } else if (!sameValue(state.gymProfile, op)) {
       next = { ...next, gymProfile: op };
+    }
+  }
+
+  // Preferencia de gym (singleton). Un tombstone vuelve al estado por defecto: gym activo (campo ausente).
+  if (plan.preference) {
+    const { op } = plan.preference;
+    if (op === null) {
+      if (state.gymDisabled !== undefined) {
+        const copy: AppState = { ...next };
+        delete copy.gymDisabled;
+        next = copy;
+      }
+    } else if (state.gymDisabled !== op) {
+      next = { ...next, gymDisabled: op };
     }
   }
 

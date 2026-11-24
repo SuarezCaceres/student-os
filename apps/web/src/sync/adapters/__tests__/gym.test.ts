@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto';
 import {
+  GYM_PREFERENCE_RECORD_ID,
   GYM_PROFILE_RECORD_ID,
   SyncRecordSchema,
   dismissedAlertRecordId,
@@ -825,6 +826,99 @@ describe('motor de sync con el adaptador real de gym', () => {
     const ids = a.holder.current.gymRoutines.map((r) => r.id);
     expect(ids).not.toContain('roto');
     expect(ids).toContain('gym-jueves');
+    expect(a.engine.getStatus().pending).toBe(0);
+  });
+});
+
+describe('preferencia de gym desactivado (spec 011)', () => {
+  const live1 = (id: string, kind: string, value: unknown, offsetMs = 0) => live(id, kind, value, offsetMs);
+
+  it('C10: un estado sin el ajuste no emite registro y lo remoto sin el ajuste lo deja activo', () => {
+    expect(gymAdapter.select(blankGymState()).some((r) => r.id === GYM_PREFERENCE_RECORD_ID)).toBe(false);
+    const next = gymAdapter.apply(blankGymState(), toRecords(fullGymState()));
+    expect(next.gymDisabled).toBeUndefined();
+  });
+
+  it('C8: gymDisabled viaja como registro `preference` y se reproduce en otro dispositivo', () => {
+    const off = { ...blankGymState(), gymDisabled: true };
+    const records = toRecords(off);
+    const pref = records.find((r) => r.id === GYM_PREFERENCE_RECORD_ID);
+    expect(pref?.data).toEqual({ kind: 'preference', value: { disabled: true } });
+    expect(SyncRecordSchema.safeParse(pref).success).toBe(true);
+    expect(gymAdapter.apply(blankGymState(), records).gymDisabled).toBe(true);
+  });
+
+  it('reactivar (false) tambien se emite para que llegue a otros dispositivos', () => {
+    const on = { ...blankGymState(), gymDisabled: false };
+    const pref = gymAdapter.select(on).find((r) => r.id === GYM_PREFERENCE_RECORD_ID);
+    expect(pref?.data).toEqual({ kind: 'preference', value: { disabled: false } });
+    const afterRemote = gymAdapter.apply({ ...blankGymState(), gymDisabled: true }, toRecords(on));
+    expect(afterRemote.gymDisabled).toBe(false);
+  });
+
+  it('un tombstone devuelve al estado por defecto (campo ausente) y es idempotente', () => {
+    const off = { ...blankGymState(), gymDisabled: true };
+    const next = gymAdapter.apply(off, [tomb(GYM_PREFERENCE_RECORD_ID)]);
+    expect('gymDisabled' in next).toBe(false);
+    expect(gymAdapter.apply(next, [tomb(GYM_PREFERENCE_RECORD_ID)])).toBe(next);
+  });
+
+  it('reaplicar el mismo registro devuelve la misma referencia', () => {
+    const state = gymAdapter.apply(blankGymState(), toRecords({ ...blankGymState(), gymDisabled: true }));
+    expect(gymAdapter.apply(state, toRecords({ ...blankGymState(), gymDisabled: true }))).toBe(state);
+  });
+
+  it('un registro con id incoherente o valor mal formado se ignora sin lanzar', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const base = blankGymState();
+    const badId = live1('otro-id', 'preference', { disabled: true });
+    const badValue = live1(GYM_PREFERENCE_RECORD_ID, 'preference', { disabled: 'si' });
+    expect(gymAdapter.apply(base, [badId, badValue])).toBe(base);
+    warn.mockRestore();
+  });
+
+  it('C7: desactivar y reactivar no toca perfil, rutinas ni asistencia', () => {
+    const full = fullGymState();
+    const off = gymAdapter.apply(full, toRecords({ ...full, gymDisabled: true }));
+    const on = gymAdapter.apply(off, toRecords({ ...off, gymDisabled: false }));
+    expect(on.gymProfile).toEqual(full.gymProfile);
+    expect(on.gymRoutines).toEqual(full.gymRoutines);
+    expect(on.gymAttendanceLogs).toEqual(full.gymAttendanceLogs);
+  });
+
+  it('un cliente no puede usar el id de la preferencia como rutina', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const state = { ...blankGymState(), gymRoutines: [routine(GYM_PREFERENCE_RECORD_ID, 'Lunes', [exercise('e1')])] };
+    expect(gymAdapter.select(state).some((r) => (r.data as { kind: string }).kind === 'routine')).toBe(false);
+    warn.mockRestore();
+  });
+});
+
+describe('motor de sync: preferencia de gym entre dispositivos (spec 011, C8)', () => {
+  async function pair() {
+    const server = new FakeServer();
+    const clock = { t: Date.parse('2026-11-13T10:00:00Z') };
+    const now = () => clock.t;
+    const a = createDevice({ server, now, adapters: [gymAdapter] });
+    const b = createDevice({ server, now, adapters: [gymAdapter] });
+    await a.start();
+    await b.start();
+    return { clock, a, b };
+  }
+
+  it('desactivar en A llega a B, y reactivar en B vuelve a llegar a A', async () => {
+    const { clock, a, b } = await pair();
+    clock.t += 1000;
+    a.edit((s) => ({ ...s, gymDisabled: true }));
+    await a.engine.syncNow();
+    await b.engine.syncNow();
+    expect(b.holder.current.gymDisabled).toBe(true);
+
+    clock.t += 1000;
+    b.edit((s) => ({ ...s, gymDisabled: false }));
+    await b.engine.syncNow();
+    await a.engine.syncNow();
+    expect(a.holder.current.gymDisabled).toBe(false);
     expect(a.engine.getStatus().pending).toBe(0);
   });
 });
