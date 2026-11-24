@@ -11,7 +11,7 @@
 ### Adopción del harness
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy `.claude/skills` es una copia sin versionar.
 - [ ] Borrar la funcionalidad de ejemplo de `docs/features.json` y poblarla (Fase 6)
-- [ ] Unificar `memories.md` (exige leerlo antes de cada commit y pide commits en inglés) con la regla de commits en español de `rules/general.md`: la skill `github-workflow-standards` y `memories.md` siguen diciendo «imperativo en inglés» (Fase 5/6)
+- [ ] `memories.md` (356 líneas) aún exige leerlo antes de cada commit y pide commits «en imperativo» en inglés, y la skill `github-workflow-standards` también lo exige: la skill ya lleva una nota que remite a `rules/general.md`, pero `memories.md` no se ha tocado. Decidir su destino en la Fase 6.
 - [ ] Las `docs/rules/` (`backend`, `frontend`) aún no incluyen convenciones observadas del código (Fase 4, pendiente de tu confirmación)
 
 ### Producción (acciones del humano, necesitan credenciales)
@@ -41,6 +41,7 @@
 - [ ] Enlace simbólico de skills · Windows exige Modo desarrollador o administrador · que el humano lo active
 
 ## Hecho
+- 2026-11-23 · Fase 5: las 7 skills de terceros asignadas (`ui-ux-pro-max`, `frontend-design`, `design-taste-frontend` → `frontend-proyecto`; `playwright-best-practices` → `pruebas-proyecto`; `github-workflow-standards`, `grill-me` y `find-skills` en `AGENTS.md`). Sin skills nuevas de NestJS, Supabase ni Prisma, y sin skill propia, por decisión del humano
 - 2026-11-23 · Fase 4 (parcial): `rules/general.md` (commits en español, PR por la skill), `rules/security.md` (reglas de StudentOS), `rules/testing.md` (`test.fail` con bug en TASKS y lección aprendida) y ADRs 0003–0006
 - 2026-11-23 · Fase 3: `AGENTS.md` locales de `apps/web`, `apps/api` y `packages/shared`; mapa de pruebas adaptado en `rules/testing.md`; zonas intocables en `AGENTS.md` y `PROJECT.md`
 - 2026-11-23 · Fase 2: `PROJECT.md` (producto público, prototipo, alcance y glosario)

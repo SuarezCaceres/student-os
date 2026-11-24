@@ -12,10 +12,12 @@ description: Úsala al crear o modificar código del frontend (apps/web): compon
 4. Si tienes dudas de *cómo* hacer algo: `docs/references/frontend/`.
 
 ## Skills de terceros
-<!-- RELLENAR al instalar skills de buenas prácticas del framework. Ejemplo:
-- Buenas prácticas del framework: `.agents/skills/<nombre-skill>/SKILL.md`
-- Diseño de interfaces: `.agents/skills/<nombre-skill>/SKILL.md`
-Úsalas para la técnica. Si contradicen docs/rules/frontend.md, gana docs/rules. -->
+- Guías de UI/UX, accesibilidad, interacción y responsive: `.agents/skills/ui-ux-pro-max/SKILL.md`
+- Dirección estética y tipografía al crear o rehacer pantallas: `.agents/skills/frontend-design/SKILL.md`
+- Páginas de marketing y la landing (`apps/web/src/components/landing/`) **solo**, no la app interna: `.agents/skills/design-taste-frontend/SKILL.md`
+- Pruebas E2E del navegador: ver la skill `pruebas-proyecto`.
+
+Úsalas para la técnica. Si contradicen `docs/rules/frontend.md` o la identidad de marca de `PRODUCT.md` (terminología, tono sobrio, «cero burocracia»), gana lo del proyecto.
 
 ## Al trabajar
 - Antes de crear un componente, busca uno existente que puedas reutilizar.

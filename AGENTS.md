@@ -54,6 +54,11 @@ scripts/          verificación y utilidades
 | `backend-proyecto` | Trabajo en `apps/api/`                                        |
 | `pruebas-proyecto` | Escribir, ejecutar o revisar pruebas                          |
 | `revisor`          | Antes de abrir un PR: evaluar el trabajo contra la spec       |
+| `github-workflow-standards` | Formato de PR (5 secciones) y tipos de commit; el idioma lo fija `docs/rules/general.md` |
+| `grill-me`         | Cuando pidas que te interrogue para afinar un plan o diseño   |
+| `find-skills`      | Para descubrir skills nuevas (pide permiso antes de instalar)  |
+
+Las de diseño y E2E (`ui-ux-pro-max`, `frontend-design`, `design-taste-frontend`, `playwright-best-practices`) se llaman desde `frontend-proyecto` y `pruebas-proyecto`.
 
 ## Comandos
 Siempre desde la raíz. Detalle por área en `docs/stack/`.

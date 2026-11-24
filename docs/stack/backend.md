@@ -53,4 +53,4 @@ test/         *.e2e-spec.ts, helpers/, e2e-harness/ (Supabase y Google simulados
 ## Skills de terceros instaladas
 | Skill | Para qué | Fuente |
 |-------|----------|--------|
-| *(ninguna todavía)* | Se decide en la Fase 5 (candidatas: NestJS, Supabase/Postgres) | — |
+| *(ninguna)* | Decisión del humano (2026-11-23): se pospone NestJS, Supabase/Postgres y Prisma. Se aplican `docs/rules/backend.md` y `security.md` | — |

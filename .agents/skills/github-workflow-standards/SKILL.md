@@ -7,6 +7,9 @@ description: Estándar oficial y obligatorio para estructurar repositorios, reda
 
 Este estándar define las reglas obligatorias e ineludibles para cualquier desarrollador o agente de inteligencia artificial que trabaje en los repositorios de la organización y proyectos personales (@SuarezCaceres).
 
+> [!NOTE]
+> **Ajuste en StudentOS (2026-11-23):** el **idioma de los mensajes de commit es el español** (`docs/rules/general.md`, decisión del humano). De esta skill siguen vigentes los tipos, el formato `<tipo>(<ámbito>): <descripción>`, minúsculas, sin punto final y el formato de PR de 5 secciones; los ejemplos en inglés son solo ilustrativos. El resto de reglas de este archivo no cambia.
+
 ---
 
 ## 📌 Protocolo de Lectura Previa Obligatoria

@@ -12,9 +12,9 @@ description: Úsala cuando haya que escribir, ejecutar, arreglar o revisar prueb
 4. Ejemplos y guías: `docs/references/testing/`.
 
 ## Skills de terceros
-<!-- RELLENAR al instalar skills de pruebas. Ejemplo:
-- Técnica E2E: `.agents/skills/<nombre-skill-e2e>/SKILL.md`
-Úsalas para la técnica. Si contradicen docs/rules/testing.md, gana docs/rules. -->
+- Técnica E2E con Playwright (flaky, mocks, OAuth, móvil, accesibilidad): `.agents/skills/playwright-best-practices/SKILL.md`
+
+Úsala para la técnica, pero en este proyecto **las E2E corren contra el stack simulado** de `apps/api/test/e2e-harness/` (ADR 0006) y se escriben en `apps/web/e2e/`. Si la skill contradice `docs/rules/testing.md`, gana docs/rules.
 
 ## Qué pruebas hacer
 - **Unitarias:** cada función o servicio nuevo, con caso feliz, casos límite y errores.

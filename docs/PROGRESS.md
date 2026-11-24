@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 5)
+- **Hecho:** skills conectadas: `frontend-proyecto` (`ui-ux-pro-max`, `frontend-design`, `design-taste-frontend` solo para landing), `pruebas-proyecto` (`playwright-best-practices`, con la nota del stack simulado), `backend-proyecto` (ninguna, decisión del humano). `AGENTS.md` lista `github-workflow-standards`, `grill-me` y `find-skills`. La skill de flujo de GitHub lleva una nota: commits en español.
+- **Pendiente:** Fase 6 (`features.json`, `TASKS.md`, qué hacer con `memories.md`) y Fase 7 (cierre, ADR 0002, PR).
+- **Problemas:** `design-taste-frontend` es para sitios de marketing; si se usa en la app interna puede chocar con la identidad de `PRODUCT.md`.
+
 ## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 4)
 - **Hecho:** reglas: `general.md` (commits en español, PR por la skill), `security.md` (exportar/borrar cuenta, RLS, tokens de Google, límites por usuario, logs sin PII), `testing.md` (`test.fail` solo con bug en TASKS; lección sobre verificar el código de salida), convenciones «(observado)» en `backend.md` y `frontend.md`; ADRs 0003 a 0006.
 - **Pendiente:** que confirmes las convenciones observadas y los ADRs. Fase 5 (skills), Fase 6 (backlog), Fase 7 (cierre y PR).

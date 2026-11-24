@@ -48,7 +48,9 @@ e2e/              pruebas Playwright (01-nocloud … 04-two-devices) y support/h
 ## Skills de terceros instaladas
 | Skill                      | Para qué                                   | Fuente |
 |----------------------------|--------------------------------------------|--------|
-| `design-taste-frontend`    | Diseño visual no genérico                  | `.agents/skills/` (pendiente de asignar en Fase 5) |
-| `frontend-design`          | Dirección estética y tipografía            | `.agents/skills/` (Fase 5) |
-| `ui-ux-pro-max`            | Guías de UI/UX, accesibilidad y paletas    | `.agents/skills/` (Fase 5) |
-| `playwright-best-practices`| Técnica de pruebas E2E                     | `.agents/skills/` (Fase 5) |
+| `ui-ux-pro-max`            | Guías de UI/UX, accesibilidad, responsive y paletas | `.agents/skills/ui-ux-pro-max/` |
+| `frontend-design`          | Dirección estética y tipografía en pantallas nuevas | `.agents/skills/frontend-design/` |
+| `design-taste-frontend`    | Solo landing y páginas de marketing (`components/landing/`) | `.agents/skills/design-taste-frontend/` |
+| `playwright-best-practices`| Técnica de pruebas E2E (vía skill `pruebas-proyecto`) | `.agents/skills/playwright-best-practices/` |
+
+Asignadas en la Fase 5 (2026-11-23) y enlazadas desde `frontend-proyecto` y `pruebas-proyecto`. Si contradicen `docs/rules/frontend.md` o `PRODUCT.md`, gana lo del proyecto.

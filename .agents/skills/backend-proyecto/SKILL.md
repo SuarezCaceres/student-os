@@ -12,10 +12,9 @@ description: Úsala al crear o modificar código del backend (apps/api): endpoin
 4. Si tienes dudas de *cómo* hacer algo: `docs/references/backend/`.
 
 ## Skills de terceros
-<!-- RELLENAR al instalar skills de buenas prácticas del framework. Ejemplo:
-- Buenas prácticas del framework: `.agents/skills/<nombre-skill>/SKILL.md`
-- Base de datos: `.agents/skills/<nombre-skill>/SKILL.md`
-Úsalas para la técnica. Si contradicen docs/rules/, gana docs/rules. -->
+Ninguna instalada todavía (decisión del humano, 2026-11-23: se pospone NestJS, Supabase/Postgres y Prisma). Para el backend se aplican solo `docs/rules/backend.md` y `docs/rules/security.md`, y las notas de los agentes en `docs/agent-notes/` (sync, Google, cuenta pública).
+
+Antes de añadir una skill nueva, usa `find-skills` y pide permiso: instalar ejecuta código de terceros.
 
 ## Al trabajar
 - Respeta las capas: controlador → servicio → repositorio.
