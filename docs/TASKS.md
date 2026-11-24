@@ -25,7 +25,10 @@ Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y q
 - **Preguntas abiertas** (ver la spec): ¿se mantiene la landing pública?, ¿basta sin botón de desvincular para la verificación de Google?, y aprobar dejar obsoletos la funcionalidad 001, la 003 (importador) y el ADR 0004. Los permisos de Calendar son «sensibles» para Google y exigen verificación completa *(deducido; confirmar con `docs/google-verification-checklist.md`)*.
 - [x] Spec aprobada por el humano el 2026-11-24 (`docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md`)
 - [x] Plan escrito (`plan.md`), **a la espera de tu aprobación**: decisión técnica D1 (cómo llega el refresh token al servidor; recomendada la opción B), relajar C10, actualizar la prueba que congela las firmas de `googleCalendar.ts` y añadir el estado `obsoleta` a `features.json`
-- [ ] Implementar (9 pasos del plan) tras aprobar el plan
+- [x] Plan aprobado el 2026-11-24 (D1 = opción B; C10 relajado a «nunca persistente»; estado `obsoleta` añadido a `features.json`)
+- [x] **Pasos 1 a 4 del plan hechos** en `feat/009-login-google-calendar-automatico`: prueba de viabilidad (`docs/references/frontend/supabase-provider-tokens.md`), `POST /google/link-login`, harness (Supabase y Google falsos) y login web con enlace automático, storage que no persiste el token y aviso si falta Calendar (C4, C5, C9 y C10 cubiertos con pruebas unitarias, de integración y E2E)
+- [ ] **Pasos 5 a 9 pendientes:** retirar cuenta local, demo, botón Conectar, importador, transporte GIS y modo local; `App.tsx` solo con sesión y BUG-01; reescribir E2E `01` y `03`; ADR 0007 y documentación; revisión y PR
+- ⚠️ **No fusionar esta rama hasta que producción (A3) esté configurada:** hoy Vercel no tiene variables de Supabase y la web funciona con el login antiguo (GIS). Al retirarlo, sin Supabase en producción nadie podría entrar. Además el proveedor Google de Supabase debe usar el **mismo client id y secret** que el API (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
 
 #### A2 · Entorno de trabajo por usuario: cada uno guarda sus propios datos (funcionalidad 010)
 Objetivo del humano: que cada usuario tenga su espacio y se guarden **por usuario** sus tareas pendientes y demás datos.

@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (implementación, pasos 1 a 4)
+- **Hecho:** `955d97c` (viabilidad + `POST /google/link-login`, 373 pruebas del API y 39 HTTP en verde) y `e96059a` (harness, login web con enlace automático, `storage` que elimina `provider_*`, aviso C9, E2E 2b y 2e). Se encontró y corrigió una carrera: el `getSession()` inicial marcaba la sesión como iniciada antes de terminar el enlace; la E2E 2e la detectó. Se rompió un ciclo de imports (`supabase.ts` ↔ `googleLogin.ts` ↔ `api.ts`) cargando `api` bajo demanda.
+- **Verificación:** 305 pruebas del frontend, tipos y lint en verde; E2E `02-login` en verde (5 de 5, el 2c sigue siendo el fallo conocido BUG-01).
+- **Pendiente:** pasos 5 a 9 del plan. **No fusionar antes de 007** (ver TASKS A1).
+- **Problemas:** la landing tiene 3 componentes con «Explorar demo», «Ver demo» y «Crear cuenta» (`HeroSection`, `LandingNavbar`, `LandingFooter`) y un mockup clicable que entra al demo; todos pasan a un único «Continuar con Google» (C1). El proveedor Google de Supabase debe compartir cliente OAuth con el API.
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (plan)
 - **Hecho:** spec 009 aprobada (landing se mantiene, sin botón de desvincular, 001/003 y ADR 0004 obsoletos) y `plan.md` escrito con 9 pasos. Verificado en la documentación de Supabase que **no guarda los tokens del proveedor** y recomienda enviarlos a un servidor propio. `features.json` en estado `plan`.
 - **Pendiente:** que apruebes el plan, en especial D1 (opción B recomendada) y la nueva redacción de C10. Luego empezar por el paso 1 (prueba de viabilidad).

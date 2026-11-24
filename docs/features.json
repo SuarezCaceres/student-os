@@ -98,7 +98,7 @@
       "id": "009",
       "nombre": "login-google-para-todos-y-calendar-automatico",
       "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
-      "estado": "plan",
+      "estado": "en_curso",
       "criterios": [
         { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": false },
         { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": false },
