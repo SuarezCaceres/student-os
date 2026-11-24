@@ -17,8 +17,8 @@ vi.mock('./api', async (importOriginal) => {
 });
 
 /**
- * MODO NUBE: con VITE_API_URL + Supabase configurados y sesion iniciada, la fachada habla con /google/* de la API
- * (jamas con Google directo) y traduce los errores de la API a la semantica de siempre (`auth_missing`, `partial`...).
+ * Spec 009: la fachada solo habla con /google/* de la API (jamas con Google directo ni con un token del navegador) y
+ * traduce los errores de la API a la semantica de siempre (`auth_missing`, `partial`...).
  */
 
 const WEEK: Record<DayOfWeek, string> = {
@@ -40,7 +40,7 @@ function clientError(status: number, body: Record<string, unknown>): ApiError {
 const REAUTH = () => clientError(409, { statusCode: 409, code: 'google_reauth_required', message: 'reautoriza' });
 const UPSTREAM = () => clientError(424, { statusCode: 424, code: 'google_upstream_error', message: 'Google no respondio' });
 
-describe('googleCalendar en modo nube', () => {
+describe('googleCalendar (transporte por la API)', () => {
   let request: ReturnType<typeof vi.fn<RequestFn>>;
   let fetchSpy: ReturnType<typeof vi.fn>;
   let cloud: typeof import('./googleCloud');
@@ -51,7 +51,6 @@ describe('googleCalendar en modo nube', () => {
     cloud = await import('./googleCloud');
     cloud.__resetGoogleCloudForTests();
     cloud.__setGoogleCloudSessionForTests(true);
-    // La fachada captura ?google=... al importarse: debe cargarse DESPUES de preparar el estado.
     facade = await import('./googleCalendar');
   }
 
@@ -62,7 +61,6 @@ describe('googleCalendar en modo nube', () => {
   beforeEach(async () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
-    window.history.replaceState(null, '', '/');
     request = vi.fn<RequestFn>();
     vi.mocked(api.getApiClient).mockReturnValue({ request } as unknown as ReturnType<typeof api.getApiClient>);
     vi.mocked(supabase.isSyncConfigured).mockReturnValue(true);
@@ -90,15 +88,17 @@ describe('googleCalendar en modo nube', () => {
       expect(facade.isGoogleCloudMode()).toBe(false);
     });
 
-    it('sin nube configurada (la app desplegada hoy) no se usa la API: getStoredAccessToken sigue siendo el de GIS', () => {
+    it('sin nube configurada no hay Calendar: ni token ni llamadas, aunque haya restos de la version anterior en el navegador', async () => {
       vi.mocked(supabase.isSyncConfigured).mockReturnValue(false);
       connectedMeta();
-      expect(facade.getStoredAccessToken()).toBeNull();
       window.sessionStorage.setItem('student_os_gcal_token', JSON.stringify({ accessToken: 'gis', expiresAt: Date.now() + 3_600_000 }));
-      expect(facade.getStoredAccessToken()).toBe('gis');
+      expect(facade.getStoredAccessToken()).toBeNull();
+      expect(await facade.trySilentGoogleReconnect()).toBeNull();
+      expect(request).not.toHaveBeenCalled();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('con sesion cerrada en Supabase vuelve al flujo GIS', async () => {
+    it('con sesion cerrada en Supabase no hay token ni llamadas al servidor', async () => {
       cloud.__setGoogleCloudSessionForTests(false);
       vi.mocked(supabase.getAccessToken).mockResolvedValue(null);
       expect(await facade.resolveGoogleCloudMode()).toBe(false);
@@ -108,6 +108,8 @@ describe('googleCalendar en modo nube', () => {
 
     it('isGoogleCalendarReady es true sin Client ID del navegador (las credenciales las tiene el servidor)', () => {
       expect(facade.isGoogleCalendarReady()).toBe(true);
+      cloud.__setGoogleCloudSessionForTests(false);
+      expect(facade.isGoogleCalendarReady()).toBe(false);
     });
   });
 
@@ -251,7 +253,7 @@ describe('googleCalendar en modo nube', () => {
       await expect(facade.deleteGoogleGymEvent(TOKEN(), 'x')).resolves.toBeUndefined();
     });
 
-    it('series: recorta con UNTIL las previas al lunes (PATCH) y borra las nuevas (DELETE), igual que en modo GIS', async () => {
+    it('series: recorta con UNTIL las previas al lunes (PATCH) y borra las nuevas (DELETE), con la misma logica de siempre', async () => {
       const master = (id: string, startDay: string) => ({
         id,
         summary: 'Gym',
@@ -384,81 +386,13 @@ describe('googleCalendar en modo nube', () => {
     });
   });
 
-  describe('conectar, reconectar y desconectar', () => {
-    it('conectar sin conexion previa: POST /google/connect con returnTo y navegacion a Google (la promesa no se resuelve)', async () => {
-      const go = vi.spyOn(cloud.navigation, 'go').mockImplementation(() => undefined);
-      respond((path) => {
-        if (path === '/google/status') return { configured: true, connected: false, needsReauth: false, email: null, connectedAt: null, scopes: [] };
-        if (path === '/google/connect') return { url: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=y' };
-        throw new Error(`ruta inesperada ${path}`);
-      });
-      let settled = false;
-      void facade.connectGoogleCalendar().then(() => (settled = true));
-      await vi.waitFor(() => expect(go).toHaveBeenCalledTimes(1));
-      expect(go).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?client_id=x&state=y');
-      const connectCall = request.mock.calls.find((c) => c[0] === '/google/connect');
-      expect(connectCall?.[1]).toMatchObject({ method: 'POST', body: { returnTo: `${window.location.origin}/` } });
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(settled).toBe(false);
-    });
-
-    it('conectar con la conexion ya guardada en el servidor: devuelve el resultado al instante, sin navegar', async () => {
-      const go = vi.spyOn(cloud.navigation, 'go').mockImplementation(() => undefined);
-      respond((path) => {
-        if (path === '/google/status') return { configured: true, connected: true, needsReauth: false, email: 'ana@gmail.example', connectedAt: '2026-11-13T10:00:00.000Z', scopes: [] };
-        if (path === '/google/calendar/primary') return { id: 'ana@gmail.example', summary: 'Ana' };
-        throw new Error(`ruta inesperada ${path}`);
-      });
-      const result = await facade.signInWithGoogleAccount();
-      expect(go).not.toHaveBeenCalled();
-      expect(result.accessToken).toBe(TOKEN());
-      expect(result.meta).toMatchObject({ connected: true, email: 'ana@gmail.example', calendarName: 'Ana' });
-      expect(result.user.email).toBe('ana@gmail.example');
-    });
-
-    it('servidor sin credenciales de Google: error claro, sin navegar', async () => {
-      const go = vi.spyOn(cloud.navigation, 'go').mockImplementation(() => undefined);
-      respond(() => ({ configured: false, connected: false, needsReauth: false, email: null, connectedAt: null, scopes: [] }));
-      await expect(facade.connectGoogleCalendar()).rejects.toThrow(/configurada/);
-      expect(go).not.toHaveBeenCalled();
-    });
-
-    it('reconectar tras reauth vuelve a pedir consentimiento', async () => {
-      const go = vi.spyOn(cloud.navigation, 'go').mockImplementation(() => undefined);
-      respond((path) => {
-        if (path === '/google/status') return { configured: true, connected: true, needsReauth: true, email: 'a@b.c', connectedAt: null, scopes: [] };
-        return { url: 'https://accounts.google.com/auth?s=1' };
-      });
-      void facade.connectGoogleCalendar();
-      await vi.waitFor(() => expect(go).toHaveBeenCalledTimes(1));
-    });
-
-    it('una URL de consentimiento que no es http(s) se rechaza', async () => {
-      respond((path) => {
-        if (path === '/google/status') return { configured: true, connected: false, needsReauth: false, email: null, connectedAt: null, scopes: [] };
-        return { url: 'javascript:alert(1)' };
-      });
-      await expect(facade.connectGoogleCalendar()).rejects.toThrow(/válida/);
-    });
-
+  describe('estado de la vinculacion', () => {
     it('disconnectGoogleCalendar (cierre de sesion) solo olvida lo LOCAL: no revoca la conexion del servidor', () => {
       connectedMeta();
-      facade.disconnectGoogleCalendar(TOKEN());
+      facade.disconnectGoogleCalendar();
       expect(facade.getStoredGoogleMeta()).toEqual({ connected: false });
       expect(request).not.toHaveBeenCalled();
       expect(fetchSpy).not.toHaveBeenCalled();
-    });
-
-    it('disconnectGoogleCalendarCloud revoca en el servidor, limpia la meta y avisa si Google no confirmo', async () => {
-      connectedMeta();
-      respond(() => ({ disconnected: true, revoked: true }));
-      expect(await facade.disconnectGoogleCalendarCloud()).toEqual({ revoked: true });
-      expect(request).toHaveBeenCalledWith('/google/disconnect', { method: 'POST', body: {} });
-      expect(facade.getStoredGoogleMeta()).toEqual({ connected: false });
-
-      connectedMeta();
-      respond(() => ({ disconnected: true, revoked: false }));
-      expect(await facade.disconnectGoogleCalendarCloud()).toEqual({ revoked: false });
     });
 
     it('refreshGoogleCloudConnection resume el estado para la UI (y es null fuera del modo nube)', async () => {
@@ -476,40 +410,6 @@ describe('googleCalendar en modo nube', () => {
       respond(() => ({ configured: true, connected: true, needsReauth: false, email: 'ana@gmail.example', connectedAt: null, scopes: [] }));
       expect(await facade.fetchGoogleUserProfile(TOKEN())).toEqual({ email: 'ana@gmail.example' });
       expect(fetchSpy).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('vuelta del consentimiento de Google (?google=...)', () => {
-    async function loadWithUrl(search: string) {
-      window.history.replaceState(null, '', `/horario${search}`);
-      await load();
-    }
-
-    it('?google=connected: limpia la URL (sin perder otros parametros), marca la conexion y avisa una sola vez', async () => {
-      await loadWithUrl('?google=connected&foo=1');
-      expect(window.location.search).toBe('?foo=1');
-      expect(window.location.pathname).toBe('/horario');
-      expect(facade.getStoredGoogleMeta().connected).toBe(true);
-      expect(facade.consumeGoogleRedirectResult()).toEqual({ status: 'connected' });
-      expect(facade.consumeGoogleRedirectResult()).toBeNull();
-    });
-
-    it('?google=error&reason=denied: no marca conexion y conserva el motivo', async () => {
-      await loadWithUrl('?google=error&reason=denied');
-      expect(window.location.search).toBe('');
-      expect(facade.getStoredGoogleMeta().connected).toBe(false);
-      expect(facade.consumeGoogleRedirectResult()).toEqual({ status: 'error', reason: 'denied' });
-    });
-
-    it('valores desconocidos o sin nube configurada se ignoran (la URL no se toca)', async () => {
-      await loadWithUrl('?google=hacked');
-      expect(window.location.search).toBe('?google=hacked');
-      expect(facade.consumeGoogleRedirectResult()).toBeNull();
-
-      vi.mocked(supabase.isSyncConfigured).mockReturnValue(false);
-      await loadWithUrl('?google=connected');
-      expect(window.location.search).toBe('?google=connected');
-      expect(facade.getStoredGoogleMeta().connected).toBe(false);
     });
   });
 });

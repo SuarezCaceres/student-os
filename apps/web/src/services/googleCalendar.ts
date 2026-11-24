@@ -8,48 +8,33 @@ import {
 } from '../utils/gymScheduleFilter';
 import {
   GOOGLE_CLOUD_ACCESS_TOKEN,
-  captureGoogleRedirectResult,
-  disconnectGoogleCloud,
   forgetGoogleCloudState,
   getGoogleCloudStatus,
   googleCloudFetch,
   isGoogleCloudMode,
   isGoogleCloudReauthRequired,
-  isGoogleCloudToken,
   resolveGoogleCloudMode,
-  startGoogleCloudConnect,
   type GoogleCloudStatus,
 } from './googleCloud';
 
 /*
  * FACHADA de Google Calendar.
  *
- * Todas las firmas exportadas (y su semantica: `auth_missing | partial | error | ok`) se mantienen. Hay dos
- * transportes y la logica es una sola:
- *  - Modo GIS (la app desplegada hoy, sin nube): el token de 1 hora vive en el navegador y se llama a Google directo.
- *  - Modo NUBE (`VITE_API_URL` + Supabase configurados y sesion iniciada): el refresh token vive cifrado en el
- *    servidor; el "token" que circula por estas funciones es `GOOGLE_CLOUD_ACCESS_TOKEN` (un marcador, no un secreto)
- *    y `googleFetch` enruta las llamadas por la API. El navegador jamas ve tokens de Google.
- * Solo se pueden AGREGAR exports (hay una prueba que congela las firmas).
+ * Spec 009: Google Calendar se vincula al iniciar sesion con Google y el refresh token vive cifrado en el servidor.
+ * Ya no existe el transporte de Google Identity Services (token de 1 hora en el navegador): el "token" que circula por
+ * estas funciones es `GOOGLE_CLOUD_ACCESS_TOKEN` (un marcador, no un secreto) y `googleFetch` enruta todas las llamadas
+ * por la API. El navegador jamas ve tokens de Google.
+ * Las firmas que siguen existiendo (y su semantica: `auth_missing | partial | error | ok`) estan congeladas por una prueba.
  */
 export {
   GOOGLE_CLOUD_ACCESS_TOKEN,
-  consumeGoogleRedirectResult,
   isGoogleCloudMode,
   isGoogleCloudToken,
   resolveGoogleCloudMode,
 } from './googleCloud';
-export type { GoogleCloudStatus, GoogleRedirectResult } from './googleCloud';
+export type { GoogleCloudStatus } from './googleCloud';
 
-export const GOOGLE_CLIENT_ID_STORAGE_KEY = 'student_os_gcal_client_id';
 export const GOOGLE_META_STORAGE_KEY = 'student_os_gcal_meta';
-const GOOGLE_TOKEN_SESSION_KEY = 'student_os_gcal_token';
-
-const GOOGLE_GSI_SCRIPT_URL = 'https://accounts.google.com/gsi/client';
-const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo';
-const GOOGLE_CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3';
-const GOOGLE_CALENDAR_SCOPES =
-  'openid profile email https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
 
 export interface GoogleUserProfile {
   name?: string;
@@ -120,48 +105,6 @@ export interface DeleteGoogleGymEventsResult {
   message: string;
 }
 
-interface StoredTokenPayload {
-  accessToken: string;
-  expiresAt: number;
-}
-
-interface GoogleTokenResponse {
-  access_token?: string;
-  expires_in?: number;
-  error?: string;
-  error_description?: string;
-}
-
-interface GoogleTokenClient {
-  requestAccessToken: (overrideConfig?: { prompt?: string }) => void;
-}
-
-interface GoogleOAuth2Api {
-  initTokenClient: (config: {
-    client_id: string;
-    scope: string;
-    prompt?: string;
-    callback: (response: GoogleTokenResponse) => void;
-    error_callback?: (error: { type?: string; message?: string }) => void;
-  }) => GoogleTokenClient;
-  revoke: (token: string, done?: () => void) => void;
-}
-
-interface GoogleGlobal {
-  accounts?: {
-    oauth2?: GoogleOAuth2Api;
-  };
-}
-
-let inMemoryToken: StoredTokenPayload | null = null;
-let gsiScriptLoadPromise: Promise<void> | null = null;
-
-function getGoogleOAuth2(): GoogleOAuth2Api | null {
-  if (typeof window === 'undefined') return null;
-  const win = window as Window & { google?: GoogleGlobal };
-  return win.google?.accounts?.oauth2 ?? null;
-}
-
 function getBrowserTimeZone(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Bogota';
@@ -192,81 +135,21 @@ function writeLocalStorage(key: string, value: string | null): void {
   }
 }
 
-function saveTokenToMemoryAndSession(accessToken: string, expiresAt: number): void {
-  const payload: StoredTokenPayload = { accessToken, expiresAt };
-  inMemoryToken = payload;
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(GOOGLE_TOKEN_SESSION_KEY, JSON.stringify(payload));
-  } catch {
-    // Session storage is optional; in-memory token remains active
-  }
-}
-
-function clearStoredToken(): void {
-  inMemoryToken = null;
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.removeItem(GOOGLE_TOKEN_SESSION_KEY);
-  } catch {
-    // Ignore
-  }
-}
-
 function saveStoredMeta(meta: GoogleCalendarMeta): void {
   writeLocalStorage(GOOGLE_META_STORAGE_KEY, JSON.stringify(meta));
 }
 
 /**
  * Unico punto por el que pasan las llamadas a Calendar API v3. `relativePath` es relativo a `/calendar/v3/`
- * (`calendars/primary/events?...`, `freeBusy`). Con el marcador de nube va por la API de StudentOS; con un token
- * de GIS va directo a Google con exactamente las mismas URLs y cabeceras de siempre.
+ * (`calendars/primary/events?...`, `freeBusy`). Todas van por la API de StudentOS, que usa el permiso guardado en el
+ * servidor; el parametro `accessToken` se conserva por compatibilidad de las firmas y siempre es el marcador de nube.
  */
 async function googleFetch(
-  accessToken: string,
+  _accessToken: string,
   relativePath: string,
   init: { method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'; body?: string } = {}
 ): Promise<Response> {
-  if (isGoogleCloudToken(accessToken)) {
-    return googleCloudFetch(relativePath, init);
-  }
-  const headers: Record<string, string> = { Authorization: `Bearer ${accessToken}` };
-  if (init.body !== undefined) {
-    headers['Content-Type'] = 'application/json';
-  }
-  return fetch(`${GOOGLE_CALENDAR_API_BASE}/${relativePath}`, {
-    ...(init.method ? { method: init.method } : {}),
-    headers,
-    ...(init.body !== undefined ? { body: init.body } : {}),
-  });
-}
-
-/**
- * Checks whether VITE_GOOGLE_CLIENT_ID is configured via environment variables.
- */
-export function hasEnvGoogleClientId(): boolean {
-  const envRecord = import.meta.env as Record<string, string | undefined> | undefined;
-  return Boolean((envRecord?.VITE_GOOGLE_CLIENT_ID ?? '').trim());
-}
-
-/**
- * Returns the Google OAuth 2.0 Client ID from localStorage override or VITE_GOOGLE_CLIENT_ID.
- */
-export function getConfiguredGoogleClientId(): string {
-  const storedCustom = readLocalStorage(GOOGLE_CLIENT_ID_STORAGE_KEY).trim();
-  if (storedCustom) return storedCustom;
-
-  const envRecord = import.meta.env as Record<string, string | undefined> | undefined;
-  return (envRecord?.VITE_GOOGLE_CLIENT_ID ?? '').trim();
-}
-
-/**
- * Saves (or clears when empty) a custom Google OAuth 2.0 Client ID in localStorage.
- */
-export function saveCustomGoogleClientId(clientId: string): string {
-  const normalized = clientId.trim();
-  writeLocalStorage(GOOGLE_CLIENT_ID_STORAGE_KEY, normalized ? normalized : null);
-  return getConfiguredGoogleClientId();
+  return googleCloudFetch(relativePath, init);
 }
 
 /**
@@ -292,165 +175,30 @@ export function getStoredGoogleMeta(): GoogleCalendarMeta {
 }
 
 /**
- * Returns an active in-memory or sessionStorage access token if not expired.
+ * Devuelve el marcador de nube si la ultima consulta al servidor dijo "conectado" y la API no ha pedido reautorizar.
+ * La sesion de Google vive en el servidor y no caduca a la hora.
  */
 export function getStoredAccessToken(): string | null {
-  // Modo nube: la sesion de Google vive en el servidor y no caduca a la hora. Se considera activa si la ultima
-  // consulta dijo "conectado" y la API no ha pedido reautorizar.
-  if (isGoogleCloudMode()) {
-    return getStoredGoogleMeta().connected && !isGoogleCloudReauthRequired()
-      ? GOOGLE_CLOUD_ACCESS_TOKEN
-      : null;
-  }
-
-  const safetyBufferMs = 30_000;
-  if (inMemoryToken && inMemoryToken.expiresAt > Date.now() + safetyBufferMs) {
-    return inMemoryToken.accessToken;
-  }
-
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(GOOGLE_TOKEN_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<StoredTokenPayload>;
-    if (
-      typeof parsed?.accessToken === 'string' &&
-      typeof parsed?.expiresAt === 'number' &&
-      parsed.expiresAt > Date.now() + safetyBufferMs
-    ) {
-      inMemoryToken = { accessToken: parsed.accessToken, expiresAt: parsed.expiresAt };
-      return parsed.accessToken;
-    }
-    clearStoredToken();
-    return null;
-  } catch {
-    return null;
-  }
+  return isGoogleCloudMode() && getStoredGoogleMeta().connected && !isGoogleCloudReauthRequired()
+    ? GOOGLE_CLOUD_ACCESS_TOKEN
+    : null;
 }
 
 /**
- * Checks whether a Google OAuth Client ID is configured in env or localStorage.
+ * Indica si Google Calendar puede usarse: la nube de StudentOS esta configurada y hay sesion iniciada. Las credenciales
+ * de Google las tiene el servidor, asi que no hace falta ningun Client ID en el navegador.
  */
-export function isGoogleCalendarReady(clientIdOverride?: string): boolean {
+export function isGoogleCalendarReady(): boolean {
   if (typeof window === 'undefined') return false;
-  // En modo nube las credenciales de Google las tiene el servidor: no hace falta un Client ID en el navegador.
-  if (isGoogleCloudMode()) return true;
-  const resolved = (clientIdOverride ?? '').trim() || getConfiguredGoogleClientId();
-  return Boolean(resolved);
-}
-
-/**
- * Dynamically loads Google Identity Services if not already included in index.html.
- */
-async function ensureGoogleIdentityScriptLoaded(): Promise<GoogleOAuth2Api> {
-  const existingApi = getGoogleOAuth2();
-  if (existingApi) return existingApi;
-
-  if (typeof document === 'undefined') {
-    throw new Error('Google Calendar solo está disponible en el navegador.');
-  }
-
-  if (!gsiScriptLoadPromise) {
-    gsiScriptLoadPromise = new Promise<void>((resolve, reject) => {
-      const existingScript = document.querySelector<HTMLScriptElement>(
-        `script[src="${GOOGLE_GSI_SCRIPT_URL}"]`
-      );
-
-      const finishIfReady = () => {
-        if (getGoogleOAuth2()) {
-          resolve();
-        } else {
-          reject(
-            new Error(
-              'El script de Google cargó, pero OAuth 2.0 no está disponible en esta sesión.'
-            )
-          );
-        }
-      };
-
-      const timeoutId = window.setTimeout(() => {
-        reject(
-          new Error(
-            'Tiempo de espera agotado al cargar Google Identity Services. Verifica tu conexión.'
-          )
-        );
-      }, 12_000);
-
-      const onLoad = () => {
-        window.clearTimeout(timeoutId);
-        finishIfReady();
-      };
-
-      const onError = () => {
-        window.clearTimeout(timeoutId);
-        reject(
-          new Error(
-            'No se pudo cargar Google Identity Services (accounts.google.com). Revisa tu conexión o bloqueadores.'
-          )
-        );
-      };
-
-      if (existingScript) {
-        if (getGoogleOAuth2()) {
-          window.clearTimeout(timeoutId);
-          resolve();
-          return;
-        }
-        existingScript.addEventListener('load', onLoad, { once: true });
-        existingScript.addEventListener('error', onError, { once: true });
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = GOOGLE_GSI_SCRIPT_URL;
-      script.async = true;
-      script.defer = true;
-      script.addEventListener('load', onLoad, { once: true });
-      script.addEventListener('error', onError, { once: true });
-      document.head.appendChild(script);
-    }).catch((err) => {
-      gsiScriptLoadPromise = null;
-      throw err;
-    });
-  }
-
-  await gsiScriptLoadPromise;
-  const loadedApi = getGoogleOAuth2();
-  if (!loadedApi) {
-    throw new Error('No se pudo inicializar Google Identity Services.');
-  }
-  return loadedApi;
+  return isGoogleCloudMode();
 }
 
 export async function fetchGoogleUserProfile(accessToken: string): Promise<GoogleUserProfile> {
   if (!accessToken.trim()) return {};
-  if (isGoogleCloudToken(accessToken)) {
-    // El servidor ya guardo el email de la cuenta conectada; el navegador no tiene (ni necesita) un token de Google.
-    try {
-      const status = await getGoogleCloudStatus();
-      return status.email ? { email: status.email } : {};
-    } catch {
-      return {};
-    }
-  }
+  // El servidor ya guardo el email de la cuenta vinculada; el navegador no tiene (ni necesita) un token de Google.
   try {
-    const response = await fetch(GOOGLE_USERINFO_URL, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-    if (!response.ok) return {};
-    const data = (await response.json()) as {
-      name?: string;
-      email?: string;
-      picture?: string;
-    };
-    return {
-      name: typeof data.name === 'string' && data.name.trim() ? data.name.trim() : undefined,
-      email: typeof data.email === 'string' && data.email.trim() ? data.email.trim() : undefined,
-      avatarUrl:
-        typeof data.picture === 'string' && data.picture.trim() ? data.picture.trim() : undefined,
-    };
+    const status = await getGoogleCloudStatus();
+    return status.email ? { email: status.email } : {};
   } catch {
     return {};
   }
@@ -474,195 +222,24 @@ async function fetchPrimaryCalendarMetadata(
   }
 }
 
-function requestOAuthToken(
-  oauth2: GoogleOAuth2Api,
-  clientId: string,
-  prompt: string,
-  timeoutMs?: number
-): Promise<{ accessToken: string; expiresAt: number }> {
-  return new Promise<{ accessToken: string; expiresAt: number }>((resolve, reject) => {
-    let settled = false;
-    let timerId: number | null = null;
-
-    const cleanup = () => {
-      if (timerId !== null && typeof window !== 'undefined') {
-        window.clearTimeout(timerId);
-        timerId = null;
-      }
-    };
-
-    if (timeoutMs && typeof window !== 'undefined') {
-      timerId = window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        reject(new Error('Tiempo de espera agotado al validar la sesión de Google.'));
-      }, timeoutMs);
-    }
-
-    const tokenClient = oauth2.initTokenClient({
-      client_id: clientId,
-      scope: GOOGLE_CALENDAR_SCOPES,
-      callback: (response: GoogleTokenResponse) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-
-        if (response.error) {
-          const msg =
-            response.error === 'access_denied'
-              ? 'Permiso cancelado. Debes aceptar el acceso a tu perfil y calendario para sincronizar.'
-              : `Error de autorización con Google: ${response.error_description || response.error}`;
-          reject(new Error(msg));
-          return;
-        }
-
-        if (!response.access_token) {
-          reject(new Error('Google no devolvió un token de acceso válido.'));
-          return;
-        }
-
-        const expiresInSec = Number(response.expires_in ?? 3600);
-        const expiresAt = Date.now() + Math.max(60, expiresInSec) * 1000;
-        resolve({ accessToken: response.access_token, expiresAt });
-      },
-      error_callback: (err) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        if (err?.type === 'popup_closed') {
-          reject(
-            new Error('Cerraste la ventana de inicio de sesión de Google antes de completar.')
-          );
-        } else if (err?.type === 'popup_failed_to_open') {
-          reject(
-            new Error(
-              'Tu navegador bloqueó la ventana emergente de Google. Permite popups para este sitio.'
-            )
-          );
-        } else {
-          reject(
-            new Error(err?.message || 'No se pudo completar la autenticación con Google.')
-          );
-        }
-      },
-    });
-
-    tokenClient.requestAccessToken({ prompt });
-  });
-}
-
 /**
- * Unified 1-step Google Sign-In + Calendar authorization (`openid profile email` + calendar scopes).
- */
-export async function signInWithGoogleAccount(
-  clientIdOverride?: string,
-  options?: { prompt?: string }
-): Promise<GoogleCalendarConnectionResult> {
-  if (await resolveGoogleCloudMode()) {
-    return connectViaCloud();
-  }
-
-  const customId = clientIdOverride?.trim();
-  if (customId) {
-    saveCustomGoogleClientId(customId);
-  }
-
-  const clientId = customId || getConfiguredGoogleClientId();
-  if (!clientId) {
-    throw new Error(
-      'Falta configurar VITE_GOOGLE_CLIENT_ID en el archivo .env.local del proyecto para iniciar sesión con Google.'
-    );
-  }
-
-  const oauth2 = await ensureGoogleIdentityScriptLoaded();
-  const previousMeta = getStoredGoogleMeta();
-  const prompt = options?.prompt ?? (previousMeta.connected ? '' : 'consent');
-  const tokenResult = await requestOAuthToken(oauth2, clientId, prompt);
-
-  saveTokenToMemoryAndSession(tokenResult.accessToken, tokenResult.expiresAt);
-  const [userProfile, calProfile] = await Promise.all([
-    fetchGoogleUserProfile(tokenResult.accessToken),
-    fetchPrimaryCalendarMetadata(tokenResult.accessToken),
-  ]);
-
-  const resolvedEmail = userProfile.email ?? calProfile.email;
-  const user: GoogleUserProfile = {
-    name: userProfile.name,
-    email: resolvedEmail,
-    avatarUrl: userProfile.avatarUrl,
-  };
-
-  const meta: GoogleCalendarMeta = {
-    connected: true,
-    email: resolvedEmail,
-    userName: user.name,
-    avatarUrl: user.avatarUrl,
-    calendarName: calProfile.calendarName || 'Calendario principal',
-    connectedAt: new Date().toISOString(),
-  };
-  saveStoredMeta(meta);
-
-  return {
-    accessToken: tokenResult.accessToken,
-    expiresAt: tokenResult.expiresAt,
-    meta,
-    user,
-  };
-}
-
-/**
- * Initiates Google OAuth 2.0 Token Client flow and caches token + connection metadata.
- */
-export async function connectGoogleCalendar(
-  clientIdOverride?: string
-): Promise<GoogleCalendarConnectionResult> {
-  return signInWithGoogleAccount(clientIdOverride);
-}
-
-/**
- * Silently restores an active Google access token if the user already connected previously.
+ * Restaura el estado de Google Calendar tras recargar la pagina: consulta al servidor (no a Google).
+ * Devuelve el marcador de nube si se puede usar ya, o `null` si falta vincular o reautorizar.
  */
 export async function trySilentGoogleReconnect(): Promise<string | null> {
   if (await resolveGoogleCloudMode()) {
     return restoreCloudSession();
   }
-
-  const cached = getStoredAccessToken();
-  if (cached) return cached;
-
-  const meta = getStoredGoogleMeta();
-  const clientId = getConfiguredGoogleClientId();
-  if (!meta.connected || !clientId) return null;
-
-  try {
-    const oauth2 = await ensureGoogleIdentityScriptLoaded();
-    const tokenResult = await requestOAuthToken(oauth2, clientId, '', 6000);
-    saveTokenToMemoryAndSession(tokenResult.accessToken, tokenResult.expiresAt);
-    return tokenResult.accessToken;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 /**
- * Clears local session/token state and revokes the Google token if available.
+ * Olvida el estado LOCAL de Google Calendar (App lo llama al cerrar sesion). La vinculacion del servidor se conserva:
+ * la siguiente vez que la persona entra con Google se vuelve a comprobar.
  */
-export function disconnectGoogleCalendar(accessToken?: string): void {
-  const tokenToRevoke = accessToken ?? inMemoryToken?.accessToken ?? getStoredAccessToken() ?? undefined;
-  clearStoredToken();
+export function disconnectGoogleCalendar(): void {
   saveStoredMeta({ connected: false });
-
-  // Modo nube: esto solo olvida el estado LOCAL (App lo llama al cerrar sesion). La conexion persistente del servidor
-  // se conserva a proposito para no pedir permisos de nuevo; revocarla es `disconnectGoogleCalendarCloud()`.
   forgetGoogleCloudState();
-
-  if (tokenToRevoke && !isGoogleCloudToken(tokenToRevoke)) {
-    try {
-      getGoogleOAuth2()?.revoke(tokenToRevoke, () => {});
-    } catch {
-      // Ignore revoke errors when offline or script unloaded
-    }
-  }
 }
 
 // --- Modo nube (sync persistente) ----------------------------------------------------------
@@ -706,33 +283,8 @@ async function restoreCloudSession(): Promise<string | null> {
 }
 
 /**
- * "Conectar" en modo nube: si el servidor ya tiene la conexion la devuelve al instante; si no, navega a Google y la
- * promesa NO se resuelve (la pagina se abandona; al volver llega `?google=connected`).
- */
-async function connectViaCloud(): Promise<GoogleCalendarConnectionResult> {
-  const status = await getGoogleCloudStatus({ force: true });
-  if (status.connected && !status.needsReauth) {
-    const meta = applyCloudStatusToMeta(status);
-    const calendar = await fetchPrimaryCalendarMetadata(GOOGLE_CLOUD_ACCESS_TOKEN);
-    const fullMeta: GoogleCalendarMeta = { ...meta, calendarName: calendar.calendarName ?? meta.calendarName };
-    saveStoredMeta(fullMeta);
-    return {
-      accessToken: GOOGLE_CLOUD_ACCESS_TOKEN,
-      expiresAt: Date.now() + 3_600_000,
-      meta: fullMeta,
-      user: { email: status.email ?? undefined },
-    };
-  }
-  if (!status.configured) {
-    throw new Error('El servidor aún no tiene configurada la conexión con Google Calendar.');
-  }
-  await startGoogleCloudConnect();
-  return new Promise<GoogleCalendarConnectionResult>(() => {});
-}
-
-/**
  * Consulta al servidor el estado de la conexion persistente y actualiza la meta local. Devuelve `null` si el modo
- * nube no esta activo (entonces se usa el flujo GIS de siempre).
+ * nube no esta activo.
  */
 export async function refreshGoogleCloudConnection(
   options: { force?: boolean } = {}
@@ -746,23 +298,6 @@ export async function refreshGoogleCloudConnection(
     needsReauth: status.connected && status.needsReauth,
     serverConfigured: status.configured,
   };
-}
-
-/** Inicia el consentimiento de Google en el servidor (PKCE) y navega a el. Solo modo nube. */
-export async function beginGoogleCloudConnect(): Promise<void> {
-  await startGoogleCloudConnect();
-}
-
-/**
- * Desconexion REAL en modo nube: el servidor revoca el acceso en Google y borra el secreto. `revoked: false` indica que
- * Google no confirmo la revocacion (el secreto se borro igual). Distinto de `disconnectGoogleCalendar`, que solo
- * olvida el estado local.
- */
-export async function disconnectGoogleCalendarCloud(): Promise<{ revoked: boolean }> {
-  const result = await disconnectGoogleCloud();
-  clearStoredToken();
-  saveStoredMeta({ connected: false });
-  return { revoked: result.revoked };
 }
 
 function parseLocalDateParts(dateIso: string): { year: number; month: number; day: number } {
@@ -790,8 +325,7 @@ function formatTimeInZone(epochMs: number, timeZone: string): string {
 
 function buildErrorFromGoogleResponse(status: number, bodyText: string, fallback: string): Error {
   if (status === 401) {
-    clearStoredToken();
-    return new Error('Tu sesión de Google Calendar expiró. Conecta nuevamente para continuar.');
+    return new Error('Tu sesión de Google Calendar expiró. Cierra sesión y vuelve a entrar con Google para continuar.');
   }
   if (status === 403) {
     return new Error(
@@ -1895,11 +1429,4 @@ export async function upsertWorkShiftRecurringSeries(
     studentOsCategory: 'trabajo',
     recurrence,
   });
-}
-
-// Al volver del consentimiento de Google (modo nube) la API agrega `?google=connected|error` a la URL. Se captura al
-// cargar el modulo (antes de que React lea la meta): se limpia la URL y, si salio bien, se marca la conexion para que
-// la sincronizacion automatica de App la detecte sin tocar nada. Sin nube configurada esto no hace nada.
-if (captureGoogleRedirectResult()?.status === 'connected') {
-  saveStoredMeta({ ...getStoredGoogleMeta(), connected: true, connectedAt: new Date().toISOString() });
 }

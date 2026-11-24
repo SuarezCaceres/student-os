@@ -67,7 +67,6 @@ import {
 import {
   buildWeeklyRecurrenceRule,
   clearOrCutoffWorkShiftEventsFromMonday,
-  connectGoogleCalendar,
   deleteGoogleGymEvent,
   deleteStudentOsGymEventsFromMonday,
   disconnectGoogleCalendar,
@@ -869,9 +868,8 @@ export const App: React.FC = () => {
           ? await trySilentGoogleReconnect()
           : null);
       if (!token) {
-        const conn = await connectGoogleCalendar();
-        token = conn.accessToken;
-        setIsGoogleConnected(true);
+        // Spec 009: Calendar se vincula al iniciar sesion; ya no se puede conectar desde aqui.
+        throw new Error('Google Calendar no está disponible. Cierra sesión y vuelve a entrar con Google para vincularlo.');
       }
 
       const targetDays: DayOfWeek[] = state.gymProfile?.selectedDays.length

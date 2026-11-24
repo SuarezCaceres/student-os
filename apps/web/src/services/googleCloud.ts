@@ -2,15 +2,14 @@ import { ApiError, getApiClient, isApiError, type ApiClient } from './api';
 import { getAccessToken, getSupabase, isSyncConfigured } from './supabase';
 
 /**
- * Modo NUBE de Google Calendar (sync persistente). El refresh token vive cifrado en el servidor (NestJS); el navegador
- * solo habla con `/google/*` de la API usando su sesion de Supabase y NUNCA ve ningun token de Google.
+ * Transporte de Google Calendar (spec 009). El refresh token vive cifrado en el servidor (NestJS) y se guarda al iniciar
+ * sesion con Google (`POST /google/link-login`); el navegador solo habla con `/google/*` de la API usando su sesion de
+ * Supabase y NUNCA ve ningun token de Google.
  *
- * Este modulo es el "transporte alterno" de la fachada `googleCalendar.ts`: la fachada conserva toda su logica y sus
- * firmas (que reciben un `accessToken: string`); cuando el modo nube esta activo, el "token" que circula es el
- * marcador `GOOGLE_CLOUD_ACCESS_TOKEN` y las llamadas a Calendar se enrutan por la API en lugar de ir directo a Google.
+ * La fachada `googleCalendar.ts` conserva su logica y sus firmas (que reciben un `accessToken: string`): el "token" que
+ * circula es el marcador `GOOGLE_CLOUD_ACCESS_TOKEN` y las llamadas a Calendar se enrutan por la API.
  *
- * Modo nube = `VITE_API_URL` + `VITE_SUPABASE_URL` (+ clave publica) configuradas Y sesion de Supabase iniciada. Si
- * falta cualquiera, la fachada usa Google Identity Services (GIS) exactamente como antes.
+ * Disponible = `VITE_API_URL` + `VITE_SUPABASE_URL` (+ clave publica) configuradas Y sesion de Supabase iniciada.
  */
 
 /** Marcador (no es un token real ni un secreto) que representa "la sesion de Google vive en el servidor". */
@@ -31,14 +30,6 @@ export interface GoogleCloudStatus {
   scopes: string[];
 }
 
-export type GoogleRedirectStatus = 'connected' | 'error';
-
-export interface GoogleRedirectResult {
-  status: GoogleRedirectStatus;
-  /** Motivo del servidor cuando `status === 'error'` (`denied`, `expired`, `missing_scopes`...). */
-  reason?: string;
-}
-
 /** Codigos estables de la API que significan "hay que (re)conectar Google": la fachada los traduce a `auth_missing`. */
 const REAUTH_CODES = new Set(['google_reauth_required', 'google_not_connected']);
 
@@ -50,7 +41,6 @@ let sessionSignedIn: boolean | null = null;
 let watcherStarted = false;
 let needsReauth = false;
 let statusCache: { at: number; value: GoogleCloudStatus } | null = null;
-let pendingRedirect: GoogleRedirectResult | null = null;
 let statusInflight: Promise<GoogleCloudStatus> | null = null;
 
 function resetCloudState(): void {
@@ -85,7 +75,7 @@ function ensureSessionWatcher(): void {
 
 /**
  * Modo nube segun lo que se sabe AHORA (sincrono). Mientras Supabase aun no respondio, devuelve `false`
- * (se usa GIS); las funciones asincronas de la fachada consultan `resolveGoogleCloudMode()` para el valor definitivo.
+ * (se considera sin sesion); las funciones asincronas de la fachada consultan `resolveGoogleCloudMode()` para el valor definitivo.
  */
 export function isGoogleCloudMode(): boolean {
   if (!isSyncConfigured()) return false;
@@ -157,78 +147,9 @@ export async function getGoogleCloudStatus(options: { force?: boolean } = {}): P
   return statusInflight;
 }
 
-/** Navegacion del navegador, aislada para poder sustituirla en pruebas (jsdom no permite espiar `location.assign`). */
-export const navigation = {
-  go(url: string): void {
-    window.location.assign(url);
-  },
-};
-
-/** Pide la URL de consentimiento y navega a ella. El servidor vuelve a esta misma pagina con `?google=connected|error`. */
-export async function startGoogleCloudConnect(): Promise<void> {
-  const returnTo = `${window.location.origin}${window.location.pathname}`;
-  const raw = await requireClient().request<{ url?: unknown }>('/google/connect', {
-    method: 'POST',
-    body: { returnTo },
-  });
-  const target = typeof raw?.url === 'string' ? raw.url : '';
-  let parsed: URL;
-  try {
-    parsed = new URL(target);
-  } catch {
-    throw new Error('El servidor no devolvió una dirección válida de Google.');
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new Error('El servidor no devolvió una dirección válida de Google.');
-  }
-  navigation.go(parsed.toString());
-}
-
-/** Revoca el acceso en Google (desde el servidor) y borra el secreto. `revoked: false` = Google no confirmó la revocación. */
-export async function disconnectGoogleCloud(): Promise<{ disconnected: boolean; revoked: boolean }> {
-  const raw = await requireClient().request<{ disconnected?: unknown; revoked?: unknown }>('/google/disconnect', {
-    method: 'POST',
-    body: {},
-  });
-  resetCloudState();
-  return { disconnected: raw?.disconnected === true, revoked: raw?.revoked === true };
-}
-
 /** Olvida el estado en memoria (cierre de sesion local). NO toca el servidor: la conexion persiste entre sesiones. */
 export function forgetGoogleCloudState(): void {
   resetCloudState();
-}
-
-// --- Redireccion de vuelta de Google ---------------------------------------------------
-
-/**
- * Lee `?google=connected|error[&reason=..]` de la URL (lo agrega la API al volver del consentimiento), lo quita de la
- * barra de direcciones y guarda el resultado para `consumeGoogleRedirectResult()`. Solo actua con la nube configurada.
- */
-export function captureGoogleRedirectResult(): GoogleRedirectResult | null {
-  if (typeof window === 'undefined' || !isSyncConfigured()) return null;
-  try {
-    const url = new URL(window.location.href);
-    const status = url.searchParams.get('google');
-    if (status !== 'connected' && status !== 'error') return null;
-    const reason = url.searchParams.get('reason') ?? undefined;
-    url.searchParams.delete('google');
-    url.searchParams.delete('reason');
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-    pendingRedirect = { status, ...(reason ? { reason } : {}) };
-    statusCache = null;
-    needsReauth = false;
-    return pendingRedirect;
-  } catch {
-    return null;
-  }
-}
-
-/** Devuelve (una sola vez) el resultado de la ultima vuelta de Google, para mostrar un aviso. */
-export function consumeGoogleRedirectResult(): GoogleRedirectResult | null {
-  const result = pendingRedirect;
-  pendingRedirect = null;
-  return result;
 }
 
 // --- Transporte de Calendar por la API ----------------------------------------------------
@@ -315,7 +236,6 @@ export function __resetGoogleCloudForTests(): void {
   needsReauth = false;
   statusCache = null;
   statusInflight = null;
-  pendingRedirect = null;
 }
 
 /** Solo para pruebas: fija el estado de sesion sin pasar por Supabase. */
