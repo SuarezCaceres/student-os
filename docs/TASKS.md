@@ -21,7 +21,8 @@ Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y q
   - [ ] Si el usuario niega los permisos de Calendar, la app debe seguir funcionando y ofrecer vincularlo después.
   - [ ] Probarlo con Google y Supabase reales, no con los simulados (criterio C5 de la funcionalidad 002).
 - **Decisiones del humano (2026-11-24):** login **estrictamente con Google** (se eliminan el registro con correo, el modo local y «Explorar demo»); permisos de Calendar los mismos de hoy (leer y crear/editar); **sin botón de desvincular**; el calendario se comporta como hoy (se lee todo de Google y se publican gym, turno de trabajo y los bloques marcados).
-- **Preguntas abiertas** (ver la spec): ¿Calendar obligatorio u opcional?, ¿qué pasa con los datos locales del prototipo?, ¿basta sin botón de desvincular para la verificación de Google?, y aprobar dejar obsoletos la funcionalidad 001 y el ADR 0004. Los permisos de Calendar son «sensibles» para Google y exigen verificación completa *(deducido; confirmar con `docs/google-verification-checklist.md`)*.
+- **Más decisiones (2026-11-24):** Calendar forma parte del login y es **obligatorio** (si el usuario lo desmarca en la pantalla de Google, no entra); los datos locales del prototipo **se descartan** (sin importador).
+- **Preguntas abiertas** (ver la spec): ¿se mantiene la landing pública?, ¿basta sin botón de desvincular para la verificación de Google?, y aprobar dejar obsoletos la funcionalidad 001, la 003 (importador) y el ADR 0004. Los permisos de Calendar son «sensibles» para Google y exigen verificación completa *(deducido; confirmar con `docs/google-verification-checklist.md`)*.
 - [x] Spec escrita en `docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md` (borrador, a la espera de aprobación)
 - [ ] Plan (`plan.md`) tras aprobar la spec
 

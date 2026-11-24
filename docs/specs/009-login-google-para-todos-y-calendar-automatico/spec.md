@@ -19,7 +19,8 @@ Cualquier persona entra **únicamente con su cuenta de Google**. En ese mismo pa
 - **Incluye:**
   - Login exclusivamente con Google, para cualquier cuenta de Google (en producción, tras 007 y 008).
   - Eliminar el registro y el login con correo y contraseña, el modo local sin cuenta y «Explorar demo en vivo». Sin sesión solo se ve la landing pública.
-  - Pedir en el mismo consentimiento de login los permisos de hoy: `openid`, `email`, `calendar.readonly` y `calendar.events`.
+  - Pedir en el mismo consentimiento de login los permisos de hoy: `openid`, `email`, `calendar.readonly` y `calendar.events`. **Calendar forma parte del login** (decisión del humano): entrar con Google implica conceder Calendar, no es un permiso aparte ni opcional.
+  - Descartar, sin subirlos, los datos locales que el prototipo haya guardado en el navegador (decisión del humano), y retirar el importador del primer inicio, que deja de tener sentido.
   - Guardar el refresh token cifrado en el servidor al terminar el login, y vincular Calendar sin ningún paso manual.
   - Quitar de la interfaz el botón «Conectar Google Calendar» y no ofrecer ninguno para desvincular.
   - Un único modo de funcionamiento: la nube (se retira el transporte GIS con token de 1 hora).
@@ -45,34 +46,42 @@ Cada criterio debe poder comprobarse con una prueba. Se copian a `docs/features.
 - **C6:** Dada la interfaz con sesión iniciada, cuando se revisan los controles de calendario, entonces no existe un botón «Conectar Google Calendar» ni uno para desvincular; solo un indicador de estado.
 - **C7:** Dado un usuario con Calendar conectado, cuando abre el calendario de la app, entonces ve sus eventos de Google sin acción manual, y se actualizan al volver a la ventana.
 - **C8:** Dado un usuario con Calendar conectado, cuando se publican su horario de gym, su turno de trabajo o un bloque marcado para Google, entonces el evento aparece en su Google Calendar real (el comportamiento actual se mantiene).
-- **C9:** Dado un usuario que no concede el permiso de Calendar, cuando termina el login, entonces **[por decidir, ver Preguntas abiertas]**.
+- **C9:** Dado un usuario que, en la pantalla de Google, desmarca el permiso de Calendar, cuando vuelve a la app, entonces **no entra**: ve un mensaje claro («StudentOS necesita acceso a tu Google Calendar para funcionar») y un botón para volver a intentarlo, y no se guarda ninguna sesión ni dato suyo.
 - **C10:** Dado cualquier momento de la sesión, cuando se inspecciona el almacenamiento y el tráfico del navegador, entonces no hay ningún access token ni refresh token de Google.
 - **C11:** Dado un usuario que cierra sesión, cuando la app termina de cerrarla, entonces vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior.
 - **C12:** Dada una cuenta de Google cualquiera (no incluida en la lista de usuarios de prueba), cuando intenta entrar en producción, entonces entra sin la advertencia de «app no verificada» (requiere 007 y 008).
 - **C13:** Dado un usuario que borra su cuenta, cuando termina el borrado, entonces su refresh token se revoca en Google y se elimina del servidor (se mantiene lo que ya existe).
+- **C14:** Dado un navegador que tenía datos locales del prototipo, cuando alguien inicia sesión con Google, entonces esos datos locales no se suben a ninguna cuenta y se eliminan del navegador.
 
 ## Casos límite y errores
-- **El usuario desmarca Calendar en la pantalla de Google** (Google permite permisos granulares): ver C9 y Preguntas abiertas.
+- **El usuario desmarca Calendar en la pantalla de Google:** Google permite permisos granulares y la app **no puede forzarlos**; lo que sí hace es detectar que falta el permiso y no dejar entrar (C9).
 - **El usuario revoca el acceso desde su cuenta de Google:** el servidor detecta el refresh inválido (`needsReauth`, hoy respuesta 409) y la app debe pedir un nuevo consentimiento al volver a entrar, sin dejar al usuario en un bucle.
 - **Google no entrega refresh token** (por ejemplo, una cuenta que ya había autorizado la app): el flujo debe forzar el consentimiento (`prompt=consent`, `access_type=offline`, como hoy).
 - **Cuenta de Google Workspace con Calendar deshabilitado o bloqueado por el administrador:** debe poder entrar o recibir un mensaje claro, sin error técnico.
 - **Sin conexión, ventana emergente o redirección bloqueada, o cierre de pestaña a mitad del consentimiento:** mensaje útil y posibilidad de reintentar.
 - **Cambio de cuenta en el mismo navegador:** los datos de una persona nunca deben aparecer ni subirse a la cuenta de otra (comparte riesgo con 010).
-- **Personas que ya usan el prototipo en local:** ver Preguntas abiertas.
+- **Personas que ya usan el prototipo en local:** sus datos locales se descartan sin subirse (C14). **Se pierden**; el único respaldo que queda es el que haga la propia persona antes de entrar (hoy, «Exportar» a `.json`), así que conviene avisarlo antes del primer login.
 - **BUG-01 (cerrar sesión no vuelve a la landing)** afecta directamente a C11 y debe corregirse dentro o antes de esta funcionalidad.
 
 ## Zonas protegidas que toca
-Esta funcionalidad toca el **importador del primer inicio**, el **cifrado del token de Google** y el **borrado de cuenta**. Según `AGENTS.md`, hay que preguntar antes de modificar cualquiera de ellos. Rotar `GOOGLE_TOKEN_ENC_KEY` no forma parte del alcance.
+Esta funcionalidad toca el **importador del primer inicio** (se retira por completo, porque los datos locales se descartan), el **cifrado del token de Google** (solo se reutiliza, sin cambiarlo) y el **borrado de cuenta** (se mantiene tal cual). Según `AGENTS.md`, hay que preguntar antes de modificar cualquiera de ellos: **al aprobar esta spec apruebas retirar el importador**. Rotar `GOOGLE_TOKEN_ENC_KEY` no forma parte del alcance.
 
 ## Cosas que esta spec deja obsoletas (requieren tu aprobación)
 - **Funcionalidad 001 (modo local sin cuenta, `hecho`):** deja de ser un objetivo del producto.
 - **ADR 0004 (modo local y modo nube):** se reemplazaría por un ADR nuevo.
 - **`docs/project/PROJECT.md` y `AGENTS.md`:** dicen «funciona sin cuenta, en local».
-- **Pruebas E2E:** `01-nocloud.spec.ts`, el flujo de registro local y el importador deben reescribirse.
+- **Pruebas E2E:** `01-nocloud.spec.ts`, `03-importer.spec.ts` y el flujo de registro local se reescriben o se eliminan.
+- **Funcionalidad 003 (importador del primer inicio, `hecho`):** se retira.
+- **Componentes que usan `localStorage` directo** (`AuthModal`, `BackupModal`, `DailyHabitsCard`, `GymTracker`, ver TASKS M2): sin modo local, hay que decidir su destino en el plan.
+
+## Decisiones ya tomadas (sin pregunta pendiente)
+- Login estrictamente con Google; sin registro, sin modo local, sin demo.
+- Permisos de Calendar: los de hoy. Calendar forma parte del login y es **obligatorio** (C9).
+- Sin botón de desvincular.
+- Datos locales del prototipo: se descartan (C14).
+- El calendario se comporta como hoy.
 
 ## Preguntas abiertas
-1. **¿Calendar es obligatorio para entrar o opcional (C9)?** Recomendado: opcional. Quien no concede Calendar entra igual, ve un aviso fijo y se le vuelve a pedir el permiso en el siguiente inicio de sesión. Si es obligatorio, quien lo desmarque no puede usar la app.
-2. **¿Qué pasa con los datos locales que ya existen** (el prototipo guarda todo en `localStorage`)? Opciones: ofrecer subirlos una sola vez en el primer login con Google (reutilizando el importador, que es zona protegida) o descartarlos.
-3. **¿La landing pública se mantiene?** Se asume que sí, como única pantalla sin sesión.
-4. **¿Basta con no ofrecer botón de desvincular?** El usuario podría revocar desde su cuenta de Google o borrando la cuenta. Hay que confirmar con `docs/google-verification-checklist.md` si Google lo acepta para la verificación (008).
-5. **¿Se aprueba dejar obsoleta la funcionalidad 001 y el ADR 0004?**
+1. **¿La landing pública se mantiene?** Se asume que sí, como única pantalla sin sesión.
+2. **¿Basta con no ofrecer botón de desvincular?** El usuario podría revocar desde su cuenta de Google o borrando la cuenta. Hay que confirmar con `docs/google-verification-checklist.md` si Google lo acepta para la verificación (008).
+3. **¿Se aprueba dejar obsoletas la funcionalidad 001 y el ADR 0004, y retirar la 003 (importador)?**

@@ -13,8 +13,8 @@
 
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico
 - **Hecho:** análisis del login y del calendario y spec 009 en borrador (`docs/specs/009-…/spec.md`, 13 criterios, `features.json` en estado `spec`). Hallazgos: hoy hay tres caminos de entrada (Google por GIS, Google por Supabase y una cuenta local falsa); en Vercel solo existe `VITE_GOOGLE_CLIENT_ID`, así que producción funciona en modo GIS; el calendario ya es casi el mismo entorno que Google una vez conectado (los eventos se leen en vivo y gym, turno y bloques marcados se publican), y lo que falta es vincular sin botón en el login.
-- **Decisiones del humano:** solo Google (sin registro, sin modo local, sin demo), mismos permisos de Calendar, sin botón de desvincular, calendario como hoy.
-- **Pendiente:** que apruebes la spec y respondas las 5 preguntas abiertas; después `plan.md`. Esta funcionalidad deja obsoletos la 001 y el ADR 0004.
+- **Decisiones del humano:** solo Google (sin registro, sin modo local, sin demo), mismos permisos de Calendar, Calendar obligatorio como parte del login (si lo desmarca no entra), datos locales del prototipo descartados (se retira el importador), sin botón de desvincular, calendario como hoy.
+- **Pendiente:** que apruebes la spec y respondas 3 preguntas abiertas (landing pública, desvincular y verificación de Google, y dejar obsoletos 001, 003 y el ADR 0004); después `plan.md`.
 - **Problemas:** el importador del primer inicio, el cifrado del token y el borrado de cuenta son zonas protegidas y esta spec los toca. Depende de 007 y 008.
 
 ## 2026-11-24 · Claude Code · docs/prioriza-pendientes
