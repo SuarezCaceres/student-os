@@ -5,7 +5,7 @@
 > Prioridad: **Alto** (bloquea que el producto sea público o que los datos de un usuario estén a salvo), **Medio** (afecta a la calidad o a un flujo, pero hay alternativa) y **Bajo** (limpieza y deuda). Calificada por el agente el 2026-11-23 a partir de lo que pediste; corrígela si no coincide.
 
 ## En curso
-- [ ] Priorización de pendientes (esta rama: `docs/prioriza-pendientes`) · agente + humano
+- [ ] **Spec 009 en revisión** (rama `feat/009-login-google-calendar-automatico`, sin subir) · agente + humano. Código completo; falta la revisión final y el PR. **No fusionar hasta que producción (A3) esté configurada.**
 
 ## Pendiente
 
@@ -27,7 +27,8 @@ Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y q
 - [x] Plan escrito (`plan.md`), **a la espera de tu aprobación**: decisión técnica D1 (cómo llega el refresh token al servidor; recomendada la opción B), relajar C10, actualizar la prueba que congela las firmas de `googleCalendar.ts` y añadir el estado `obsoleta` a `features.json`
 - [x] Plan aprobado el 2026-11-24 (D1 = opción B; C10 relajado a «nunca persistente»; estado `obsoleta` añadido a `features.json`)
 - [x] **Pasos 1 a 4 del plan hechos** en `feat/009-login-google-calendar-automatico`: prueba de viabilidad (`docs/references/frontend/supabase-provider-tokens.md`), `POST /google/link-login`, harness (Supabase y Google falsos) y login web con enlace automático, storage que no persiste el token y aviso si falta Calendar (C4, C5, C9 y C10 cubiertos con pruebas unitarias, de integración y E2E)
-- [ ] **Pasos 5 a 9 pendientes:** retirar cuenta local, demo, botón Conectar, importador, transporte GIS y modo local; `App.tsx` solo con sesión y BUG-01; reescribir E2E `01` y `03`; ADR 0007 y documentación; revisión y PR
+- [x] **Pasos 5 a 8 hechos:** retiradas la cuenta local, la demo, el botón Conectar y el de desvincular, el importador, el transporte de Google Identity Services y el modo local; `App.tsx` solo con sesión y BUG-01 corregido; E2E `01` a `05` (C7 y C8 cubiertos); ADR 0007 y documentación actualizada
+- [ ] **Paso 9 pendiente:** `./scripts/check.sh` completo, skill `revisor` y PR. Quedan sin cumplir C12 (manual, necesita producción y la verificación de Google)
 - ⚠️ **No fusionar esta rama hasta que producción (A3) esté configurada:** hoy Vercel no tiene variables de Supabase y la web funciona con el login antiguo (GIS). Al retirarlo, sin Supabase en producción nadie podría entrar. Además el proveedor Google de Supabase debe usar el **mismo client id y secret** que el API (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`)
 
 #### A2 · Entorno de trabajo por usuario: cada uno guarda sus propios datos (funcionalidad 010)
@@ -57,8 +58,8 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 
 ### 🟡 Medio
 
-- [ ] **M1 · BUG-01:** al cerrar sesión con la nube activa, `App.tsx` (efecto ~línea 202) re-adopta la sesión de Supabase mientras `signOut()` sigue en vuelo y el usuario no vuelve a la landing. Lo cubre `apps/web/e2e/02-login.spec.ts` (2c) con `test.fail`; al arreglarlo, quita esa marca y marca `pasa: true` en el criterio C4 de la funcionalidad 002. Importa para A1 y A2 (cambio de cuenta).
-- [ ] **M2 · `localStorage` directo:** revisar `AuthModal`, `BackupModal`, `DailyHabitsCard` y `GymTracker` y decidir cuál es intencional y cuál debe pasar por `AppState`/el sync.
+- [x] **M1 · BUG-01:** corregido en la spec 009 (`handleLogout` espera a `signOut()` antes de volver a la landing); la E2E 2c ya no lleva `test.fail`.
+- [x] **M2 · `localStorage` directo:** resuelto en la spec 009 (paso 5e): `AuthModal` se reescribió y `BackupModal`, `DailyHabitsCard` y `GymTracker` ya pasan siempre por `App`. Falta quitar la excepción de `docs/rules/frontend.md` (línea 24), que es una regla y necesita tu permiso.
 - [ ] **M3 · E2E en el CI:** el CI no ejecuta la E2E (solo build, lint y tests unitarios de los tres paquetes). Valorar un job de E2E.
 - [ ] **M4 · `.claude/settings.json`** deniega `Read(./.env.*)` y eso bloquea también leer `.env.example`, que el harness pide mantener al día. Decidir: listar solo los `.env` con secretos (`.env`, `.env.local`, `.env.production`…) o aceptar la limitación.
 - [ ] **M5 · Revisar lo deducido:** las convenciones «(observado)» de `docs/rules/backend.md` y `frontend.md`, el glosario de `PROJECT.md` y los ADRs 0004 a 0006 salen del código y de las notas de los agentes, no de una decisión tuya.
@@ -66,6 +67,8 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 ### 🟢 Bajo
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy es una copia sin versionar que hay que resincronizar a mano tras tocar una skill.
 - [ ] El hook `.claude/hooks/guard.sh` da un falso positivo si el texto del comando contiene «git … push … main» (por ejemplo en el cuerpo de un PR). Afinar el regex.
+- [ ] **Volcar los cambios pendientes antes de cerrar sesión:** al cerrar sesión se limpia la cola de sync y lo que no se había subido se pierde. Intentar un `syncNow` con tiempo límite antes de `signOut`.
+- [ ] **Quitar `VITE_GOOGLE_CLIENT_ID`** de Vercel y de `.env.example` (la web ya no la usa; `.env.example` está bloqueado por el hook, ver M4).
 - [ ] Los módulos `kanban`, `university`, `gym` y `calendar` de `apps/api/src/` son controladores vacíos de 6 líneas (el dato viaja por `/sync`). Decidir: eliminarlos o rellenarlos.
 - [ ] Bundle web de ~1 MB (aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).
@@ -82,6 +85,7 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Enlace simbólico de skills · Windows exige Modo desarrollador o administrador · que el humano lo active
 
 ## Hecho
+- 2026-11-24 · Spec 009 implementada en `feat/009-login-google-calendar-automatico` (pasos 1 a 8): login solo con Google con Calendar vinculado, sin modo local ni importador; pendiente de revisión y de producción para fusionar
 - 2026-11-24 · PR #7 fusionado: harness de agentes adoptado en `main` y desplegado en Vercel (web en modo local; sin API en producción)
 - 2026-11-23 · Fase 6: `features.json` poblado, `memories.md` y los planes archivados en `docs/references/historial/`, carpetas de spec, prioridades
 - 2026-11-23 · Fases 0 a 5 de la adopción del harness (instalación, borrador técnico, producto, arquitectura, reglas, skills) y ADRs 0002 a 0006

@@ -5,7 +5,7 @@
       "id": "001",
       "nombre": "modo-local-sin-cuenta",
       "spec": null,
-      "estado": "hecho",
+      "estado": "obsoleta",
       "criterios": [
         { "id": "C1", "descripcion": "Sin cuenta ni nube, la app arranca y funciona sin errores de consola ni llamadas de red a la nube (E2E apps/web/e2e/01-nocloud.spec.ts)", "pasa": true }
       ]
@@ -98,7 +98,7 @@
       "id": "009",
       "nombre": "login-google-para-todos-y-calendar-automatico",
       "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
-      "estado": "en_curso",
+      "estado": "revision",
       "criterios": [
         { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": true },
         { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": true },
@@ -106,8 +106,8 @@
         { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": true },
         { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": true },
         { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": true },
-        { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": false },
-        { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
+        { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": true },
+        { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": true },
         { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": true },
         { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": true },
         { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": true },

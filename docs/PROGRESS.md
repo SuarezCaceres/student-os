@@ -11,6 +11,13 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (pasos 5b a 8)
+- **Hecho:** 5b `1ac122c` (sin botones Conectar/Desvincular), 5c `1d477f1` (importador retirado; el motor descarta lo ajeno y, con la nube vacía, sube el estado de una cuenta nueva), 5d (transporte de Google Identity Services, `googleCalendar.gis.test.ts` y la prueba de firmas actualizada, que ahora vigila que lo retirado no vuelva), 5e (`useLocalStorage` y `localStorage` directo fuera; `clearLegacyLocalData`; estado de cuenta nueva = partida sin bloques de ejemplo y con el nombre de Google), aviso en el modal de que los datos locales se eliminan, E2E `05-calendario` (C7, C8), ADR 0007 y documentación (001 `obsoleta`, 009 `revision`).
+- **Fallos reales que cazaron las pruebas:** (1) en el primer acceso de un dispositivo los eventos de Google tardaban hasta 45 s en aparecer porque la carga inicial se decidía antes de saber que Calendar estaba vinculado (corregido en `App.tsx`); (2) la nube vacía sin subir el estado dejaba dos dispositivos con datos distintos.
+- **Verificación:** 291 pruebas del frontend, tipos, lint, integración del API y E2E (01 a 05) en verde; falta el `check.sh` completo y la revisión del paso 9.
+- **Pendiente:** paso 9 (`check.sh`, skill `revisor`, PR), volcar cambios antes de cerrar sesión, decidir qué ve una cuenta nueva (aún recibe Kanban, entregas y gym de ejemplo; es la spec 010), quitar `VITE_GOOGLE_CLIENT_ID`. **No fusionar antes de producción (007).**
+- **Problemas:** C8 se verifica por E2E con el turno y un bloque; el gym usa la misma función (`upsertGoogleGymEvent`, probada por unidad) pero no tiene E2E propia. C12 es manual. `docs/rules/frontend.md` línea 24 cita excepciones de `localStorage` ya resueltas: es una regla, no la toqué sin tu permiso. El onboarding de gym del primer acceso ya no se abre (la spec 011 lo vuelve opcional).
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (paso 5a)
 - **Hecho:** `80af0db`. El modal pasa a un único «Continuar con Google»; la landing quita registro, demo y «100 % offline» (afirmaciones que dejaron de ser ciertas); `App.tsx` ya no se fía de la sesión local sobrante (C2) y el cierre de sesión espera a `signOut` (**BUG-01 corregido**, se quitó el `test.fail` del caso 2c). `features.json`: 002-C4 y 009 (C1, C2, C3, C4, C5, C9, C10, C13) en `pasa: true`.
 - **Fallos reales que cazaron las pruebas:** (1) una sesión local sobrante abría la app sin login; (2) `supabase-js` emite `SIGNED_IN` dos veces y el segundo enlace pisaba el motivo real del error.

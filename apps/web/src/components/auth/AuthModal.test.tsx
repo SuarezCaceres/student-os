@@ -23,6 +23,11 @@ describe('AuthModal: unico acceso con Google (spec 009, C1)', () => {
     expect(screen.getByText(/ver y editar los eventos de tu calendario/)).toBeTruthy();
   });
 
+  it('avisa antes del primer login que los datos locales del prototipo se eliminan sin pasarse a la cuenta (C14)', () => {
+    render(<AuthModal isOpen cloudAuth onClose={() => undefined} />);
+    expect(screen.getByText(/no se pasan a tu cuenta y se eliminan al entrar/)).toBeTruthy();
+  });
+
   it('al pulsar inicia el login con Google (una sola vez)', async () => {
     const signIn = vi.fn(async () => undefined);
     render(<AuthModal isOpen cloudAuth onClose={() => undefined} onCloudSignIn={signIn} />);

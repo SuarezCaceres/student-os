@@ -20,3 +20,6 @@ Antes, el token de Google Calendar vivía en el navegador (GIS, 1 hora, se perd�
 ## Consecuencias
 - **Rotar `GOOGLE_TOKEN_ENC_KEY` deja ilegibles los tokens guardados** y obliga a reconectar: requiere aprobación del humano (ver `docs/rules/security.md`).
 - La verificación de la app en Google (`docs/google-verification-checklist.md`) sigue pendiente; hasta entonces el login admite 100 usuarios de prueba.
+
+## Actualización (ADR 0007, 2026-11-24)
+El refresh token ya no se obtiene con el botón «Conectar» (`/google/connect`) sino en el propio login: la web lo entrega una sola vez a `POST /google/link-login`. El cifrado, la clave y el borrado de cuenta no cambian. La web ya no usa `/google/connect`, `/google/disconnect` ni el transporte de Google Identity Services.

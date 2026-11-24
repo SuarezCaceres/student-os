@@ -294,9 +294,12 @@ export const App: React.FC = () => {
     [weekDates, setState, pruneMirroredLocalGymBlocks]
   );
 
+  // Carga inicial de los eventos de Google. Depende de `isGoogleConnected`: en el primer acceso de un dispositivo la
+  // vinculacion se descubre al consultar al servidor, despues de entrar a la app; sin esta dependencia los eventos
+  // tardarian hasta el siguiente sondeo (45 s) en aparecer.
   useEffect(() => {
     if (currentView !== 'app') return;
-    if (!getStoredAccessToken() && !getStoredGoogleMeta().connected) return;
+    if (!isGoogleConnected && !getStoredAccessToken() && !getStoredGoogleMeta().connected) return;
 
     let cancelled = false;
     void (async () => {
@@ -308,7 +311,7 @@ export const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentView, refreshGoogleCalendarWeek]);
+  }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
   // Automatic zero-button Google Calendar background sync (focus, visibilitychange & 45s polling)
   useEffect(() => {

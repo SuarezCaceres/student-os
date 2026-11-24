@@ -185,6 +185,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, cloudAuth
         <p className="mt-5 text-center text-[13px] text-[var(--muted)]">
           Google te pedirá permiso para ver y editar los eventos de tu calendario. Tus datos se guardan en tu cuenta y los ves en todos tus dispositivos.
         </p>
+        <p className="mt-2 text-center text-[12px] text-[var(--muted)]">
+          Si antes usaste StudentOS sin cuenta en este navegador, esos datos no se pasan a tu cuenta y se eliminan al entrar.
+        </p>
       </div>
     </div>
   );
