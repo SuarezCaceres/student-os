@@ -1,6 +1,6 @@
 # Spec · 012 · Quehaceres diarios con meta, motivación e historial
 
-> Estado: **borrador** (espera la aprobación del humano)
+> Estado: **aprobada** por el humano el 2026-11-24 (con la lista base que él fijó; las elecciones 🧭 quedan aceptadas)
 > Dice **qué** y **por qué**, no **cómo**. El cómo va en `plan.md`, después de aprobar esta spec.
 > Prioridad: pedido por el humano el 2026-11-23 (`docs/TASKS.md` → P2).
 > Las decisiones marcadas con 🧭 son **elecciones del agente** (el humano dijo «tú escoge y avanza»); revísalas, son fáciles de cambiar antes de implementar.
@@ -14,8 +14,8 @@ En la pantalla principal hay una tarjeta **«Quehaceres»** con las tareas cotid
 ## Alcance
 - **Incluye:**
   - Tarjeta «Quehaceres» en el resumen, separada de «Hábitos diarios» (esa guarda cantidades, esta casillas de hecho / no hecho).
-  - Una **lista base editable** con ejemplos (tender la cama, darle de comer al perro, sacar al perro a pasear, caminar 15 minutos, ir al mercado…); el usuario puede **añadir los suyos**, renombrar y quitar cualquiera.
-  - Cada quehacer elige **qué días de la semana aplica** (por ejemplo, el mercado solo el sábado). Por defecto, todos los días.
+  - Una **lista base editable** con cinco quehaceres fijados por el humano: **tender la cama, pasear al perro, ducharme, limpiar mi cuarto y avanzar en mis proyectos personales de inteligencia artificial**. El usuario puede **añadir los suyos**, renombrar y quitar cualquiera (incluidos estos).
+  - Cada quehacer elige **qué días de la semana aplica** (por ejemplo, uno que solo toque el sábado). Por defecto, los cinco de la lista base aplican todos los días.
   - Marcar un quehacer **una vez por día** (hecho / no hecho).
   - **Niveles de motivación por cantidad:** por defecto, 5 completados = «¡Eres lo máximo!» y 10 = «¡Sigue así!»; los umbrales y los mensajes son editables.
   - Botón **«Hoy no puedo»**: marca el día como **día difícil**, sin penalización. 🧭 Se puede añadir un motivo opcional (cansado, agobiado, enfermo, otro) y deshacerlo el mismo día; lo ya marcado se conserva.
@@ -37,7 +37,7 @@ En la pantalla principal hay una tarjeta **«Quehaceres»** con las tareas cotid
 
 ## Criterios de aceptación
 Cada criterio debe poder comprobarse con una prueba. Se copian a `docs/features.json`.
-- **C1:** Dado un usuario nuevo, cuando ve el resumen, entonces aparece la tarjeta «Quehaceres» con la lista base de ejemplos, cada uno sin marcar.
+- **C1:** Dado un usuario nuevo, cuando ve el resumen, entonces aparece la tarjeta «Quehaceres» con los cinco quehaceres de la lista base, cada uno sin marcar.
 - **C2:** Dado un usuario, cuando añade, renombra o elimina un quehacer, entonces la lista refleja el cambio y se conserva al recargar.
 - **C3:** Dado un quehacer con días de la semana elegidos, cuando es un día que no le corresponde, entonces no aparece en la tarjeta de hoy ni cuenta para la meta; y cuando sí le corresponde, aparece.
 - **C4:** Dado un quehacer de hoy, cuando se marca y se desmarca, entonces el contador de completados sube y baja en consecuencia, y no se puede marcar dos veces el mismo en el día.
@@ -64,5 +64,4 @@ Cada criterio debe poder comprobarse con una prueba. Se copian a `docs/features.
 - **Dato dañado o de una versión futura:** se ignora sin romper el resumen.
 
 ## Preguntas abiertas
-- Confirmar las elecciones 🧭: sin rachas, solo hoy editable, promedio de 8 semanas, motivo opcional del día difícil y máximo de 30 quehaceres.
-- ¿La lista base debe incluir exactamente los cinco ejemplos que mencionaste, o prefieres otros? 🧭 Se propone: tender la cama, darle de comer al perro, sacar al perro a pasear, caminar 15 minutos e ir al mercado (sábado).
+- Ninguna. La lista base y las elecciones 🧭 quedaron aprobadas.

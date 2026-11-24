@@ -153,7 +153,7 @@
       "spec": "docs/specs/012-quehaceres-diarios/spec.md",
       "estado": "spec",
       "criterios": [
-        { "id": "C1", "descripcion": "Un usuario nuevo ve la tarjeta Quehaceres con la lista base de ejemplos sin marcar", "pasa": false },
+        { "id": "C1", "descripcion": "Un usuario nuevo ve la tarjeta Quehaceres con los cinco quehaceres de la lista base (tender la cama, pasear al perro, ducharme, limpiar mi cuarto, avanzar en proyectos de IA) sin marcar", "pasa": false },
         { "id": "C2", "descripcion": "Anadir, renombrar y eliminar quehaceres se refleja y se conserva al recargar", "pasa": false },
         { "id": "C3", "descripcion": "Un quehacer con dias de la semana elegidos solo aparece y cuenta en esos dias", "pasa": false },
         { "id": "C4", "descripcion": "Marcar y desmarcar un quehacer de hoy actualiza el contador, sin poder marcarlo dos veces en el dia", "pasa": false },
