@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { emptyAppState } from './data/emptyState';
+import { ConfirmLogoutDialog } from './components/auth/ConfirmLogoutDialog';
+import { syncStore } from './sync/syncStore';
 import { useSyncedAppState } from './hooks/useSyncedAppState';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
@@ -347,7 +349,25 @@ export const App: React.FC = () => {
     };
   }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
+  // Cierre de sesion (spec 010): antes de salir se intenta subir lo pendiente; si queda algo (sin red o servidor lento),
+  // se avisa y la persona decide. Nunca se descarta trabajo en silencio.
+  const [logoutPhase, setLogoutPhase] = useState<'idle' | 'saving' | 'confirm'>('idle');
+  const [logoutPending, setLogoutPending] = useState<{ pending: number; timedOut: boolean }>({ pending: 0, timedOut: false });
+
   const handleLogout = async () => {
+    if (logoutPhase !== 'idle') return;
+    setLogoutPhase('saving');
+    const flush = await syncStore.flushPending();
+    if (flush.pending > 0) {
+      setLogoutPending({ pending: flush.pending, timedOut: flush.timedOut });
+      setLogoutPhase('confirm');
+      return;
+    }
+    await finishLogout();
+  };
+
+  /** Cierra la sesion sin subir nada (tras borrar la cuenta no hay nada que sincronizar). */
+  const finishLogout = async () => {
     // Se espera a que Supabase cierre la sesion ANTES de volver a la landing: si no, el efecto de `auth.userSession`
     // la vuelve a adoptar mientras `signOut()` sigue en vuelo y el usuario no sale de la app (BUG-01).
     setIsSigningOut(true);
@@ -372,6 +392,7 @@ export const App: React.FC = () => {
     setUserSession(null);
     setCurrentView('landing');
     setIsSigningOut(false);
+    setLogoutPhase('idle');
   };
 
   // Handle Theme Toggle
@@ -2297,6 +2318,21 @@ export const App: React.FC = () => {
         userSession={userSession}
         onLogout={handleLogout}
       />
+      {logoutPhase === 'saving' && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-2 text-[13px] text-[var(--ink)] shadow-lg"
+        >
+          Guardando tus cambios antes de salir…
+        </div>
+      )}
+      <ConfirmLogoutDialog
+        isOpen={logoutPhase === 'confirm'}
+        pending={logoutPending.pending}
+        timedOut={logoutPending.timedOut}
+        onCancel={() => setLogoutPhase('idle')}
+        onConfirm={() => void finishLogout()}
+      />
       {/* Estado de sincronizacion: no pinta nada si la nube no esta configurada */}
       <div className="empty:hidden flex justify-end px-4 pt-2 sm:px-6">
         <SyncStatusBadge interactive />
@@ -2490,7 +2526,7 @@ export const App: React.FC = () => {
       <footer className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 lg:px-8">
         <div className="flex flex-col gap-4 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <LegalLinks />
-          <AccountPanel onAccountDeleted={handleLogout} onClearLocalData={resetState} />
+          <AccountPanel onAccountDeleted={finishLogout} onClearLocalData={resetState} />
         </div>
       </footer>
 
