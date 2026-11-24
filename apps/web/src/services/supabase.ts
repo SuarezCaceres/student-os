@@ -194,13 +194,15 @@ const sessionStore = (() => {
         const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
           // Login recien hecho con Google: la app NO se considera iniciada hasta que Calendar quede vinculado en el
           // servidor. Si falta el permiso o falla el enlace, se cierra la sesion y se explica por que (C9).
+          // supabase-js puede emitir SIGNED_IN mas de una vez para el mismo login: mientras uno se completa se ignora todo,
+          // o el segundo enlace usaria un token ya consumido y su error pisaria el motivo real (p. ej. permiso desmarcado).
+          if (finishingLogin) return;
           if (event === 'SIGNED_IN' && session && (session.provider_token || session.provider_refresh_token || hasPendingProviderRefreshToken())) {
             finishingLogin = true;
             set(LOADING_STATE);
             void finishGoogleLogin(supabase, session);
             return;
           }
-          if (finishingLogin) return;
           set(stateFromSession(session));
         });
         unsubscribeAuth = () => sub.subscription.unsubscribe();

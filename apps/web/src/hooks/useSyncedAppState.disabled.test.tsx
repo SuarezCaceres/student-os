@@ -91,18 +91,21 @@ describe('sin variables de entorno de Supabase/API', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('AuthModal conserva el aspecto y el flujo de siempre (sin boton de nube)', () => {
-    render(<AuthModal isOpen onClose={() => undefined} onSuccess={() => undefined} onEnterDemo={() => undefined} />);
-    expect(screen.getByText('Continuar con Google')).toBeTruthy();
-    expect(screen.queryByText('Guarda en la nube')).toBeNull();
+  it('AuthModal sin nube configurada: ofrece un unico acceso, deshabilitado, y explica que no esta disponible', () => {
+    render(<AuthModal isOpen onClose={() => undefined} />);
+    const button = screen.getByRole('button', { name: /Continuar con Google/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
     expect(screen.getByText('Entrar a StudentOS')).toBeTruthy();
-    expect(screen.getByText(/Modo Demo/)).toBeTruthy();
+    expect(screen.getByText(/no está disponible en este momento/)).toBeTruthy();
+    // Ya no existe el modo demo.
+    expect(screen.queryByText(/Modo Demo/)).toBeNull();
   });
 
-  it('AuthModal con cloudAuth ofrece Google en la nube y mantiene el acceso con Google Calendar', () => {
-    render(<AuthModal isOpen cloudAuth onClose={() => undefined} onSuccess={() => undefined} onEnterDemo={() => undefined} />);
-    expect(screen.getByText('Continuar con Google')).toBeTruthy();
-    expect(screen.getByText('Guarda en la nube')).toBeTruthy();
-    expect(screen.getByText('Entrar solo con Google Calendar')).toBeTruthy();
+  it('AuthModal con cloudAuth ofrece un unico "Continuar con Google" activo que incluye Calendar', () => {
+    render(<AuthModal isOpen cloudAuth onClose={() => undefined} />);
+    const button = screen.getByRole('button', { name: /Continuar con Google/ }) as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(screen.getAllByText('Calendar').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Entrar solo con Google Calendar')).toBeNull();
   });
 });

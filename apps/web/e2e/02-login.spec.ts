@@ -38,7 +38,7 @@ test.describe('2. login con sesion en la nube', () => {
 
     // La app hizo su primer pull autenticado y la API respondio 200 con el JWT del Supabase falso.
     await expect.poll(() => tap.pulls().length, { timeout: 15_000 }).toBeGreaterThan(0);
-    expect(tap.pulls()[0].status).toBe(200);
+    await expect.poll(() => tap.pulls()[0]?.status ?? null, { timeout: 15_000 }).toBe(200);
     expect(tap.statuses().filter((st) => st === 401)).toEqual([]);
 
     // El pull crea el perfil en el servidor (SyncService -> ProfileService.ensure).
@@ -68,9 +68,9 @@ test.describe('2. login con sesion en la nube', () => {
     const page = await context.newPage();
     const tap = new PageTap(page);
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: /Iniciar sesión/i }).first().click();
-    // En modo nube el modal ofrece "Continuar con Google" de Supabase (no el de GIS/Calendar).
-    const loginButton = page.getByRole('button', { name: /Continuar con Google/i }).first();
+    await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+    // El modal ofrece un unico "Continuar con Google" (Supabase): un solo consentimiento con Calendar incluido.
+    const loginButton = page.getByRole('dialog').getByRole('button', { name: /Continuar con Google/i });
     await expect(loginButton).toBeVisible();
     await evidence(page, '02-login-modal-nube');
     const authorizeRequest = page.waitForRequest((r) => r.url().includes('/auth/v1/authorize'));
@@ -109,7 +109,7 @@ test.describe('2. login con sesion en la nube', () => {
     expect(leaked).not.toMatch(/fake-rt-/);
     expect(leaked).not.toContain('provider_refresh_token');
     await expect.poll(() => tap.pulls().length, { timeout: 15_000 }).toBeGreaterThan(0);
-    expect(tap.pulls()[0].status).toBe(200);
+    await expect.poll(() => tap.pulls()[0]?.status ?? null, { timeout: 15_000 }).toBe(200);
     const stored = await page.evaluate((k) => localStorage.getItem(k), s.storageKey);
     expect(stored, 'supabase-js guardo la sesion').toContain(s.userId);
     expect(page.url(), 'el ?code= se limpia de la URL').not.toContain('code=');
@@ -130,8 +130,8 @@ test.describe('2. login con sesion en la nube', () => {
       const context = await newContext(browser);
       const page = await context.newPage();
       await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-      await page.getByRole('button', { name: /Iniciar sesión/i }).first().click();
       await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+      await page.getByRole('dialog').getByRole('button', { name: /Continuar con Google/i }).click();
 
       // Vuelve de Google sin el permiso: el servidor lo rechaza y la app muestra el aviso en la landing.
       const notice = page.getByRole('alert').filter({ hasText: 'necesita acceso a tu Google Calendar' });
@@ -151,11 +151,9 @@ test.describe('2. login con sesion en la nube', () => {
     }
   });
 
-  test('2c. cerrar sesion: supabase-js borra su sesion Y la app vuelve a la landing (BUG-01: no vuelve)', async ({ browser }) => {
-    // BUG-01 (docs/qa/BUGS.md): App.tsx re-adopta la sesion de Supabase (efecto de la linea ~202) mientras `signOut()`
-    // aun esta en vuelo, asi que `handleLogout` deja al usuario DENTRO de la app. Se espera que este test falle
-    // hasta que se corrija; si algun dia pasa, Playwright avisa ("expected to fail") y hay que quitar esta marca.
-    test.fail(true, 'BUG-01: logout con sesion de nube no vuelve a la landing');
+  test('2c. cerrar sesion: supabase-js borra su sesion Y la app vuelve a la landing (BUG-01 corregido)', async ({ browser }) => {
+    // BUG-01: `handleLogout` no esperaba a `signOut()` y App.tsx re-adoptaba la sesion de Supabase en vuelo, dejando al
+    // usuario DENTRO de la app. Ahora el cierre espera a que termine (C11).
     const s = await sessionFor(userKey('s2c'));
     const context = await newContext(browser, { session: s });
     const page = await context.newPage();
@@ -165,7 +163,7 @@ test.describe('2. login con sesion en la nube', () => {
     await page.getByRole('button', { name: 'Ahora no' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
-    await expect(page.getByRole('button', { name: /Explorar Demo en Vivo/i }).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole('button', { name: /Continuar con Google/i }).first()).toBeVisible({ timeout: 8_000 });
     expect(API).toContain('3100');
     await context.close();
   });

@@ -1,15 +1,11 @@
 import React from 'react';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface LandingNavbarProps {
-  onOpenAuth: (mode: 'login' | 'register') => void;
-  onEnterAppDemo: () => void;
+  onOpenAuth: () => void;
 }
 
-export const LandingNavbar: React.FC<LandingNavbarProps> = ({
-  onOpenAuth,
-  onEnterAppDemo,
-}) => {
+export const LandingNavbar: React.FC<LandingNavbarProps> = ({ onOpenAuth }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-[var(--line)] bg-[var(--surface)]/90 backdrop-blur-md transition-colors">
       <div className="mx-auto flex h-16 sm:h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -75,31 +71,11 @@ export const LandingNavbar: React.FC<LandingNavbarProps> = ({
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
-            onClick={onEnterAppDemo}
-            className="hidden sm:inline-flex items-center justify-center gap-1.5 t-btn t-btn-secondary min-h-[44px] px-3.5 text-xs font-medium"
-            title="Explorar la aplicación completa sin registro"
-            aria-label="Explorar la aplicación completa en modo demo"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-[var(--action)]" />
-            <span>Ver Demo</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenAuth('login')}
-            className="t-btn t-btn-ghost min-h-[44px] px-3.5 text-xs font-medium"
-            aria-label="Iniciar sesión con tu cuenta de StudentOS"
-          >
-            Iniciar Sesión
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onOpenAuth('register')}
+            onClick={onOpenAuth}
             className="t-btn t-btn-primary min-h-[44px] px-4 text-xs font-medium"
-            aria-label="Crear tu cuenta gratis en StudentOS"
+            aria-label="Continuar con Google para entrar a StudentOS"
           >
-            <span>Crear Cuenta</span>
+            <span>Continuar con Google</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>

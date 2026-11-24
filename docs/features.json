@@ -19,7 +19,7 @@
         { "id": "C1", "descripcion": "Con una sesion de Supabase, la app entra en modo nube, aparece el indicador de sync y el servidor crea el perfil (E2E 02-login 2a)", "pasa": true },
         { "id": "C2", "descripcion": "El flujo 'Continuar con Google' (PKCE) vuelve con codigo y deja la sesion iniciada (E2E 02-login 2b, con Supabase simulado)", "pasa": true },
         { "id": "C3", "descripcion": "Al cerrar sesion, la sesion de supabase-js se borra del navegador y una recarga no reabre la nube (E2E 02-login 2d)", "pasa": true },
-        { "id": "C4", "descripcion": "Al cerrar sesion, la app vuelve a la landing (BUG-01: hoy no vuelve; E2E 02-login 2c marcada como fallo conocido)", "pasa": false },
+        { "id": "C4", "descripcion": "Al cerrar sesion, la app vuelve a la landing (BUG-01: hoy no vuelve; E2E 02-login 2c marcada como fallo conocido)", "pasa": true },
         { "id": "C5", "descripcion": "El login funciona con Google y Supabase reales, no solo con los simulados", "pasa": false }
       ]
     },
@@ -100,19 +100,19 @@
       "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
       "estado": "en_curso",
       "criterios": [
-        { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": false },
-        { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": false },
-        { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": false },
-        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": false },
-        { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": false },
+        { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": true },
+        { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": true },
+        { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": true },
+        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": true },
+        { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": true },
         { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": false },
         { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": false },
         { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
-        { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": false },
-        { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": false },
+        { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": true },
+        { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": true },
         { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": false },
         { "id": "C12", "descripcion": "Una cuenta de Google cualquiera, fuera de la lista de usuarios de prueba, entra en produccion sin la advertencia de app no verificada (requiere 007 y 008)", "pasa": false },
-        { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": false },
+        { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": true },
         { "id": "C14", "descripcion": "Los datos locales del prototipo que hubiera en el navegador no se suben a ninguna cuenta y se eliminan al iniciar sesion", "pasa": false }
       ]
     },

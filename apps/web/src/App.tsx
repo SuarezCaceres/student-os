@@ -173,44 +173,24 @@ export const App: React.FC = () => {
     googleBusyByDateRef.current = googleBusyByDate;
   }, [googleBusyByDate]);
 
-  // User session & Landing vs App View Routing
-  const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (session) {
-        const parsed = JSON.parse(session);
-        if (parsed.isLoggedIn) return 'app';
-      }
-    } catch {
-      // Fallback to landing
-    }
-    return 'landing';
-  });
-
-  const [userSession, setUserSession] = useState<UserSession | null>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (session) return JSON.parse(session);
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  // User session & Landing vs App View Routing.
+  // La UNICA fuente de verdad de la sesion es la de Supabase (login con Google, spec 009). Un dato sobrante en el
+  // navegador (p. ej. `student_os_user_session` del prototipo) NUNCA da acceso a la app (C2).
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>('landing');
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  // `true` mientras se cierra la sesion: evita que el efecto de abajo la vuelva a adoptar (BUG-01).
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Sesion en la nube (Supabase). Sin variables de entorno de Supabase no hace nada.
   const auth = useAuthState();
   useEffect(() => {
+    if (isSigningOut) return;
     // Al volver del redirect de Google, Supabase restaura la sesion: entrar a la app.
     if (auth.userSession && !userSession) {
       setUserSession(auth.userSession);
-      try {
-        localStorage.setItem('student_os_user_session', JSON.stringify(auth.userSession));
-      } catch {
-        // ignore
-      }
       setCurrentView('app');
     }
-  }, [auth.userSession, userSession]);
+  }, [auth.userSession, userSession, isSigningOut]);
 
   // Con sesion en la nube, restaura la conexion persistente de Google Calendar guardada en el servidor
   // (p. ej. en un dispositivo nuevo). Sin nube configurada devuelve null y no hace nada.
@@ -229,16 +209,7 @@ export const App: React.FC = () => {
     };
   }, [auth.userSession]);
 
-  const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (!session) return false;
-      const parsed = JSON.parse(session);
-      return Boolean(parsed?.isLoggedIn) && !state.gymProfile;
-    } catch {
-      return false;
-    }
-  });
+  const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(false);
 
   // One-time migration for authenticated real sessions: strip cb-1..cb-14 seed blocks & seed 22:00-06:00 work shift
   useEffect(() => {
@@ -398,8 +369,15 @@ export const App: React.FC = () => {
     };
   }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
-  const handleLogout = () => {
-    void auth.signOut();
+  const handleLogout = async () => {
+    // Se espera a que Supabase cierre la sesion ANTES de volver a la landing: si no, el efecto de `auth.userSession`
+    // la vuelve a adoptar mientras `signOut()` sigue en vuelo y el usuario no sale de la app (BUG-01).
+    setIsSigningOut(true);
+    try {
+      await auth.signOut();
+    } catch {
+      // Sin red el cierre local igualmente se completa abajo.
+    }
     try {
       localStorage.removeItem('student_os_user_session');
       localStorage.removeItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY);
@@ -422,6 +400,7 @@ export const App: React.FC = () => {
     setIsFirstGymOnboardingOpen(false);
     setUserSession(null);
     setCurrentView('landing');
+    setIsSigningOut(false);
   };
 
   // Handle Theme Toggle
@@ -2325,48 +2304,15 @@ export const App: React.FC = () => {
     ]
   );
 
+  // Mientras Supabase restaura la sesion al abrir la web no se pinta la landing (evita un parpadeo para quien ya tenia sesion).
+  if (auth.status === 'loading' && currentView === 'landing') {
+    return <div className="min-h-screen bg-[var(--bg)]" aria-busy="true" />;
+  }
+
   if (currentView === 'landing') {
-    return (
-      <LandingPage
-        onEnterApp={() => setCurrentView('app')}
-        onAuthSuccess={(user) => {
-          setUserSession(user);
-          try {
-            localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
-            localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-          } catch {
-            // Ignore storage errors
-          }
-
-          const firstName = user.name.trim().split(/\s+/)[0];
-          setState((prev) => {
-            const cleaned = applyRealAccountCalendarCleanup(prev);
-            const withWorkShift = ensureDefaultWorkShiftForRealAccount(cleaned);
-            calendarBlocksRef.current = withWorkShift.calendarBlocks;
-            return {
-              ...withWorkShift,
-              studentName: firstName || withWorkShift.studentName,
-            };
-          });
-
-          if (user.provider === 'google') {
-            const activeToken = getStoredAccessToken();
-            if (activeToken) {
-              setIsGoogleConnected(true);
-              void refreshGoogleCalendarWeek({
-                explicitToken: activeToken,
-                source: 'internal_mutation',
-              });
-            }
-          }
-
-          if (!state.gymProfile) {
-            setIsFirstGymOnboardingOpen(true);
-          }
-          setCurrentView('app');
-        }}
-      />
-    );
+    // Sin sesion solo se ve la landing. La unica entrada es «Continuar con Google»: al volver, el efecto de `auth.userSession`
+    // de arriba restaura la sesion de Supabase y entra a la app (spec 009).
+    return <LandingPage />;
   }
 
   return (

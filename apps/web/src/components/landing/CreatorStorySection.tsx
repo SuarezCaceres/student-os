@@ -39,8 +39,8 @@ export const CreatorStorySection: React.FC = () => {
               <div className="flex items-start gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface-2)]/60 p-4">
                 <ShieldCheck className="h-5 w-5 text-[var(--ok)] shrink-0 mt-0.5" />
                 <div>
-                  <strong className="text-[var(--ink)] block font-semibold mb-1">100% Offline & Privado</strong>
-                  <span className="text-[var(--muted)]">Tus calificaciones y rutinas son tuyas. Se guardan en tu navegador sin rastreadores ni venta de datos.</span>
+                  <strong className="text-[var(--ink)] block font-semibold mb-1">Privado y bajo tu control</strong>
+                  <span className="text-[var(--muted)]">Tus calificaciones y rutinas son tuyas. Se guardan en tu cuenta, sin rastreadores ni venta de datos, y puedes exportarlos o borrarlos cuando quieras.</span>
                 </div>
               </div>
 
