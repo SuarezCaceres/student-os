@@ -1,5 +1,10 @@
 # 🧠 MEMORIES.md — Contexto Integral de StudentOS PRO MAX
 
+> [!WARNING]
+> **ARCHIVADO el 2026-11-23: solo es historial de consulta (hasta la v2.15.0). Ya no se actualiza.**
+> La memoria viva del proyecto está ahora en: `docs/project/PROJECT.md` y `ARCHITECTURE.md` (qué es y cómo encaja), `docs/decisions/` (por qué), `docs/PROGRESS.md` y `docs/TASKS.md` (qué se hizo y qué falta), `docs/features.json` (funcionalidades y sus pruebas) y `docs/rules/` (reglas y lecciones aprendidas).
+> Las reglas de commits y PR de abajo quedan **superadas** por `docs/rules/general.md` (commits en español).
+
 > **Documento de memoria técnica, arquitectónica y funcional**  
 > **Proyecto:** `student-os`  
 > **Ubicación:** `C:\Users\Sergio Suarez\Documents\student-os`  

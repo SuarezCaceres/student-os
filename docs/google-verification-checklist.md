@@ -2,7 +2,7 @@
 
 Objetivo: pasar la pantalla de consentimiento OAuth de **Testing** a **In production** y que Google **verifique** la app, para que los usuarios no vean el aviso de "Google no ha verificado esta app" ni choquen con el tope de usuarios.
 
-> Esto lo hace el **usuario** en Google Cloud Console (compuerta humana, ver `PLAN_BACKEND.md` §7). Nada de esto se automatiza desde el repo. Lo que sí está listo en el repo: páginas legales, borrado/exportación de cuenta y los textos de justificación de abajo.
+> Esto lo hace el **usuario** en Google Cloud Console (compuerta humana, ver `docs/references/historial/PLAN_BACKEND.md` §7). Nada de esto se automatiza desde el repo. Lo que sí está listo en el repo: páginas legales, borrado/exportación de cuenta y los textos de justificación de abajo.
 
 ## 0. Por qué importa (qué pasa si NO se verifica)
 
