@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { MAX_PULL_LIMIT, MAX_PUSH_CHANGES, type SyncRecord } from '@student-os/shared';
+import { GYM_PREFERENCE_RECORD_ID, MAX_PULL_LIMIT, MAX_PUSH_CHANGES, type SyncRecord } from '@student-os/shared';
 import type { SyncService } from '../../src/sync/sync.service';
 import { MAX_RECORDS_PER_USER, MAX_RECORD_DATA_BYTES } from '../../src/sync/sync.constants';
 import { NOW, at, kanbanData, kanbanRecord, newUserId, profileRecord, titleOf, tombstone } from './sync-fixtures';
@@ -278,6 +278,32 @@ export function defineSyncScenarios(label: string, setup: () => Promise<Scenario
         expect(b.cursor).toBe('1');
         const a = await pullAll(ctx.service, A);
         expect(a.cursor).toBe('3');
+      });
+
+      it('la preferencia de gym desactivado (spec 011) la ve solo su dueño y el servidor la valida', async () => {
+        const gymPreference = (disabled: unknown): SyncRecord => ({
+          id: GYM_PREFERENCE_RECORD_ID,
+          collection: 'gym',
+          data: { kind: 'preference', value: { disabled } },
+          updatedAt: at(-5),
+          deletedAt: null,
+          rev: 0,
+        });
+        await push(A, gymPreference(true));
+        const a = await pullAll(ctx.service, A, undefined, 'gym');
+        expect(a.records.map((r) => r.data)).toEqual([{ kind: 'preference', value: { disabled: true } }]);
+        expect((await pullAll(ctx.service, B, undefined, 'gym')).records).toEqual([]);
+
+        // B puede tener su propia preferencia con el mismo id sin tocar la de A.
+        await push(B, { ...gymPreference(false), updatedAt: at(-1) });
+        expect((await pullAll(ctx.service, A, undefined, 'gym')).records[0].data).toEqual({
+          kind: 'preference',
+          value: { disabled: true },
+        });
+
+        // Un valor que no cumple el contrato se rechaza (400) y no escribe nada.
+        const bad = await statusOf(push(A, { ...gymPreference('si'), updatedAt: at(-1) }));
+        expect(bad.status).toBe(400);
       });
 
       it('deleteAllForUser borra solo los datos del usuario indicado', async () => {

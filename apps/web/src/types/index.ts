@@ -238,6 +238,8 @@ export interface AppState {
   weightHistory?: WeightHistoryEntry[];
   gymAttendanceLogs?: GymAttendanceLog[];
   dismissedGymScheduleAlerts?: string[];
+  /** `true` = el usuario no va al gimnasio y el modulo esta oculto (spec 011). Ausente o `false` = gym activo. */
+  gymDisabled?: boolean;
   weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];

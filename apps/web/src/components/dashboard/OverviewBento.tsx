@@ -62,6 +62,10 @@ export interface OverviewBentoProps {
   todayDateIso?: string;
   attendanceLogs?: GymAttendanceLog[];
   missingScheduledGymDays?: MissingScheduledGymDay[];
+  /** `false` = el usuario dijo que no va al gimnasio: se oculta todo lo de gym (spec 011). */
+  gymEnabled?: boolean;
+  onEnableGym?: () => void;
+  onDisableGym?: () => void;
   onNavigateTab: (tab: NavTab) => void;
   onToggleGymSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onUpdateUniStatus: (id: string, status: AssignmentStatus) => void;
@@ -108,6 +112,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   todayDateIso,
   attendanceLogs,
   missingScheduledGymDays = [],
+  gymEnabled = true,
+  onEnableGym,
+  onDisableGym,
   onNavigateTab,
   onToggleGymSet,
   onUpdateUniStatus,
@@ -706,6 +713,19 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
         </div>
 
         {/* Card 3: Entrenamiento de hoy (Synced with Attendance & Schedule) */}
+        {!gymEnabled ? (
+          <div className="t-card p-6 flex flex-col justify-center gap-3" data-testid="gym-disabled-notice">
+            <div className="flex items-center gap-2 text-[14px] text-[var(--muted)]">
+              <Dumbbell className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>Gym desactivado</span>
+            </div>
+            {onEnableGym && (
+              <button type="button" onClick={onEnableGym} className="t-btn t-btn-secondary self-start">
+                Reactivar
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="t-card p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
@@ -765,9 +785,20 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             )}
 
             {!todayRoutine || gymExercises.length === 0 ? (
-              <p className="py-8 text-[14px] text-[var(--muted)]">
-                Hoy toca descanso o aún no hay ejercicios cargados.
-              </p>
+              <div className="py-8">
+                <p className="text-[14px] text-[var(--muted)]">
+                  Hoy toca descanso o aún no hay ejercicios cargados.
+                </p>
+                {!state.gymProfile && onDisableGym && (
+                  <button
+                    type="button"
+                    onClick={onDisableGym}
+                    className="t-btn t-btn-ghost px-2.5 mt-3 text-[13px]"
+                  >
+                    No voy al gimnasio
+                  </button>
+                )}
+              </div>
             ) : (
               <div>
                 {visibleExercises.map((ex) => (
@@ -846,6 +877,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             <span>Agregar ejercicio</span>
           </button>
         </div>
+        )}
 
         {/* Card 4: Hábitos diarios */}
         <DailyHabitsCard
@@ -1228,6 +1260,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     Cerraste todas las entregas de la semana{' '}
                     <span className="t-num">{currentWeek}</span>.
                   </span>
+                  {gymEnabled && (
                   <button
                     type="button"
                     onClick={() => onNavigateTab('gym')}
@@ -1236,6 +1269,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     <span>Ir al Gym</span>
                     <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
+                  )}
                 </div>
               )}
             </div>

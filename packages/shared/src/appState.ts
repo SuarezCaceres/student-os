@@ -26,6 +26,8 @@ export const AppStateSchema = z.object({
   weightHistory: z.array(WeightHistoryEntrySchema).optional(),
   gymAttendanceLogs: z.array(GymAttendanceLogSchema).optional(),
   dismissedGymScheduleAlerts: z.array(z.string()).optional(),
+  /** `true` = el usuario dijo que no va al gimnasio (spec 011). Ausente o `false` = gym activo. */
+  gymDisabled: z.boolean().optional(),
   gymRoutines: z.array(GymRoutineSchema),
   // learning
   weeklyReflections: WeeklyReflectionsMapSchema.optional(),
