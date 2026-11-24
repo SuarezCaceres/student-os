@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico
+- **Hecho:** análisis del login y del calendario y spec 009 en borrador (`docs/specs/009-…/spec.md`, 13 criterios, `features.json` en estado `spec`). Hallazgos: hoy hay tres caminos de entrada (Google por GIS, Google por Supabase y una cuenta local falsa); en Vercel solo existe `VITE_GOOGLE_CLIENT_ID`, así que producción funciona en modo GIS; el calendario ya es casi el mismo entorno que Google una vez conectado (los eventos se leen en vivo y gym, turno y bloques marcados se publican), y lo que falta es vincular sin botón en el login.
+- **Decisiones del humano:** solo Google (sin registro, sin modo local, sin demo), mismos permisos de Calendar, sin botón de desvincular, calendario como hoy.
+- **Pendiente:** que apruebes la spec y respondas las 5 preguntas abiertas; después `plan.md`. Esta funcionalidad deja obsoletos la 001 y el ADR 0004.
+- **Problemas:** el importador del primer inicio, el cifrado del token y el borrado de cuenta son zonas protegidas y esta spec los toca. Depende de 007 y 008.
+
 ## 2026-11-24 · Claude Code · docs/prioriza-pendientes
 - **Hecho:** `docs/TASKS.md` reordenado por prioridad Alto/Medio/Bajo. Dos pendientes nuevos de prioridad Alta pedidos por el humano: **A1** login con Google para cualquier usuario y Calendar vinculado sin botón (funcionalidad 009, marcado importante) y **A2** entorno de trabajo por usuario (010). `features.json` con 009 y 010 y sus carpetas de spec. Verificado que el PR #7 está en `main` y que Vercel sirve la web en https://student-os-mocha-iota.vercel.app (HTTP 200).
 - **Pendiente:** escribir las specs 009 y 010 con `spec-plan-code`. Producción (A3) y verificación de Google (A4) son prerrequisitos y van en paralelo.

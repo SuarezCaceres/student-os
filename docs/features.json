@@ -98,13 +98,21 @@
       "id": "009",
       "nombre": "login-google-para-todos-y-calendar-automatico",
       "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
-      "estado": "pendiente",
+      "estado": "spec",
       "criterios": [
-        { "id": "C1", "descripcion": "Cualquier persona con una cuenta de Google puede iniciar sesion en produccion, sin estar en una lista de usuarios de prueba", "pasa": false },
-        { "id": "C2", "descripcion": "Tras iniciar sesion, su Google Calendar queda vinculado sin pulsar ningun boton 'Conectar'", "pasa": false },
-        { "id": "C3", "descripcion": "Si el usuario niega los permisos de Calendar, la app sigue funcionando y puede vincularlo mas tarde", "pasa": false },
-        { "id": "C4", "descripcion": "El refresh token se guarda cifrado en el servidor y el navegador nunca lo ve (se mantiene lo del criterio 005-C1)", "pasa": false },
-        { "id": "C5", "descripcion": "El flujo funciona con Google y Supabase reales de produccion, no solo con los simulados", "pasa": false }
+        { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": false },
+        { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": false },
+        { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": false },
+        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": false },
+        { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": false },
+        { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": false },
+        { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": false },
+        { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
+        { "id": "C9", "descripcion": "Comportamiento si el usuario no concede el permiso de Calendar (POR DECIDIR en la spec: recomendado, entra con aviso y se le vuelve a pedir)", "pasa": false },
+        { "id": "C10", "descripcion": "El navegador nunca guarda ni recibe access token ni refresh token de Google", "pasa": false },
+        { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": false },
+        { "id": "C12", "descripcion": "Una cuenta de Google cualquiera, fuera de la lista de usuarios de prueba, entra en produccion sin la advertencia de app no verificada (requiere 007 y 008)", "pasa": false },
+        { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": false }
       ]
     },
     {
