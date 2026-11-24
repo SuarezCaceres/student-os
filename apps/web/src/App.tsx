@@ -404,13 +404,14 @@ export const App: React.FC = () => {
     setState((prev) => (prev.gymDisabled === true ? { ...prev, gymDisabled: false } : prev));
   }, [setState]);
 
-  // Si el gym se desactiva (aqui o desde otro dispositivo) mientras se esta en su pestana, volver al resumen.
+  // Con el gym desactivado la pestana Gym no existe: si se desactiva (aqui o desde otro dispositivo) estando en ella, o si
+  // algo intenta abrirla despues (p. ej. el aviso «Ir a Gym» de Google), se vuelve al resumen en vez de dejar la pantalla vacia.
   useEffect(() => {
     if (!isGymEnabled) {
       setIsFirstGymOnboardingOpen(false);
-      setActiveTab((tab) => (tab === 'gym' ? 'overview' : tab));
+      if (activeTab === 'gym') setActiveTab('overview');
     }
-  }, [isGymEnabled]);
+  }, [isGymEnabled, activeTab]);
 
   // Quick Add Trigger Helper
   const handleOpenQuickAdd = useCallback((tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
@@ -2545,6 +2546,7 @@ export const App: React.FC = () => {
         state={state}
         initialTab={quickAddInitialTab}
         isGoogleConnected={isGoogleConnected}
+        gymEnabled={isGymEnabled}
         onAddAssignment={handleAddAssignment}
         onAddGymExercise={handleAddGymExercise}
         onAddKanbanItem={handleAddKanbanItem}

@@ -24,13 +24,25 @@ import {
  */
 test.describe.configure({ mode: 'serial' });
 
-const GYM_BLOCK = 'Entrenamiento Push (Pecho/Hombro)'; // bloque de gym del estado de partida
+const GYM_BLOCK = 'Entrenamiento Push E2E'; // bloque de gym local que crea la prueba
 
 const preference = async (userId: string) => {
   const rows = await syncRecordsOf(userId, 'gym');
   const row = rows.find((r) => r.id === 'gym-preference' && r.deletedAt === null);
   return (row?.data as { value?: { disabled?: boolean } } | undefined)?.value?.disabled;
 };
+
+/** Crea un bloque de gym en el horario desde la interfaz (los bloques de gym son locales: no viajan por el sync). */
+async function addGymBlock(page: Page, title: string): Promise<void> {
+  await openTab(page, 'Horario');
+  await page.getByRole('button', { name: 'Agendar bloque' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Actividad o clase').fill(title);
+  await dialog.locator('select').nth(1).selectOption('gym');
+  await dialog.getByRole('button', { name: 'Guardar bloque' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText(title).first()).toBeVisible();
+}
 
 const gymTab = (page: Page) =>
   page.getByRole('navigation', { name: 'Navegación principal' }).getByText('Gym', { exact: true });
@@ -41,27 +53,6 @@ test.describe('5. gym opcional', () => {
 
   test.beforeAll(async ({ browser }) => {
     session = await sessionFor(userKey('s5'));
-    // Una cuenta nueva no trae bloques de calendario: se siembra uno de gym por el API para poder ver que se oculta.
-    const now = new Date().toISOString();
-    const seeded = await apiFetch('/sync/push', session.accessToken, {
-      method: 'POST',
-      body: JSON.stringify({
-        changes: [
-          {
-            id: 'cb-gym-e2e',
-            collection: 'calendar',
-            data: {
-              kind: 'block',
-              value: { id: 'cb-gym-e2e', day: 'Lunes', startTime: '07:00', endTime: '08:30', title: GYM_BLOCK, category: 'gym' },
-            },
-            updatedAt: now,
-            deletedAt: null,
-            rev: 0,
-          },
-        ],
-      }),
-    });
-    expect(seeded.status, seeded.text).toBeLessThan(300);
     a = await bootDevice(browser, session, { kind: 'desktop' });
   });
 
@@ -71,8 +62,7 @@ test.describe('5. gym opcional', () => {
 
   test('5a. con el gym activo hay pestana, bloques de gym y la opcion «No voy al gimnasio» (C1, C2)', async () => {
     await expect(gymTab(a.page)).toBeVisible();
-    await openTab(a.page, 'Horario');
-    await expect(a.page.getByText(GYM_BLOCK).first()).toBeVisible();
+    await addGymBlock(a.page, GYM_BLOCK);
 
     await openTab(a.page, 'Gym');
     // Sin perfil de gym (cuenta nueva) la opcion esta en la propia pestana.
@@ -111,13 +101,13 @@ test.describe('5. gym opcional', () => {
       await b.page.getByRole('button', { name: 'Reactivar' }).click();
       await expect(gymTab(b.page)).toBeVisible();
       await expect.poll(() => preference(session.userId), { timeout: 20_000 }).toBe(false);
-      // Los datos de gym siguen ahi: el bloque del horario vuelve a aparecer.
-      await openTab(b.page, 'Horario');
-      await expect(b.page.getByText(GYM_BLOCK).first()).toBeVisible();
       expect(relevantConsoleErrors(b.tap)).toEqual([]);
 
+      // El primer dispositivo recibe la reactivacion y su bloque de gym (local) vuelve a aparecer: no se perdio nada.
       await pullByFocusUntil(a.page, async () => (await gymTab(a.page).count()) > 0);
       await expect(gymTab(a.page)).toBeVisible();
+      await openTab(a.page, 'Horario');
+      await expect(a.page.getByText(GYM_BLOCK).first()).toBeVisible();
     } finally {
       await b.context.close();
     }
@@ -149,20 +139,12 @@ test.describe('5. gym opcional', () => {
     await control('/supabase/config', { loginUserKey: key });
     const s = await sessionFor(key);
     const at = new Date().toISOString();
-    // La cuenta ya tiene el gym desactivado y un bloque de gym en su horario.
+    // La cuenta ya tiene el gym desactivado.
     const seeded = await apiFetch('/sync/push', s.accessToken, {
       method: 'POST',
       body: JSON.stringify({
         changes: [
           { id: 'gym-preference', collection: 'gym', data: { kind: 'preference', value: { disabled: true } }, updatedAt: at, deletedAt: null, rev: 0 },
-          {
-            id: 'cb-gym-e2e-google',
-            collection: 'calendar',
-            data: { kind: 'block', value: { id: 'cb-gym-e2e-google', day: 'Lunes', startTime: '07:00', endTime: '08:30', title: GYM_BLOCK, category: 'gym' } },
-            updatedAt: at,
-            deletedAt: null,
-            rev: 0,
-          },
         ],
       }),
     });
@@ -185,7 +167,6 @@ test.describe('5. gym opcional', () => {
     await expect(gymTab(page)).toHaveCount(0);
     for (const tab of ['Kanban', 'Universidad', 'Horario', 'Aprendizaje', 'Resumen'] as const) await openTab(page, tab);
     await openTab(page, 'Horario');
-    await expect(page.getByText(GYM_BLOCK)).toHaveCount(0);
     await page.waitForTimeout(3_000);
 
     // Calendar esta realmente vinculado (la API hablo con Google al enlazar) y, aun asi, la app no escribe en el calendario.

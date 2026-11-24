@@ -17,6 +17,8 @@ const baseBento = (state: AppState) => ({
   onUpdateUniStatus: noop,
   onUpdateKanbanStatus: noop,
   onOpenQuickAdd: noop,
+  onHabitsChange: noop,
+  onRestoreState: noop,
 });
 
 // Sin perfil de gym ni rutinas con ejercicios: el estado de quien aun no configuro nada.
