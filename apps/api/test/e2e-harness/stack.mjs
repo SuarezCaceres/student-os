@@ -186,10 +186,14 @@ try {
   log('prisma db push OK (schema dev_e2e)');
 
   // 3. Supabase y Google falsos
-  const supabase = await startFakeSupabase({ port: PORTS.supabase });
-  closers.push(() => supabase.close());
+  // Google primero: el Supabase falso le pide los refresh tokens que entrega en el login (spec 009).
   const google = await startFakeGoogle({ port: PORTS.google });
   closers.push(() => google.close());
+  const supabase = await startFakeSupabase({
+    port: PORTS.supabase,
+    issueProviderRefreshToken: (email, scopes) => google.issueRefreshToken(email, scopes),
+  });
+  closers.push(() => supabase.close());
   log(`Supabase falso :${PORTS.supabase}, Google falso :${PORTS.google}`);
 
   // 4. API real
@@ -279,6 +283,7 @@ try {
           const body = await readJson(req);
           if (typeof body.failRefresh === 'boolean') supabase.state.failRefresh = body.failRefresh;
           if (typeof body.loginUserKey === 'string') supabase.state.loginUserKey = body.loginUserKey;
+          if (body.grantedScopes === null || Array.isArray(body.grantedScopes)) supabase.state.grantedScopes = body.grantedScopes;
           return reply(res, 200, supabase.state);
         }
         case 'GET /supabase/state':

@@ -1,5 +1,12 @@
 import { useSyncExternalStore } from 'react';
 import type { Session, SupabaseClient, User } from '@supabase/supabase-js';
+import {
+  clearCalendarLinkState,
+  createProviderTokenStrippingStorage,
+  GOOGLE_LOGIN_CALENDAR_SCOPES,
+  hasPendingProviderRefreshToken,
+  linkCalendarAfterLogin,
+} from './googleLogin';
 
 /**
  * Cliente de Supabase Auth para StudentOS.
@@ -65,6 +72,9 @@ export function getSupabase(): Promise<SupabaseClient | null> {
           autoRefreshToken: true,
           detectSessionInUrl: true,
           flowType: 'pkce',
+          // supabase-js persiste la sesion completa, incluido el refresh token de Google. Este `storage` lo elimina antes
+          // de escribir: el token solo vive en memoria hasta enviarse al servidor (spec 009, C10).
+          storage: createProviderTokenStrippingStorage(window.localStorage),
         },
       }),
     );
@@ -84,11 +94,15 @@ export function __resetSupabaseForTests(): void {
 export async function signInWithGoogle(): Promise<void> {
   const supabase = await getSupabase();
   if (!supabase) throw new Error('El inicio de sesión en la nube no está configurado.');
+  clearCalendarLinkState();
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
       redirectTo: window.location.origin,
-      queryParams: { prompt: 'select_account' },
+      // Calendar forma parte del login (spec 009): un solo consentimiento con los permisos de calendario y
+      // `offline` + `consent` para que Google entregue el refresh token que el servidor guardara cifrado.
+      scopes: GOOGLE_LOGIN_CALENDAR_SCOPES,
+      queryParams: { access_type: 'offline', prompt: 'consent select_account' },
     },
   });
   if (error) throw new Error(error.message);
@@ -149,6 +163,25 @@ const sessionStore = (() => {
     listeners.forEach((l) => l());
   };
 
+  // `true` mientras un login con Google espera a que Calendar quede vinculado. Durante ese tiempo NADA debe marcar la
+  // sesion como iniciada (p. ej. el `getSession()` inicial, que termina despues del canje PKCE): si el enlace falla,
+  // la app no debe haber llegado a entrar.
+  let finishingLogin = false;
+
+  const finishGoogleLogin = async (supabase: SupabaseClient, session: Session) => {
+    try {
+      const result = await linkCalendarAfterLogin(session);
+      if (result === 'failed') {
+        await supabase.auth.signOut().catch(() => undefined);
+        set(stateFromSession(null));
+        return;
+      }
+      set(stateFromSession(session));
+    } finally {
+      finishingLogin = false;
+    }
+  };
+
   const start = () => {
     if (started) return;
     started = true;
@@ -158,12 +191,21 @@ const sessionStore = (() => {
           set(DISABLED_STATE);
           return;
         }
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+          // Login recien hecho con Google: la app NO se considera iniciada hasta que Calendar quede vinculado en el
+          // servidor. Si falta el permiso o falla el enlace, se cierra la sesion y se explica por que (C9).
+          if (event === 'SIGNED_IN' && session && (session.provider_token || session.provider_refresh_token || hasPendingProviderRefreshToken())) {
+            finishingLogin = true;
+            set(LOADING_STATE);
+            void finishGoogleLogin(supabase, session);
+            return;
+          }
+          if (finishingLogin) return;
           set(stateFromSession(session));
         });
         unsubscribeAuth = () => sub.subscription.unsubscribe();
         const { data } = await supabase.auth.getSession();
-        set(stateFromSession(data.session));
+        if (!finishingLogin) set(stateFromSession(data.session));
       })
       .catch((error) => {
         console.warn('No se pudo iniciar Supabase Auth:', error);
@@ -187,6 +229,7 @@ const sessionStore = (() => {
       unsubscribeAuth?.();
       unsubscribeAuth = null;
       started = false;
+      finishingLogin = false;
       state = LOADING_STATE;
       listeners.clear();
     },

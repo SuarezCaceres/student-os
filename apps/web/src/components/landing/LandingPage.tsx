@@ -7,6 +7,7 @@ import { AudienceSection } from './AudienceSection';
 import { CreatorStorySection } from './CreatorStorySection';
 import { LandingFooter } from './LandingFooter';
 import { AuthModal, type UserSession } from '../auth/AuthModal';
+import { CalendarLinkNotice } from '../auth/CalendarLinkNotice';
 
 interface LandingPageProps {
   onEnterApp: () => void;
@@ -42,6 +43,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         onOpenAuth={handleOpenAuth}
         onEnterAppDemo={handleEnterDemo}
       />
+
+      {/* Aviso si el login se cerro porque Calendar no quedo vinculado (spec 009, C9) */}
+      <CalendarLinkNotice />
 
       {/* Main Content with Scroll Storytelling */}
       <main>

@@ -17,7 +17,11 @@ export function uuidForUser(key) {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-export async function startFakeSupabase({ port, host = '::' }) {
+/**
+ * `issueProviderRefreshToken(email, grantedScopes)`: callback opcional (lo da el Google falso) para que el login con
+ * Google entregue `provider_refresh_token` como el Supabase real cuando la peticion lo pide (`access_type=offline`).
+ */
+export async function startFakeSupabase({ port, host = '::', issueProviderRefreshToken = null }) {
   const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
   const kid = 'e2e-key-1';
   const publicJwk = { ...(await exportJWK(publicKey)), kid, alg: 'ES256', use: 'sig' };
@@ -31,6 +35,13 @@ export async function startFakeSupabase({ port, host = '::' }) {
     failRefresh: false,
     /** Usuario con el que "inicia sesion" el boton de Google (pantalla fake de /authorize). */
     loginUserKey: 'login-user',
+    /**
+     * Permisos que "concede" el usuario en la pantalla de Google. `null` = los que pidio la web. Una lista simula
+     * que desmarco alguno (consentimiento granular).
+     */
+    grantedScopes: null,
+    /** Ultima peticion de login recibida (para que las pruebas comprueben `scopes`, `access_type` y `prompt`). */
+    lastAuthorize: null,
   };
   const authCodes = new Map();
   const refreshSerial = new Map();
@@ -138,7 +149,15 @@ export async function startFakeSupabase({ port, host = '::' }) {
           if (!entry) return json(res, 400, { error: 'invalid_grant', error_description: 'unknown auth code' });
           const challenge = createHash('sha256').update(String(body.code_verifier ?? '')).digest('base64url');
           if (challenge !== entry.challenge) return json(res, 400, { error: 'invalid_grant', error_description: 'code_verifier mismatch' });
-          return json(res, 200, await buildSession(entry.userKey));
+          const session = await buildSession(entry.userKey);
+          // Como el Supabase real: solo hay refresh token del proveedor si la web lo pidio con access_type=offline.
+          if (issueProviderRefreshToken && entry.accessType === 'offline') {
+            const requested = ['openid', 'email', ...entry.scopes];
+            const granted = state.grantedScopes ?? [...new Set(requested)];
+            session.provider_token = `fake-google-access-${entry.userKey}`;
+            session.provider_refresh_token = issueProviderRefreshToken(`${entry.userKey}@e2e.test`, granted);
+          }
+          return json(res, 200, session);
         }
         return json(res, 400, { error: 'unsupported_grant_type' });
       }
@@ -148,7 +167,15 @@ export async function startFakeSupabase({ port, host = '::' }) {
         const challenge = url.searchParams.get('code_challenge');
         if (!redirectTo || !challenge) return json(res, 400, { error: 'missing redirect_to / code_challenge' });
         const code = randomBytes(12).toString('hex');
-        authCodes.set(code, { userKey: state.loginUserKey, challenge });
+        const scopes = (url.searchParams.get('scopes') ?? '').split(/[\s,]+/).filter(Boolean);
+        const accessType = url.searchParams.get('access_type');
+        state.lastAuthorize = {
+          scopes,
+          accessType,
+          prompt: url.searchParams.get('prompt'),
+          provider: url.searchParams.get('provider'),
+        };
+        authCodes.set(code, { userKey: state.loginUserKey, challenge, scopes, accessType });
         const target = new URL(redirectTo);
         target.searchParams.set('code', code);
         res.statusCode = 302;

@@ -78,8 +78,36 @@ test.describe('2. login con sesion en la nube', () => {
     const req = await authorizeRequest;
     expect(new URL(req.url()).searchParams.get('code_challenge_method')?.toLowerCase()).toBe('s256');
 
+    // C4: el MISMO consentimiento del login pide los permisos de Calendar y el refresh token (offline + consent).
+    const asked = new URL(req.url()).searchParams;
+    expect((asked.get('scopes') ?? '').split(/[\s,+]+/)).toEqual(
+      expect.arrayContaining([
+        'https://www.googleapis.com/auth/calendar.readonly',
+        'https://www.googleapis.com/auth/calendar.events',
+      ]),
+    );
+    expect(asked.get('access_type')).toBe('offline');
+    expect(asked.get('prompt') ?? '').toContain('consent');
+
     // Tras el redirect de vuelta y el canje PKCE, la app entra sola.
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible({ timeout: 30_000 });
+
+    // C5: Calendar queda vinculado SIN pulsar ningun boton: el servidor guardo el refresh token cifrado.
+    await expect
+      .poll(async () => (await apiFetch('/google/status', s.accessToken)).json, { timeout: 15_000 })
+      .toMatchObject({ connected: true, needsReauth: false, email: `${key}@e2e.test` });
+    expect(
+      (await apiFetch('/google/status', s.accessToken)).text,
+      'el estado de Calendar nunca incluye tokens',
+    ).not.toMatch(/fake-rt-|refresh_token/i);
+
+    // C10: ningun almacenamiento persistente del navegador contiene el refresh token de Google.
+    const leaked = await page.evaluate(() => {
+      const dump = (st: Storage) => Object.keys(st).map((k) => `${k}=${st.getItem(k)}`).join('\n');
+      return `${dump(localStorage)}\n${dump(sessionStorage)}`;
+    });
+    expect(leaked).not.toMatch(/fake-rt-/);
+    expect(leaked).not.toContain('provider_refresh_token');
     await expect.poll(() => tap.pulls().length, { timeout: 15_000 }).toBeGreaterThan(0);
     expect(tap.pulls()[0].status).toBe(200);
     const stored = await page.evaluate((k) => localStorage.getItem(k), s.storageKey);
@@ -89,6 +117,38 @@ test.describe('2. login con sesion en la nube', () => {
     await evidence(page, '02-login-google-pkce-ok');
     expect(tap.pageErrors).toEqual([]);
     await context.close();
+  });
+
+  test('2e. C9: si el usuario desmarca el permiso de Calendar en Google, no entra: mensaje claro, sin sesion y sin datos', async ({ browser }) => {
+    const key = userKey('s2e');
+    await control('/supabase/config', {
+      loginUserKey: key,
+      grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
+    });
+    try {
+      const s = await sessionFor(key);
+      const context = await newContext(browser);
+      const page = await context.newPage();
+      await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Iniciar sesión/i }).first().click();
+      await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+
+      // Vuelve de Google sin el permiso: el servidor lo rechaza y la app muestra el aviso en la landing.
+      const notice = page.getByRole('alert').filter({ hasText: 'necesita acceso a tu Google Calendar' });
+      await expect(notice).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole('tablist', { name: 'Vistas principales' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Continuar con Google' }).first()).toBeVisible();
+      await evidence(page, '02-login-sin-permiso-calendar');
+
+      // No se guardo ninguna sesion ni datos suyos, y no hay conexion de Calendar.
+      const stored = await page.evaluate((k) => localStorage.getItem(k), s.storageKey);
+      expect(stored === null || !stored.includes('access_token')).toBe(true);
+      expect((await rowsOf(s.userId)).profiles).toBe(0);
+      expect((await apiFetch('/google/status', s.accessToken)).json).toMatchObject({ connected: false });
+      await context.close();
+    } finally {
+      await control('/supabase/config', { grantedScopes: null });
+    }
   });
 
   test('2c. cerrar sesion: supabase-js borra su sesion Y la app vuelve a la landing (BUG-01: no vuelve)', async ({ browser }) => {
