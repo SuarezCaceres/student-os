@@ -4,6 +4,11 @@
 > Su objetivo es que la siguiente sesión, que no recuerda nada, sepa dónde retomar.
 
 <!-- Formato:
+## 2026-11-24 · Claude Code · docs/spec-007-produccion
+- **Hecho:** spec 007 (producción) en borrador, partiendo de `origin/main`. Propone los criterios C6 a C8 (dos cuentas reales, sin secretos, respaldo de `GOOGLE_TOKEN_ENC_KEY`) y reparte qué hace el humano y qué prepara el agente. La spec 008 (verificación de Google) la redacta «agente 2» en su propia rama.
+- **Pendiente:** tu aprobación de la spec; después, el plan y el script de verificación de solo lectura. Mientras tanto A3 y A4 siguen siendo las acciones del humano que bloquean la 009.
+- **Problemas:** `.env.example` está bloqueado para lectura por `.claude/settings.json` (M4 de `TASKS.md`), así que las variables salen de `env.schema.ts` y `render.yaml`.
+
 ## AAAA-MM-DD · agente (Claude Code / Antigravity) · rama
 - **Hecho:** qué se completó (con referencia a commits o PR)
 - **Verificación:** resultado de ./scripts/check.sh
