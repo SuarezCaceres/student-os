@@ -33,6 +33,8 @@ export interface StatsHeroProps {
   googleEvents?: GoogleCalendarEvent[];
   todayDateIso?: string;
   missingGymScheduleCount?: number;
+  /** `false` = gym oculto (spec 011): no se muestra el KPI de gym. */
+  gymEnabled?: boolean;
   onOpenQuickAddWithTab?: (
     tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning'
   ) => void;
@@ -44,6 +46,7 @@ export const StatsHero: React.FC<StatsHeroProps> = ({
   googleEvents = [],
   todayDateIso,
   missingGymScheduleCount = 0,
+  gymEnabled = true,
   onOpenQuickAddWithTab,
   onNavigateTab,
 }) => {
@@ -122,7 +125,7 @@ export const StatsHero: React.FC<StatsHeroProps> = ({
             <span className="t-badge t-badge-accent t-num">
               Semana {state.currentAcademicWeek}
             </span>
-            {missingGymScheduleCount > 0 && onNavigateTab && (
+            {gymEnabled && missingGymScheduleCount > 0 && onNavigateTab && (
               <button
                 type="button"
                 onClick={() => onNavigateTab('gym')}
@@ -233,7 +236,7 @@ export const StatsHero: React.FC<StatsHeroProps> = ({
 
         {/* Right Column: 4 Day-Focused KPIs (Hairline-divided, zero nested boxes) */}
         <div className="xl:border-l xl:border-[var(--line)] xl:pl-8 w-full xl:w-auto pt-4 xl:pt-0 border-t xl:border-t-0 border-[var(--line)] shrink-0">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-y-4 gap-x-4 sm:gap-x-6">
+          <div className={`grid grid-cols-2 ${gymEnabled ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-y-4 gap-x-4 sm:gap-x-6`}>
             {/* KPI 1: Racha */}
             <div className="flex flex-col justify-between min-w-0">
               <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
@@ -250,6 +253,7 @@ export const StatsHero: React.FC<StatsHeroProps> = ({
             </div>
 
             {/* KPI 2: Gym hoy */}
+            {gymEnabled && (
             <div className="flex flex-col justify-between min-w-0 border-l border-[var(--line)] pl-4 sm:pl-6">
               <div className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
                 <Dumbbell className="w-3.5 h-3.5 text-[var(--gym)] shrink-0" aria-hidden="true" />
@@ -264,6 +268,7 @@ export const StatsHero: React.FC<StatsHeroProps> = ({
                 </p>
               </div>
             </div>
+            )}
 
             {/* KPI 3: Hábitos hoy */}
             <div className="flex flex-col justify-between min-w-0 pt-3 sm:pt-0 border-t sm:border-t-0 sm:border-l border-[var(--line)] sm:pl-6">

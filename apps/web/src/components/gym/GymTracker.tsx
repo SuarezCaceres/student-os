@@ -75,6 +75,8 @@ export interface GymTrackerProps {
   autoOpenOnboarding?: boolean;
   onOnboardingOpenChange?: (isOpen: boolean) => void;
   onOpenGoogleSync?: () => void;
+  /** Spec 011: «No voy al gimnasio». Oculta todo el modulo; los datos se conservan. */
+  onDisableGym?: () => void;
   onSyncGymWeekToGoogle?: () => Promise<void> | void;
   onSaveGymPlan?: (payload: GymOnboardingCompletePayload) => void;
   onClearPreviousGymBlocks?: () => Promise<DeleteGoogleGymEventsResult | void> | void;
@@ -159,6 +161,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   autoOpenOnboarding,
   onOnboardingOpenChange,
   onOpenGoogleSync,
+  onDisableGym,
   onSyncGymWeekToGoogle,
   onSaveGymPlan,
   onClearPreviousGymBlocks,
@@ -516,6 +519,12 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
               <Settings2 className="w-4 h-4" aria-hidden="true" />
               <span>{gymProfile ? 'Mi perfil gym' : 'Configurar gym'}</span>
             </button>
+
+            {!gymProfile && onDisableGym && (
+              <button type="button" onClick={onDisableGym} className="t-btn t-btn-ghost">
+                <span>No voy al gimnasio</span>
+              </button>
+            )}
 
             {onSyncGymWeekToGoogle && (
               <button
@@ -1222,6 +1231,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
         isGoogleSyncing={isGoogleSyncing || isSyncingGymToGoogle}
         onClearPreviousGymBlocks={onClearPreviousGymBlocks}
         onOpenGoogleSync={onOpenGoogleSync}
+        onDisableGym={onDisableGym}
         onComplete={(payload) => {
           onSaveGymPlan?.(payload);
           setPinnedMissDay(null);

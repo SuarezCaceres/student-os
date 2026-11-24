@@ -391,6 +391,27 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
+  // Gym opcional (spec 011): `gymDisabled` ausente = gym activo. Ocultar no borra nada: perfil, rutinas y asistencia se conservan.
+  const isGymEnabled = state.gymDisabled !== true;
+
+  const handleDisableGym = useCallback(() => {
+    setIsFirstGymOnboardingOpen(false);
+    setActiveTab((tab) => (tab === 'gym' ? 'overview' : tab));
+    setState((prev) => (prev.gymDisabled === true ? prev : { ...prev, gymDisabled: true }));
+  }, [setState]);
+
+  const handleEnableGym = useCallback(() => {
+    setState((prev) => (prev.gymDisabled === true ? { ...prev, gymDisabled: false } : prev));
+  }, [setState]);
+
+  // Si el gym se desactiva (aqui o desde otro dispositivo) mientras se esta en su pestana, volver al resumen.
+  useEffect(() => {
+    if (!isGymEnabled) {
+      setIsFirstGymOnboardingOpen(false);
+      setActiveTab((tab) => (tab === 'gym' ? 'overview' : tab));
+    }
+  }, [isGymEnabled]);
+
   // Quick Add Trigger Helper
   const handleOpenQuickAdd = useCallback((tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
     setQuickAddInitialTab(tab);
@@ -2235,25 +2256,41 @@ export const App: React.FC = () => {
     [state.weeklyReflections, state.currentAcademicWeek]
   );
 
+  // Con el gym desactivado no se muestran bloques ni eventos de gym (no se borran: solo se filtran al mostrar).
+  const visibleState = useMemo(
+    () =>
+      isGymEnabled
+        ? state
+        : { ...state, calendarBlocks: state.calendarBlocks.filter((b) => b.category !== 'gym') },
+    [isGymEnabled, state]
+  );
+  const visibleGoogleEvents = useMemo(
+    () => (isGymEnabled ? googleEvents : googleEvents.filter((event) => !isStudentOsGymGoogleEvent(event))),
+    [isGymEnabled, googleEvents]
+  );
+
   const missingScheduledGymDays = useMemo(
     () =>
-      findMissingScheduledGymDays({
-        gymProfile: state.gymProfile,
-        routines: state.gymRoutines,
-        attendanceLogs: state.gymAttendanceLogs,
-        calendarBlocks: state.calendarBlocks,
-        googleEvents,
-        snapshotGoogleEvents: loadGoogleEventsSnapshot(),
-        isGoogleConnected,
-        isGoogleMetaConnected: getStoredGoogleMeta().connected,
-        hasGoogleWeekReady,
-        isGoogleSyncing,
-        weekDates,
-        todayIso: getLocalIsoDate(),
-        dismissedDates: state.dismissedGymScheduleAlerts,
-        deletedDatesThisSession: deletedGymDatesThisSession,
-      }),
+      state.gymDisabled === true
+        ? []
+        : findMissingScheduledGymDays({
+          gymProfile: state.gymProfile,
+          routines: state.gymRoutines,
+          attendanceLogs: state.gymAttendanceLogs,
+          calendarBlocks: state.calendarBlocks,
+          googleEvents,
+          snapshotGoogleEvents: loadGoogleEventsSnapshot(),
+          isGoogleConnected,
+          isGoogleMetaConnected: getStoredGoogleMeta().connected,
+          hasGoogleWeekReady,
+          isGoogleSyncing,
+          weekDates,
+          todayIso: getLocalIsoDate(),
+          dismissedDates: state.dismissedGymScheduleAlerts,
+          deletedDatesThisSession: deletedGymDatesThisSession,
+        }),
     [
+      state.gymDisabled,
       state.gymProfile,
       state.gymRoutines,
       state.gymAttendanceLogs,
@@ -2293,6 +2330,7 @@ export const App: React.FC = () => {
         isFreeWeek={isFreeWeek}
         hasReflectionThisWeek={hasReflectionThisWeek}
         gymScheduleAlertCount={missingScheduledGymDays.length}
+        gymEnabled={isGymEnabled}
         onNavigateLanding={() => setCurrentView('landing')}
         userSession={userSession}
         onLogout={handleLogout}
@@ -2361,6 +2399,7 @@ export const App: React.FC = () => {
         )}
         {!(
           activeTab === 'gym' &&
+          isGymEnabled &&
           googleImpactReport?.status === 'no_conflict' &&
           missingScheduledGymDays.length > 0
         ) && (
@@ -2374,16 +2413,20 @@ export const App: React.FC = () => {
           {activeTab === 'overview' && (
             <>
               <StatsHero
-                state={state}
-                googleEvents={googleEvents}
+                state={visibleState}
+                googleEvents={visibleGoogleEvents}
+                gymEnabled={isGymEnabled}
                 todayDateIso={getLocalIsoDate()}
                 missingGymScheduleCount={missingScheduledGymDays.length}
                 onOpenQuickAddWithTab={(tab) => handleOpenQuickAdd(tab)}
                 onNavigateTab={setActiveTab}
               />
               <OverviewBento
-                state={state}
-                googleEvents={googleEvents}
+                state={visibleState}
+                googleEvents={visibleGoogleEvents}
+                gymEnabled={isGymEnabled}
+                onEnableGym={handleEnableGym}
+                onDisableGym={handleDisableGym}
                 todayDateIso={getLocalIsoDate()}
                 attendanceLogs={state.gymAttendanceLogs}
                 missingScheduledGymDays={missingScheduledGymDays}
@@ -2421,7 +2464,7 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'gym' && (
+          {activeTab === 'gym' && isGymEnabled && (
             <GymTracker
               routines={state.gymRoutines}
               gymProfile={state.gymProfile}
@@ -2449,6 +2492,7 @@ export const App: React.FC = () => {
               onFinishWorkout={handleFinishWorkout}
               onUpdateExercise={handleUpdateGymExercise}
               missingScheduledDays={missingScheduledGymDays}
+              onDisableGym={handleDisableGym}
               onDismissMissingGymDay={handleDismissMissingGymDay}
               onSwapFixedGymDay={handleSwapFixedGymDay}
               onRemoveFixedGymDay={handleRemoveFixedGymDay}
@@ -2457,13 +2501,13 @@ export const App: React.FC = () => {
 
           {activeTab === 'calendar' && (
             <WeeklyCalendar
-              blocks={state.calendarBlocks}
+              blocks={visibleState.calendarBlocks}
               onAddBlock={handleAddCalendarBlock}
               onDeleteBlock={handleDeleteCalendarBlock}
               onDeleteGoogleEvent={handleDeleteGoogleEvent}
               isGoogleConnected={isGoogleConnected}
               isGoogleSyncing={isGoogleSyncing}
-              googleEvents={googleEvents}
+              googleEvents={visibleGoogleEvents}
               googleBusyCount={googleBusyCount}
               onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
               onRefreshGoogleWeek={() => void refreshGoogleCalendarWeek({ source: 'manual_sync' })}
@@ -2579,7 +2623,7 @@ export const App: React.FC = () => {
       />
 
       {/* First-Time Real Account Gym Onboarding Popup (when viewing another tab) */}
-      {activeTab !== 'gym' && (
+      {activeTab !== 'gym' && isGymEnabled && (
         <GymOnboardingModal
           isOpen={isFirstGymOnboardingOpen}
           onClose={() => setIsFirstGymOnboardingOpen(false)}
@@ -2593,6 +2637,7 @@ export const App: React.FC = () => {
           isGoogleSyncing={isGoogleSyncing}
           onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
           onClearPreviousGymBlocks={handleClearPreviousGymBlocks}
+          onDisableGym={handleDisableGym}
           onComplete={(payload) => {
             void handleSaveGymPlan(payload);
             setIsFirstGymOnboardingOpen(false);

@@ -28,6 +28,8 @@ export interface NavbarProps {
   isFreeWeek?: boolean;
   hasReflectionThisWeek?: boolean;
   gymScheduleAlertCount?: number;
+  /** `false` = el usuario dijo que no va al gimnasio: no se muestra la pestana Gym (spec 011). */
+  gymEnabled?: boolean;
   onNavigateLanding?: () => void;
   userSession?: {
     name: string;
@@ -49,11 +51,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   isFreeWeek = false,
   hasReflectionThisWeek = false,
   gymScheduleAlertCount = 0,
+  gymEnabled = true,
   onNavigateLanding,
   userSession,
   onLogout,
 }) => {
-  const desktopOptions: SegmentOption<NavTab>[] = [
+  const allDesktopOptions: SegmentOption<NavTab>[] = [
     {
       id: 'overview',
       label: 'Resumen',
@@ -92,7 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     },
   ];
 
-  const mobileTabs: Array<{
+  const allMobileTabs: Array<{
     id: NavTab;
     label: string;
     Icon: React.ComponentType<{ className?: string }>;
@@ -104,6 +107,10 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'calendar', label: 'Horario', Icon: CalendarDays },
     { id: 'learning', label: 'Aprender', Icon: BookOpen },
   ];
+
+  // Con el gym desactivado la pestana no existe (spec 011).
+  const desktopOptions = gymEnabled ? allDesktopOptions : allDesktopOptions.filter((o) => o.id !== 'gym');
+  const mobileTabs = gymEnabled ? allMobileTabs : allMobileTabs.filter((t) => t.id !== 'gym');
 
   return (
     <>
@@ -260,7 +267,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[var(--surface)] border-t border-[var(--line)] pb-[env(safe-area-inset-bottom)]"
         aria-label="Navegación móvil"
       >
-        <div className="grid grid-cols-6 px-1">
+        <div className={`grid ${gymEnabled ? 'grid-cols-6' : 'grid-cols-5'} px-1`}>
           {mobileTabs.map((tab) => {
             const Icon = tab.Icon;
             const isActive = activeTab === tab.id;
