@@ -25,7 +25,10 @@ Despliegue: web en **Vercel** (Root Directory `apps/web`), API en **Render** (`r
 ## Sesión y datos
 - **Sin sesión solo se ve la landing**; la única entrada es «Continuar con Google» (ADR 0007). No hay modo local, demo ni cuenta local.
 - **Con sesión:** `useSyncedAppState` guarda el `AppState` en `localStorage` (caché de la cuenta), lo envuelve por *slices*, calcula diferencias por `id`, las encola en IndexedDB y las envía en segundo plano; al abrir o recuperar el foco hace *pull*.
-- **Primer acceso en un navegador:** si ese navegador no tiene a la cuenta ya arrancada, el estado local se descarta (nunca se sube) y se parte de la nube o, si está vacía, del estado de una cuenta nueva (`utils/newAccountState.ts`). Al abrir la app se borran las claves del prototipo (`clearLegacyLocalData`).
+- **Primer acceso en un navegador:** si ese navegador no tiene a la cuenta ya arrancada, el estado local se descarta (nunca se sube) y se parte de la nube o, si está vacía, del estado de una cuenta nueva: `emptyAppState` (`data/emptyState.ts`), vacío en todos los módulos y con el nombre de su cuenta de Google (`utils/newAccountState.ts`). Cada módulo vacío muestra una guía (`components/common/EmptyHint.tsx`). Al abrir la app se borran las claves del prototipo (`clearLegacyLocalData`).
+
+- **Cerrar sesión:** `syncStore.flushPending()` intenta subir lo pendiente (máximo 5 s). Si queda algo (sin red o servidor lento) se avisa y la persona decide; sin red el cierre es local (`signOut({ scope: 'local' })`). Borrar la cuenta sale directo.
+- **Límites por cuenta:** 5000 registros y 64 KB por registro (API). El indicador de sync lo explica con un aviso visible (`describeStatus.ts`); lo ya guardado se conserva.
 
 ## Contrato y sync
 - **Contrato:** `packages/shared` define los esquemas zod. `COLLECTIONS = profile, kanban, university, learning, gym, calendar`; cada registro de sync se valida contra el esquema de su colección.

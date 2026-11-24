@@ -11,6 +11,13 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (implementación)
+- **Hecho:** pasos 1 a 6 del plan. `emptyAppState` (cuenta nueva vacía), guías con `EmptyHint`, aviso visible de límite y de cambios rechazados, `syncStore.flushPending` (zona protegida, con tu permiso) y cierre de sesión que sube antes de salir o avisa. E2E `06-cerrar-sesion` (comprobado que falla sin la subida) y `03`/`04` adaptadas al estado vacío.
+- **Defecto real que cazó la E2E:** sin red, `signOut` dejaba la sesión guardada y la app la volvía a adoptar (no se podía salir). Ahora cae al cierre local.
+- **Verificación:** `./scripts/check.sh` completo pasa: 381 unitarias del API, 35 de shared, 321 del frontend, 151 de integración y 22 E2E.
+- **Pendiente:** C1 es manual (dos cuentas reales en producción: 007 y 008). Mover `initialData` a fixtures. **No fusionar antes de la 009 ni de producción.**
+- **Problemas:** C5 pide guía en Aprendizaje y hábitos: la de Aprendizaje es solo texto y no tiene aserción E2E; hábitos usa valores por defecto. `docs/rules/frontend.md` línea 24 sigue citando excepciones de `localStorage` ya resueltas (necesita tu permiso).
+
 ## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (spec)
 - **Hecho:** spec 010 redactada (10 criterios; C3, C4 y C10 ya los cubren la 009 y las pruebas del API) y `features.json` en estado `spec`. Decisiones del humano: cuenta nueva **vacía con guía**, **subir antes de cerrar sesión** (con tiempo máximo y aviso sin red) y **avisar claro al llegar al límite** (5000 registros, 64 KB) sin subirlo.
 - **Hecho también:** spec aprobada y `plan.md` escrito (7 pasos, sin migraciones ni dependencias; los cambios son solo de la web).
