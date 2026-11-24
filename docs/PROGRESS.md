@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · docs/prioriza-pendientes
+- **Hecho:** `docs/TASKS.md` reordenado por prioridad Alto/Medio/Bajo. Dos pendientes nuevos de prioridad Alta pedidos por el humano: **A1** login con Google para cualquier usuario y Calendar vinculado sin botón (funcionalidad 009, marcado importante) y **A2** entorno de trabajo por usuario (010). `features.json` con 009 y 010 y sus carpetas de spec. Verificado que el PR #7 está en `main` y que Vercel sirve la web en https://student-os-mocha-iota.vercel.app (HTTP 200).
+- **Pendiente:** escribir las specs 009 y 010 con `spec-plan-code`. Producción (A3) y verificación de Google (A4) son prerrequisitos y van en paralelo.
+- **Problemas:** la API no está desplegada, así que hoy el login y los datos por usuario no funcionan de verdad en producción; solo en local con servicios simulados. Posible riesgo al cambiar de cuenta en el mismo navegador (el importador podría ofrecer subir datos locales de otro usuario).
+
 ## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 7, cierre)
 - **Hecho:** ADR 0002, plan de adopción archivado en `docs/references/historial/`, `check.sh` completo (5 de 5, 169 s) y revisión con la skill `revisor`. Correcciones de la revisión: permisos de ejecución (`100755`) en scripts y hooks, `.gitattributes` con LF para scripts, `.claude/skills/` ignorado como directorio y rutas corregidas.
 - **Verificación:** `./scripts/check.sh` completo pasa (lint, tipos, unitarias, integración del API y 14 E2E).
