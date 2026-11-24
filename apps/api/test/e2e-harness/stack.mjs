@@ -10,7 +10,10 @@
 // Uso:  node apps/api/test/e2e-harness/stack.mjs [--skip-build] [--clean]
 //   --clean       mata lo que escuche en SUS puertos (nunca otros: 5173/5174 no se tocan) y sale.
 //   --skip-build  no recompila shared/api (usa dist existente).
-// Se apaga con Ctrl+C, con SIGTERM o con `POST http://127.0.0.1:54343/shutdown`.
+// Se apaga con Ctrl+C, con SIGTERM o con `POST http://127.0.0.1:<control>/shutdown` (54343 + E2E_PORT_OFFSET).
+//
+// Los puertos de arriba son los BASE: la variable E2E_PORT_OFFSET (entero, por defecto 0) se suma a todos para poder
+// correr varias sesiones a la vez (ver apps/api/test/ports.cjs). Ej.:  E2E_PORT_OFFSET=2000 npm run test:e2e -w @student-os/web
 import { execFileSync, spawn } from 'node:child_process';
 import { createWriteStream, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -216,7 +219,7 @@ try {
   await startApi();
   log(`API real lista en :${PORTS.api}`);
 
-  // 5. Web real (Vite). Dos servidores: con nube (5293) y SIN variables (5294).
+  // 5. Web real (Vite). Dos servidores: con nube (PORTS.web) y SIN variables (PORTS.webNoCloud).
   const viteBin = join(dirname(requireWeb.resolve('vite/package.json')), 'bin', 'vite.js');
   const webEnvBase = { ...process.env, BROWSER: 'none' };
   spawnLogged('web', process.execPath, [viteBin, '--port', String(PORTS.web), '--strictPort', '--host', 'localhost'], {

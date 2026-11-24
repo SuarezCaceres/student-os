@@ -32,6 +32,19 @@ Se ejecutan desde la raíz del repo.
 | Crear migración       | **Pendiente de definir** (hoy las migraciones SQL están en `prisma/migrations/` y se aplican a mano; requiere aprobación) |
 | Aplicar migraciones   | **Manual**, por el humano, contra Supabase                |
 
+### Puertos de las pruebas y `E2E_PORT_OFFSET`
+Las pruebas usan puertos fijos (Postgres embebido, Supabase/Google falsos, API y Vite del E2E). Si dos sesiones corren pruebas a la vez en la misma máquina chocan (`P1001: Can't reach database server at 127.0.0.1:54334`). Para evitarlo, **una sola variable de entorno desplaza todos los puertos**:
+
+```bash
+E2E_PORT_OFFSET=2000 ./scripts/check.sh --rapido     # también vale para npm run test:e2e -w ... y para git commit (el hook la hereda)
+```
+
+- Entero `>= 0`; por defecto `0`, que deja los puertos de siempre. Si no es un entero válido o saca un puerto de rango (> 65535), las pruebas fallan al arrancar.
+- Cada sesión debe usar un desplazamiento distinto (p. ej. 0, 100, 200…). Con desplazamientos pequeños los rangos pueden solaparse: separa los valores al menos 20.
+- En Windows, algunos rangos están reservados por el sistema y Postgres embebido falla al arrancar (`public-pg-server: undefined`). Comprueba el desplazamiento con `netsh int ipv4 show excludedportrange protocol=tcp` (en una máquina con el rango 55842-56360 reservado, `2000` falló y `500` funcionó).
+- Puertos base: integración `54329` (sync), `54334` (google), `54335` (public); E2E `54340` (Postgres), `54341` (Supabase falso), `54342` (Google falso), `54343` (control), `3100` (API), `5293` y `5294` (Vite con y sin nube).
+- Fuente única: `apps/api/test/ports.cjs` (la leen los helpers `*-pg.ts`, los `*-pg-server.mjs`, `e2e-harness/config.mjs` y, a través de este, `apps/web/e2e/support/harness.ts`). Para añadir un puerto nuevo, añádelo solo ahí. Prueba: `apps/api/test/ports.e2e-spec.ts`.
+
 ## Estructura de carpetas en `apps/api/`
 ```
 src/
