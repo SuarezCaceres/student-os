@@ -70,9 +70,9 @@ export interface OverviewBentoProps {
   onOpenQuickAdd: (
     tab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning'
   ) => void;
-  onHabitsChange?: (habits: DailyHabits) => void;
+  onHabitsChange: (habits: DailyHabits) => void;
   onSaveReflection?: (reflection: WeeklyReflection) => void;
-  onRestoreState?: (restored: AppState) => void;
+  onRestoreState: (restored: AppState) => void;
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {

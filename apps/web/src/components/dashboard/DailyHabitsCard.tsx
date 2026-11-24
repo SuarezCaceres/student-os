@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useState } from 'react';
+import React, { useId, useState } from 'react';
 import {
   Check,
   Droplets,
@@ -22,7 +22,7 @@ import { getLocalIsoDate } from '../../utils/gymAttendance';
 export interface DailyHabitsCardProps {
   initialHabits?: DailyHabits;
   todayDateIso?: string;
-  onHabitsChange?: (habits: DailyHabits) => void;
+  onHabitsChange: (habits: DailyHabits) => void;
 }
 
 export const DailyHabitsCard: React.FC<DailyHabitsCardProps> = ({
@@ -33,32 +33,9 @@ export const DailyHabitsCard: React.FC<DailyHabitsCardProps> = ({
   const formId = useId();
   const resolvedTodayIso = todayDateIso ?? getLocalIsoDate();
 
-  const [localHabits, setLocalHabits] = useState<DailyHabits>(() => {
-    try {
-      const raw = localStorage.getItem('student_os_state_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.dailyHabits) {
-          return normalizeDailyHabitsForDate(
-            parsed.dailyHabits as DailyHabits,
-            resolvedTodayIso
-          ).habits;
-        }
-      }
-    } catch {
-      // fallback to initialHabits or default
-    }
-    return normalizeDailyHabitsForDate(
-      initialHabits ?? DEFAULT_DAILY_HABITS,
-      resolvedTodayIso
-    ).habits;
-  });
-
-  const rawActiveHabits = onHabitsChange && initialHabits ? initialHabits : localHabits;
-  const { habits: activeHabits, changed: needsDateRollover } = normalizeDailyHabitsForDate(
-    rawActiveHabits,
-    resolvedTodayIso
-  );
+  // Spec 009: los habitos son parte del estado de la cuenta (App los guarda y sincroniza); la tarjeta no toca el navegador.
+  const rawActiveHabits = initialHabits ?? DEFAULT_DAILY_HABITS;
+  const { habits: activeHabits } = normalizeDailyHabitsForDate(rawActiveHabits, resolvedTodayIso);
 
   const [isEditingTargets, setIsEditingTargets] = useState(false);
   const [targetWaterInput, setTargetWaterInput] = useState(
@@ -77,41 +54,12 @@ export const DailyHabitsCard: React.FC<DailyHabitsCardProps> = ({
       ...updated,
       lastUpdatedDate: resolvedTodayIso,
     };
-    setLocalHabits(stamped);
-    if (onHabitsChange) {
-      onHabitsChange(stamped);
-      return;
-    }
-
-    try {
-      const raw = localStorage.getItem('student_os_state_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        parsed.dailyHabits = stamped;
-        localStorage.setItem('student_os_state_v1', JSON.stringify(parsed));
-      }
-    } catch {
-      // ignore localStorage errors
-    }
+    onHabitsChange(stamped);
   };
 
-  useEffect(() => {
-    if (!needsDateRollover) return;
-    // Con estado controlado (App) el reinicio diario es solo de visualizacion: se persiste al primer cambio
-    // real (`saveHabits` ya sella `lastUpdatedDate`). Persistirlo al montar crearia una edicion "de hoy a cero"
-    // que, en un dispositivo con datos de ayer, pisaria por ultima-edicion-gana los habitos de hoy de otro dispositivo.
-    if (onHabitsChange) return;
-    try {
-      const raw = localStorage.getItem('student_os_state_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        parsed.dailyHabits = activeHabits;
-        localStorage.setItem('student_os_state_v1', JSON.stringify(parsed));
-      }
-    } catch {
-      // ignore localStorage errors
-    }
-  }, [needsDateRollover, activeHabits, onHabitsChange]);
+  // El reinicio diario es solo de visualizacion: se persiste al primer cambio real (`saveHabits` ya sella
+  // `lastUpdatedDate`). Persistirlo al montar crearia una edicion "de hoy a cero" que, en un dispositivo con datos de
+  // ayer, pisaria por ultima-edicion-gana los habitos de hoy de otro dispositivo.
 
   const handleOpenTargets = () => {
     if (isEditingTargets) {

@@ -116,7 +116,7 @@ export interface GymTrackerProps {
     routineName: string;
     durationMinutes?: number;
   }) => void;
-  onUpdateExercise?: (day: DayOfWeek, updated: GymExercise) => void;
+  onUpdateExercise: (day: DayOfWeek, updated: GymExercise) => void;
   missingScheduledDays?: MissingScheduledGymDay[];
   onDismissMissingGymDay?: (dateIso: string, dayOfWeek: DayOfWeek) => void;
   onSwapFixedGymDay?: (payload: {
@@ -216,13 +216,10 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   const [timerAutoStart, setTimerAutoStart] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
 
-  // Exercise Progress Modal & fallback local overrides (used when onUpdateExercise is not passed)
+  // Exercise Progress Modal
   const [selectedExerciseIdForModal, setSelectedExerciseIdForModal] = useState<string | null>(null);
   const [selectedExerciseIdForVideoModal, setSelectedExerciseIdForVideoModal] = useState<string | null>(null);
   const [selectedExerciseIdForWeightModal, setSelectedExerciseIdForWeightModal] = useState<string | null>(null);
-  const [exerciseOverrides, setExerciseOverrides] = useState<
-    Record<string, Omit<Partial<GymExercise>, 'completedSets'>>
-  >({});
 
   // Add Exercise Modal state
   const [showAddForm, setShowAddForm] = useState(false);
@@ -240,14 +237,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
     exercises: [],
   };
 
-  // Merge local overrides only when parent hasn't connected onUpdateExercise yet
-  const currentRoutine: GymRoutine = {
-    ...rawRoutine,
-    exercises: rawRoutine.exercises.map((ex) => ({
-      ...ex,
-      ...(onUpdateExercise ? {} : exerciseOverrides[ex.id] || {}),
-    })),
-  };
+  const currentRoutine: GymRoutine = rawRoutine;
 
   const selectedExerciseForModal =
     selectedExerciseIdForModal
@@ -321,36 +311,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
   };
 
   const handleUpdateExerciseFromModal = (updated: GymExercise) => {
-    if (onUpdateExercise) {
-      onUpdateExercise(selectedDay, updated);
-      return;
-    }
-
-    // Fallback when App.tsx hasn't passed onUpdateExercise yet
-    const { completedSets: _ignoredSets, ...restUpdated } = updated;
-    void _ignoredSets;
-    setExerciseOverrides((prev) => ({
-      ...prev,
-      [updated.id]: restUpdated,
-    }));
-
-    try {
-      const raw = localStorage.getItem('student_os_state_v1');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed.gymRoutines)) {
-          parsed.gymRoutines = parsed.gymRoutines.map((r: GymRoutine) => ({
-            ...r,
-            exercises: r.exercises.map((e: GymExercise) =>
-              e.id === updated.id ? { ...e, ...restUpdated } : e
-            ),
-          }));
-          localStorage.setItem('student_os_state_v1', JSON.stringify(parsed));
-        }
-      }
-    } catch {
-      // Ignore storage errors in restricted environments
-    }
+    onUpdateExercise(selectedDay, updated);
   };
 
   const handleQuickAdd = (e: React.FormEvent) => {

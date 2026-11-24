@@ -8,12 +8,11 @@ import { initialData } from '../data/initialData';
 import { getApiClient } from '../services/api';
 import { __resetSupabaseForTests, getSupabase, isSyncConfigured } from '../services/supabase';
 import { syncStore } from '../sync/syncStore';
-import { useLocalStorage } from './useLocalStorage';
 import { useSyncedAppState } from './useSyncedAppState';
 
 /**
- * Requisito critico: sin VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY / VITE_API_URL la app se
- * comporta EXACTAMENTE como hoy (solo localStorage, sin red, sin IndexedDB, sin login obligatorio).
+ * Sin VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY / VITE_API_URL no hay login posible (solo la landing, con el
+ * acceso deshabilitado) y el estado vive unicamente en localStorage: sin red y sin IndexedDB.
  */
 describe('sin variables de entorno de Supabase/API', () => {
   beforeEach(() => {
@@ -34,32 +33,26 @@ describe('sin variables de entorno de Supabase/API', () => {
     await expect(getSupabase()).resolves.toBeNull();
   });
 
-  it('useSyncedAppState se comporta igual que useLocalStorage (estado, escritura y reset)', () => {
+  it('useSyncedAppState sin nube: estado, escritura y reset solo en localStorage', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const synced = renderHook(() => useSyncedAppState('synced_key', initialData));
-    const plain = renderHook(() => useLocalStorage('plain_key', initialData));
+    const { result } = renderHook(() => useSyncedAppState('synced_key', initialData));
+    expect(result.current[0]).toEqual(initialData);
 
-    expect(synced.result.current[0]).toEqual(plain.result.current[0]);
-
-    const edit = (s: typeof initialData) => ({ ...s, studentName: 'Ana', streak: s.streak + 1 });
-    act(() => synced.result.current[1](edit));
-    act(() => plain.result.current[1](edit));
-    expect(synced.result.current[0]).toEqual(plain.result.current[0]);
-    expect(window.localStorage.getItem('synced_key')).toBe(window.localStorage.getItem('plain_key'));
+    act(() => result.current[1]((s) => ({ ...s, studentName: 'Ana', streak: s.streak + 1 })));
+    expect(result.current[0].studentName).toBe('Ana');
+    expect(JSON.parse(window.localStorage.getItem('synced_key')!).studentName).toBe('Ana');
 
     // Varias actualizaciones funcionales seguidas se encadenan igual que en React.
+    const streak = result.current[0].streak;
     act(() => {
-      synced.result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
-      synced.result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
-      plain.result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
-      plain.result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
+      result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
+      result.current[1]((s) => ({ ...s, streak: s.streak + 1 }));
     });
-    expect(synced.result.current[0].streak).toBe(plain.result.current[0].streak);
+    expect(result.current[0].streak).toBe(streak + 2);
 
-    act(() => synced.result.current[2]());
-    act(() => plain.result.current[2]());
-    expect(synced.result.current[0]).toEqual(plain.result.current[0]);
-    expect(window.localStorage.getItem('synced_key')).toBe(window.localStorage.getItem('plain_key'));
+    act(() => result.current[2]());
+    expect(result.current[0]).toEqual(initialData);
+    expect(JSON.parse(window.localStorage.getItem('synced_key') ?? 'null') ?? initialData).toEqual(initialData);
 
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(syncStore.getSnapshot().enabled).toBe(false);
@@ -74,7 +67,7 @@ describe('sin variables de entorno de Supabase/API', () => {
     expect(JSON.parse(window.localStorage.getItem('student_os_state_v1')!).career).toBe('Otra');
   });
 
-  it('JSON corrupto en localStorage cae al estado inicial, como useLocalStorage', () => {
+  it('JSON corrupto en localStorage cae al estado inicial', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     window.localStorage.setItem('student_os_state_v1', '{no es json');
     const { result } = renderHook(() => useSyncedAppState(initialData));

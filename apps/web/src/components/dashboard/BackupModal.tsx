@@ -16,13 +16,13 @@ export interface BackupModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentState: AppState;
-  onRestoreState?: (restored: AppState) => void;
+  onRestoreState: (restored: AppState) => void;
 }
 
 interface BackupModalContentProps {
   onClose: () => void;
   currentState: AppState;
-  onRestoreState?: (restored: AppState) => void;
+  onRestoreState: (restored: AppState) => void;
 }
 
 const BackupModalContent: React.FC<BackupModalContentProps> = ({
@@ -108,23 +108,15 @@ const BackupModalContent: React.FC<BackupModalContentProps> = ({
     if (!restoredPreview) return;
 
     try {
-      localStorage.setItem('student_os_state_v1', JSON.stringify(restoredPreview));
       triggerConfetti();
       setErrorMessage(null);
-
-      if (onRestoreState) {
-        onRestoreState(restoredPreview);
-        setSuccessMessage('Tus datos se restauraron correctamente.');
-        setRestoredPreview(null);
-        setTimeout(() => {
-          onClose();
-        }, 700);
-      } else {
-        setSuccessMessage('Datos restaurados. Actualizando tu espacio...');
-        setTimeout(() => {
-          window.location.reload();
-        }, 800);
-      }
+      // Spec 009: restaurar pasa siempre por App, que guarda el estado y lo sincroniza con la cuenta.
+      onRestoreState(restoredPreview);
+      setSuccessMessage('Tus datos se restauraron correctamente.');
+      setRestoredPreview(null);
+      setTimeout(() => {
+        onClose();
+      }, 700);
     } catch {
       setErrorMessage('No se pudo guardar el respaldo en el navegador.');
     }

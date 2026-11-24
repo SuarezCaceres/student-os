@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { describeSyncStatus } from '../describeStatus';
 import { runAsLeader } from '../leader';
-import { FakeServer, createDevice, task, withTasks } from './helpers';
+import { FakeServer, createDevice, task } from './helpers';
 
 /** Gestor de locks en memoria: una sola pestana lider por nombre; las demas esperan su turno. */
 function createFakeLocks() {

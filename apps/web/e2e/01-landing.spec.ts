@@ -53,6 +53,8 @@ test.describe('1. landing publica: unico acceso con Google', () => {
     // No se monta la app, no se muestran los datos y se ve la landing con su unico acceso.
     await expect(page.getByRole('tablist', { name: 'Vistas principales' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Continuar con Google/i }).first()).toBeVisible({ timeout: 15_000 });
+    // Y la marca de sesion antigua se borra del navegador sin leerla (C14).
+    expect(await page.evaluate(() => localStorage.getItem('student_os_user_session'))).toBeNull();
     await context.close();
   });
 

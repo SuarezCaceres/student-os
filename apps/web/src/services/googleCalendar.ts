@@ -204,24 +204,6 @@ export async function fetchGoogleUserProfile(accessToken: string): Promise<Googl
   }
 }
 
-async function fetchPrimaryCalendarMetadata(
-  accessToken: string
-): Promise<{ email?: string; calendarName?: string }> {
-  try {
-    const response = await googleFetch(accessToken, 'calendars/primary');
-    if (!response.ok) return {};
-    const data = (await response.json()) as { id?: string; summary?: string };
-    const email = typeof data.id === 'string' && data.id.includes('@') ? data.id : undefined;
-    const calendarName =
-      typeof data.summary === 'string' && data.summary.trim()
-        ? data.summary.trim()
-        : email ?? 'Calendario principal';
-    return { email, calendarName };
-  } catch {
-    return {};
-  }
-}
-
 /**
  * Restaura el estado de Google Calendar tras recargar la pagina: consulta al servidor (no a Google).
  * Devuelve el marcador de nube si se puede usar ya, o `null` si falta vincular o reautorizar.

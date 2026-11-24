@@ -9,6 +9,7 @@ import { runAsLeader } from '../sync/leader';
 import { getDefaultSyncStorage } from '../sync/storage';
 import { syncStore } from '../sync/syncStore';
 import { clearSyncDataOnSignOut } from '../utils/accountDataCleanup';
+import { buildNewAccountState, getAccountDisplayName } from '../utils/newAccountState';
 
 export const APP_STATE_STORAGE_KEY = 'student_os_state_v1';
 
@@ -36,13 +37,13 @@ function writeLocal(key: string, value: AppState): void {
 }
 
 /**
- * Sustituto de `useLocalStorage<AppState>('student_os_state_v1', initialData)` con sincronizacion.
+ * Estado de la app: `[state, setState, reset]`, guardado en `localStorage` y sincronizado con la cuenta.
  *
- * - Misma firma de retorno: `[state, setState, reset]`.
- * - `localStorage` sigue siendo la cache local y se escribe de forma sincrona en cada cambio.
- * - Sin `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` / `VITE_API_URL`, o sin sesion iniciada,
- *   se comporta igual que `useLocalStorage`: no hay motor, ni red, ni IndexedDB.
- * - Con sesion, arranca el motor de sync (una sola pestana lider por cuenta).
+ * - `localStorage` es la cache local de la cuenta y se escribe de forma sincrona en cada cambio.
+ * - Con sesion y configuracion completa arranca el motor de sync (una sola pestana lider por cuenta). Si este navegador no
+ *   tiene a esa cuenta ya arrancada, lo que hubiera en `localStorage` se descarta y se parte del estado de una cuenta
+ *   nueva (`buildNewAccountState`): sin los bloques de ejemplo y con el nombre de su cuenta de Google (spec 009).
+ * - Sin configuracion o sin sesion no hay motor, ni red, ni IndexedDB: la app solo muestra la landing.
  *
  * Acepta `(initial)` o `(key, initial)`.
  */
@@ -60,6 +61,11 @@ export function useSyncedAppState(a: AppState | string, b?: AppState): SyncedTup
   const session = useSupabaseSession();
   const syncEnabled = isSyncConfigured();
   const userId = syncEnabled && session.status === 'signedIn' ? (session.user?.id ?? null) : null;
+  const displayName = session.status === 'signedIn' ? getAccountDisplayName(session.user) : undefined;
+  const displayNameRef = useRef<string | undefined>(displayName);
+  useEffect(() => {
+    displayNameRef.current = displayName;
+  }, [displayName]);
 
   const setState = useCallback<Dispatch<SetStateAction<AppState>>>(
     (action) => {
@@ -80,7 +86,7 @@ export function useSyncedAppState(a: AppState | string, b?: AppState): SyncedTup
       console.warn(`Error resetting localStorage key "${key}":`, error);
       return;
     }
-    // useLocalStorage borra la clave y su efecto la reescribe con el valor inicial si el estado cambio.
+    // Se borra la clave y se reescribe con el valor inicial si el estado cambio.
     if (!Object.is(stateRef.current, initialRef.current)) writeLocal(key, initialRef.current);
     stateRef.current = initialRef.current;
     setStored(initialRef.current);
@@ -116,8 +122,9 @@ export function useSyncedAppState(a: AppState | string, b?: AppState): SyncedTup
             setStored(next);
           },
           isPristine: (s) => stableStringify(s) === stableStringify(initialRef.current),
-          // Spec 009: el estado local de otra cuenta o del prototipo no se sube ni se pregunta; se descarta.
-          initialState: () => initialRef.current,
+          // Spec 009: el estado local de otra cuenta o del prototipo no se sube ni se pregunta; se descarta y se parte
+          // del de una cuenta nueva.
+          initialState: () => buildNewAccountState(initialRef.current, displayNameRef.current),
         });
         engineRef.current = created;
         unsubscribeEngine = created.subscribe((status) => syncStore.publish(status));

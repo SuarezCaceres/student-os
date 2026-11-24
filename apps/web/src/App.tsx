@@ -35,15 +35,10 @@ import {
   GymOnboardingModal,
   type GymOnboardingCompletePayload,
 } from './components/gym/GymOnboardingModal';
-import {
-  REAL_ACCOUNT_CLEANUP_FLAG_KEY,
-  applyRealAccountCalendarCleanup,
-} from './utils/accountDataCleanup';
+import { clearLegacyLocalData } from './utils/accountDataCleanup';
 import {
   WORK_SHIFT_BLOCK_ID_PREFIX,
-  WORK_SHIFT_INIT_FLAG_KEY,
   applyWorkShiftConfigToBlocks,
-  ensureDefaultWorkShiftForRealAccount,
 } from './utils/workSchedule';
 import {
   doesGoogleEventMirrorBlock,
@@ -210,29 +205,10 @@ export const App: React.FC = () => {
 
   const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(false);
 
-  // One-time migration for authenticated real sessions: strip cb-1..cb-14 seed blocks & seed 22:00-06:00 work shift
+  // Spec 009 (C14): lo que dejo el prototipo en este navegador (cuenta local, token de Google, marcas) se borra sin subirlo.
   useEffect(() => {
-    if (currentView !== 'app' || !userSession?.isLoggedIn) return;
-    let cleanedDone = false;
-    let shiftDone = false;
-    try {
-      cleanedDone = localStorage.getItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY) === '1';
-      // Con sesion en la nube NO se siembra el turno por defecto: el turno real llega con el primer
-      // pull; sembrarlo aqui lo subiria y podria pisar el que el usuario ya tiene en la nube.
-      shiftDone = localStorage.getItem(WORK_SHIFT_INIT_FLAG_KEY) === '1' || Boolean(auth.userSession);
-      if (cleanedDone && shiftDone) return;
-      localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
-      localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-    } catch {
-      // Ignore storage errors
-    }
-    setState((prev) => {
-      const cleaned = cleanedDone ? prev : applyRealAccountCalendarCleanup(prev);
-      const withWorkShift = shiftDone ? cleaned : ensureDefaultWorkShiftForRealAccount(cleaned);
-      calendarBlocksRef.current = withWorkShift.calendarBlocks;
-      return withWorkShift;
-    });
-  }, [currentView, userSession, auth.userSession, setState]);
+    clearLegacyLocalData();
+  }, []);
 
   const refreshGoogleCalendarWeek = useCallback(
     async (
@@ -376,13 +352,6 @@ export const App: React.FC = () => {
       await auth.signOut();
     } catch {
       // Sin red el cierre local igualmente se completa abajo.
-    }
-    try {
-      localStorage.removeItem('student_os_user_session');
-      localStorage.removeItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY);
-      localStorage.removeItem(WORK_SHIFT_INIT_FLAG_KEY);
-    } catch {
-      // ignore
     }
     if (userSession?.provider === 'google' || isGoogleConnected) {
       disconnectGoogleCalendar();
@@ -1850,12 +1819,6 @@ export const App: React.FC = () => {
     async (nextConfig: WorkShiftConfig, options: { syncToGoogle: boolean }) => {
       setIsSavingWorkShift(true);
       try {
-        try {
-          localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-        } catch {
-          // Ignore storage errors
-        }
-
         const extraLinkedWorkIds = new Set<string>();
         for (const block of calendarBlocksRef.current) {
           if (block.id.startsWith(WORK_SHIFT_BLOCK_ID_PREFIX) && block.googleEventId) {
