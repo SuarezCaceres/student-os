@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
+import { EmptyHint } from '../common/EmptyHint';
 import {
   AlertCircle,
   AlertTriangle,
@@ -1014,6 +1015,9 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
 
         {/* Exercises List (clean .t-row separation, zero triple nesting) */}
         <div className="pt-4">
+          {routines.length === 0 && (
+            <EmptyHint className="mb-4">Aún no tienes rutina. Configura tu gimnasio y agrega tu primer ejercicio.</EmptyHint>
+          )}
           {currentRoutine.exercises.length === 0 ? (
             <div className="py-12 text-center">
               <Dumbbell className="w-8 h-8 mx-auto text-[var(--muted)] mb-3" />

@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react';
+import { EmptyHint } from '../common/EmptyHint';
 import {
   MapPin,
   Plus,
@@ -391,6 +392,10 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           )}
         </div>
       </div>
+
+      {blocks.length === 0 && (googleEvents?.length ?? 0) === 0 && !workShift?.enabled && (
+        <EmptyHint>Tu horario está vacío. Usa «Agendar bloque»; tus eventos de Google aparecerán aquí solos.</EmptyHint>
+      )}
 
       {/* Main Content: Timeline Grid vs Day Columns */}
       {viewMode === 'grid' ? (

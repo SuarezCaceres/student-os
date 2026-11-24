@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EmptyHint } from '../common/EmptyHint';
 import {
   Plus,
   Search,
@@ -206,6 +207,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <section className="space-y-5">
+      {items.length === 0 && (
+        <EmptyHint>Aún no tienes tareas. Escribe la primera arriba y pulsa Enter.</EmptyHint>
+      )}
       {/* Header */}
       <SectionHeader
         title="Tablero de proyectos"

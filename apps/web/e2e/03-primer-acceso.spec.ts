@@ -65,6 +65,17 @@ test.describe('3. primer acceso sin importador', () => {
     expect(Object.keys(stored.weeklyReflections ?? {})).toEqual([]);
     // Y en pantalla no hay rastro de los datos de ejemplo de Mateo.
     await expect(page.getByText('Mateo')).toHaveCount(0);
+    // Cada modulo vacio explica que hacer primero (spec 010, C5).
+    await expect(page.getByRole('note').filter({ hasText: 'Tu espacio está listo' })).toBeVisible();
+    for (const [tab, guide] of [
+      ['Kanban', 'Aún no tienes tareas'],
+      ['Universidad', 'Aún no tienes entregas'],
+      ['Horario', 'Tu horario está vacío'],
+      ['Gym', 'Aún no tienes rutina'],
+    ] as const) {
+      await openTab(page, tab);
+      await expect(page.getByRole('note').filter({ hasText: guide }), `guia de ${tab}`).toBeVisible();
+    }
     await evidence(page, '03-primer-acceso-directo');
     expect(tap.pageErrors).toEqual([]);
     expect(relevantConsoleErrors(tap)).toEqual([]);
