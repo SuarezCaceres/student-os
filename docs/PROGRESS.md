@@ -11,6 +11,13 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (paso 5a)
+- **Hecho:** `80af0db`. El modal pasa a un único «Continuar con Google»; la landing quita registro, demo y «100 % offline» (afirmaciones que dejaron de ser ciertas); `App.tsx` ya no se fía de la sesión local sobrante (C2) y el cierre de sesión espera a `signOut` (**BUG-01 corregido**, se quitó el `test.fail` del caso 2c). `features.json`: 002-C4 y 009 (C1, C2, C3, C4, C5, C9, C10, C13) en `pasa: true`.
+- **Fallos reales que cazaron las pruebas:** (1) una sesión local sobrante abría la app sin login; (2) `supabase-js` emite `SIGNED_IN` dos veces y el segundo enlace pisaba el motivo real del error.
+- **Verificación:** 311 pruebas del frontend, tipos, lint y E2E de login (5/5), landing (3/3), importador y dos dispositivos en verde.
+- **Pendiente:** 5b botón Conectar/Desvincular, 5c importador (zona protegida), 5d transporte GIS y prueba de firmas, 5e modo local y limpieza de datos (C11 herencia, C14), onboarding de gym y nombre en el primer acceso, E2E 03, ADR 0007 y revisión. **No fusionar antes de producción (007).**
+- **Problemas:** hay edits ajenos sin commitear en `docs/TASKS.md` (pedidos P1 «gym opcional» y P2 «quehaceres», fechados 2026-11-23); no son míos y no los incluí. Con el modo local fuera, el primer acceso ya no abre el onboarding de gym ni fija el nombre (lo hacía `onAuthSuccess`).
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (implementación, pasos 1 a 4)
 - **Hecho:** `955d97c` (viabilidad + `POST /google/link-login`, 373 pruebas del API y 39 HTTP en verde) y `e96059a` (harness, login web con enlace automático, `storage` que elimina `provider_*`, aviso C9, E2E 2b y 2e). Se encontró y corrigió una carrera: el `getSession()` inicial marcaba la sesión como iniciada antes de terminar el enlace; la E2E 2e la detectó. Se rompió un ciclo de imports (`supabase.ts` ↔ `googleLogin.ts` ↔ `api.ts`) cargando `api` bajo demanda.
 - **Verificación:** 305 pruebas del frontend, tipos y lint en verde; E2E `02-login` en verde (5 de 5, el 2c sigue siendo el fallo conocido BUG-01).
