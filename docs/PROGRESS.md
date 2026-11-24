@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 6)
+- **Hecho:** `docs/features.json` con 8 funcionalidades (001–006 existentes con `pasa: true` solo donde una prueba que pasa lo respalda; 007 producción y 008 verificación de Google pendientes). `memories.md`, `PLAN.md` y `PLAN_BACKEND.md` archivados con `git mv` en `docs/references/historial/` (`memories.md` con aviso de archivado). Carpetas de spec para 007 y 008. `TASKS.md` reordenado por tu prioridad: producción, verificación de Google, BUG-01, `localStorage` directo, deuda.
+- **Pendiente:** Fase 7 (ADR 0002, `check.sh` completo, skill `revisor`, PR). Las specs de 007 y 008 se escriben con `spec-plan-code`.
+- **Problemas:** `PRODUCT.md` y varios comentarios de código siguen citando `memories.md`; quedó en `TASKS.md`. El estado `en_curso` de la funcionalidad 002 depende del BUG-01.
+
 ## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 5)
 - **Hecho:** skills conectadas: `frontend-proyecto` (`ui-ux-pro-max`, `frontend-design`, `design-taste-frontend` solo para landing), `pruebas-proyecto` (`playwright-best-practices`, con la nota del stack simulado), `backend-proyecto` (ninguna, decisión del humano). `AGENTS.md` lista `github-workflow-standards`, `grill-me` y `find-skills`. La skill de flujo de GitHub lleva una nota: commits en español.
 - **Pendiente:** Fase 6 (`features.json`, `TASKS.md`, qué hacer con `memories.md`) y Fase 7 (cierre, ADR 0002, PR).

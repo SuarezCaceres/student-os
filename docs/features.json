@@ -1,13 +1,97 @@
 {
-  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho.",
+  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho. Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad de lo pendiente: 007, 008, luego BUG-01 y deuda en docs/TASKS.md.",
   "features": [
     {
       "id": "001",
-      "nombre": "ejemplo-borrar-al-empezar",
-      "spec": "docs/specs/001-ejemplo-borrar-al-empezar/spec.md",
+      "nombre": "modo-local-sin-cuenta",
+      "spec": null,
+      "estado": "hecho",
+      "criterios": [
+        { "id": "C1", "descripcion": "Sin cuenta ni nube, la app arranca y funciona sin errores de consola ni llamadas de red a la nube (E2E apps/web/e2e/01-nocloud.spec.ts)", "pasa": true }
+      ]
+    },
+    {
+      "id": "002",
+      "nombre": "login-con-google-y-sesion-en-la-nube",
+      "spec": null,
+      "estado": "en_curso",
+      "criterios": [
+        { "id": "C1", "descripcion": "Con una sesion de Supabase, la app entra en modo nube, aparece el indicador de sync y el servidor crea el perfil (E2E 02-login 2a)", "pasa": true },
+        { "id": "C2", "descripcion": "El flujo 'Continuar con Google' (PKCE) vuelve con codigo y deja la sesion iniciada (E2E 02-login 2b, con Supabase simulado)", "pasa": true },
+        { "id": "C3", "descripcion": "Al cerrar sesion, la sesion de supabase-js se borra del navegador y una recarga no reabre la nube (E2E 02-login 2d)", "pasa": true },
+        { "id": "C4", "descripcion": "Al cerrar sesion, la app vuelve a la landing (BUG-01: hoy no vuelve; E2E 02-login 2c marcada como fallo conocido)", "pasa": false },
+        { "id": "C5", "descripcion": "El login funciona con Google y Supabase reales, no solo con los simulados", "pasa": false }
+      ]
+    },
+    {
+      "id": "003",
+      "nombre": "importador-del-primer-inicio",
+      "spec": null,
+      "estado": "hecho",
+      "criterios": [
+        { "id": "C1", "descripcion": "Con datos locales y nube vacia, ofrece subir, descarga un respaldo previo y sube (E2E 03-importer 3a)", "pasa": true },
+        { "id": "C2", "descripcion": "Con datos distintos en local y nube, pregunta 'Usar la nube / Conservar este dispositivo' y 'Usar la nube' reemplaza lo local (E2E 3b)", "pasa": true },
+        { "id": "C3", "descripcion": "'Conservar lo de este dispositivo' sube lo local y retira lo que solo estaba en la nube, con confirmacion y respaldos (E2E 3c)", "pasa": true },
+        { "id": "C4", "descripcion": "'Ahora no' deja la sincronizacion en pausa, no sube nada y avisa en el indicador (E2E 3d)", "pasa": true }
+      ]
+    },
+    {
+      "id": "004",
+      "nombre": "sync-entre-dispositivos",
+      "spec": null,
+      "estado": "hecho",
+      "criterios": [
+        { "id": "C1", "descripcion": "Crear en el PC una entrega, una tarea Kanban y un ejercicio de gym, y verlos en el movil tras sincronizar (E2E 04-two-devices 4a)", "pasa": true },
+        { "id": "C2", "descripcion": "Editar en el movil (empezar tarea, entregar, completar serie) y verlo en el PC (E2E 4b)", "pasa": true },
+        { "id": "C3", "descripcion": "Las dos pantallas muestran las tarjetas en el mismo orden (E2E 4c)", "pasa": true },
+        { "id": "C4", "descripcion": "Borrar en el PC y verlo desaparecer en el movil (E2E 4d)", "pasa": true },
+        { "id": "C5", "descripcion": "Tras converger no hay mas pushes: no hay eco infinito (E2E 4e)", "pasa": true },
+        { "id": "C6", "descripcion": "La logica de conflictos (ultima edicion gana, tombstones, limites) esta cubierta por pruebas unitarias e integracion del API (apps/api/src/sync, test/sync*.e2e-spec.ts)", "pasa": true }
+      ]
+    },
+    {
+      "id": "005",
+      "nombre": "google-calendar-persistente",
+      "spec": null,
+      "estado": "revision",
+      "criterios": [
+        { "id": "C1", "descripcion": "El refresh token se guarda cifrado (AES-256-GCM) en el servidor y el navegador nunca ve un token de Google (apps/api/src/google/*.spec.ts, test/google.e2e-spec.ts)", "pasa": true },
+        { "id": "C2", "descripcion": "Un refresh invalido o una clave cambiada responden 409 google_reauth_required, no 401 (google.service.spec.ts)", "pasa": true },
+        { "id": "C3", "descripcion": "La conexion sigue activa al dia siguiente con Google Calendar real", "pasa": false }
+      ]
+    },
+    {
+      "id": "006",
+      "nombre": "cuenta-exportar-borrar-y-paginas-legales",
+      "spec": null,
+      "estado": "hecho",
+      "criterios": [
+        { "id": "C1", "descripcion": "GET /account/export devuelve perfil, registros de sync no borrados y datos de otros modulos (test/public.e2e-spec.ts)", "pasa": true },
+        { "id": "C2", "descripcion": "Borrar la cuenta elimina todo lo del usuario A (sync, estado, perfil, modulo externo) y deja intacto a B; es idempotente (test/public.e2e-spec.ts)", "pasa": true },
+        { "id": "C3", "descripcion": "Los enlaces a privacidad y terminos estan montados en la web (apps/web/src/components/legal/LegalLinks.test.tsx)", "pasa": true }
+      ]
+    },
+    {
+      "id": "007",
+      "nombre": "produccion-student-os-prod",
+      "spec": "docs/specs/007-produccion-student-os-prod/spec.md",
       "estado": "pendiente",
       "criterios": [
-        { "id": "C1", "descripcion": "Describe aquí un comportamiento comprobable", "pasa": false }
+        { "id": "C1", "descripcion": "Existe el proyecto Supabase student-os-prod con las migraciones de apps/api/prisma/migrations aplicadas y rls-baseline.sql ejecutado sin errores", "pasa": false },
+        { "id": "C2", "descripcion": "Vercel (VITE_*) y Render (DATABASE_URL, DIRECT_URL, SUPABASE_URL, WEB_ORIGINS, GOOGLE_*) tienen sus variables de produccion", "pasa": false },
+        { "id": "C3", "descripcion": "La API esta desplegada en Render y GET /health responde 200", "pasa": false },
+        { "id": "C4", "descripcion": "Un ping programado evita la pausa de Supabase a los 7 dias", "pasa": false },
+        { "id": "C5", "descripcion": "Un usuario de prueba puede iniciar sesion y sincronizar contra produccion de punta a punta", "pasa": false }
+      ]
+    },
+    {
+      "id": "008",
+      "nombre": "verificacion-de-la-app-en-google",
+      "spec": "docs/specs/008-verificacion-app-google/spec.md",
+      "estado": "pendiente",
+      "criterios": [
+        { "id": "C1", "descripcion": "Todos los puntos de docs/google-verification-checklist.md estan completados", "pasa": false },
+        { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false }
       ]
     }
   ]

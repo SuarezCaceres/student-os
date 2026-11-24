@@ -52,4 +52,4 @@ No marcaste de forma explícita el modo local, Supabase de producción ni los de
 | Tombstone | Marca de borrado de un registro de sync |
 | Harness | Estructura de `AGENTS.md`, `docs/` y skills que usan los agentes de IA |
 
-Fuentes: `PRODUCT.md` (producto y marca), `PLAN.md` y `PLAN_BACKEND.md` (historial de planificación) y `memories.md` (historial de versiones).
+Fuentes: `PRODUCT.md` (producto y marca), `docs/references/historial/PLAN.md` y `PLAN_BACKEND.md` (historial de planificación) y `docs/references/historial/memories.md` (historial de versiones, archivado).
