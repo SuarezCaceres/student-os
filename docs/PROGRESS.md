@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (spec)
+- **Hecho:** spec 010 redactada (10 criterios; C3, C4 y C10 ya los cubren la 009 y las pruebas del API) y `features.json` en estado `spec`. Decisiones del humano: cuenta nueva **vacía con guía**, **subir antes de cerrar sesión** (con tiempo máximo y aviso sin red) y **avisar claro al llegar al límite** (5000 registros, 64 KB) sin subirlo.
+- **Pendiente:** que apruebes la spec (y respondas las 2 preguntas abiertas: textos de las guías y el tiempo máximo de 5 s); después `plan.md`. La rama parte de la 009 (PR #9, sin fusionar).
+- **Problemas:** C1 es manual y necesita producción (007) y la verificación de Google (008).
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (pasos 5b a 8)
 - **Hecho:** 5b `1ac122c` (sin botones Conectar/Desvincular), 5c `1d477f1` (importador retirado; el motor descarta lo ajeno y, con la nube vacía, sube el estado de una cuenta nueva), 5d (transporte de Google Identity Services, `googleCalendar.gis.test.ts` y la prueba de firmas actualizada, que ahora vigila que lo retirado no vuelva), 5e (`useLocalStorage` y `localStorage` directo fuera; `clearLegacyLocalData`; estado de cuenta nueva = partida sin bloques de ejemplo y con el nombre de Google), aviso en el modal de que los datos locales se eliminan, E2E `05-calendario` (C7, C8), ADR 0007 y documentación (001 `obsoleta`, 009 `revision`).
 - **Fallos reales que cazaron las pruebas:** (1) en el primer acceso de un dispositivo los eventos de Google tardaban hasta 45 s en aparecer porque la carga inicial se decidía antes de saber que Calendar estaba vinculado (corregido en `App.tsx`); (2) la nube vacía sin subir el estado dejaba dos dispositivos con datos distintos.

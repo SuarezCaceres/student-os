@@ -39,7 +39,7 @@ Objetivo del humano: que cada usuario tenga su espacio y se guarden **por usuari
   - [ ] Los 4 componentes que usan `localStorage` directo (`AuthModal`, `BackupModal`, `DailyHabitsCard`, `GymTracker`) no sincronizan en modo nube: hábitos y gym podrían quedarse en el navegador y no «seguir» al usuario a otro dispositivo (ver M2).
   - [ ] **Riesgo a analizar:** si el usuario A cierra sesión y el B entra en el mismo navegador, el importador del primer inicio podría ofrecer subir los datos locales de A a la cuenta de B. Decidir qué pasa con el estado local al cambiar de cuenta.
   - [ ] Definir qué ve un usuario nuevo (estado vacío o datos de ejemplo) y los límites por cuenta (hoy 5000 registros y 64 KB por registro).
-- [ ] Escribir la spec en `docs/specs/010-entorno-de-trabajo-por-usuario/spec.md`
+- [x] Spec escrita en `docs/specs/010-entorno-de-trabajo-por-usuario/spec.md` (rama `feat/010-entorno-de-trabajo-por-usuario`, **a la espera de tu aprobación**). Decisiones tuyas del 2026-11-24: cuenta nueva vacía con guía, subir antes de cerrar sesión y avisar al llegar al límite sin subirlo. Los puntos de `localStorage` directo y del cambio de cuenta ya los cubre la 009.
 
 #### A3 · Producción: `student-os-prod`, variables y API desplegada (funcionalidad 007)
 Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
