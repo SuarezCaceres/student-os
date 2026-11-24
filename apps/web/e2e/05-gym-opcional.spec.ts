@@ -1,8 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   PageTap,
+  WEB,
   apiFetch,
   bootDevice,
+  control,
   gotoApp,
   newContext,
   openTab,
@@ -139,5 +141,62 @@ test.describe('5. gym opcional', () => {
     expect(await preference(other.userId)).toBeUndefined();
     expect(tap.pageErrors).toEqual([]);
     await ctx.close();
+  });
+
+  test('5f. con Calendar vinculado y el gym desactivado, la app no publica nada de gym en Google (C5)', async ({ browser }) => {
+    const key = userKey('s5-google');
+    const email = `${key}@e2e.test`;
+    await control('/supabase/config', { loginUserKey: key });
+    const s = await sessionFor(key);
+    const at = new Date().toISOString();
+    // La cuenta ya tiene el gym desactivado y un bloque de gym en su horario.
+    const seeded = await apiFetch('/sync/push', s.accessToken, {
+      method: 'POST',
+      body: JSON.stringify({
+        changes: [
+          { id: 'gym-preference', collection: 'gym', data: { kind: 'preference', value: { disabled: true } }, updatedAt: at, deletedAt: null, rev: 0 },
+          {
+            id: 'cb-gym-e2e-google',
+            collection: 'calendar',
+            data: { kind: 'block', value: { id: 'cb-gym-e2e-google', day: 'Lunes', startTime: '07:00', endTime: '08:30', title: GYM_BLOCK, category: 'gym' } },
+            updatedAt: at,
+            deletedAt: null,
+            rev: 0,
+          },
+        ],
+      }),
+    });
+    expect(seeded.status, seeded.text).toBeLessThan(300);
+
+    const before = (await control<{ paths: string[] }>('/google/state?email=' + encodeURIComponent(email))).paths.length;
+
+    // Login real con Google (Calendar queda vinculado solo) y recorrido por todas las pestanas.
+    const context = await newContext(browser);
+    const page = await context.newPage();
+    const tap = new PageTap(page);
+    await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: /Continuar con Google/i }).click();
+    await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(async () => (await apiFetch('/google/status', s.accessToken)).json, { timeout: 15_000 })
+      .toMatchObject({ connected: true });
+    await waitSynced(page, 40_000);
+    await expect(gymTab(page)).toHaveCount(0);
+    for (const tab of ['Kanban', 'Universidad', 'Horario', 'Aprendizaje', 'Resumen'] as const) await openTab(page, tab);
+    await openTab(page, 'Horario');
+    await expect(page.getByText(GYM_BLOCK)).toHaveCount(0);
+    await page.waitForTimeout(3_000);
+
+    // Calendar esta realmente vinculado (la API hablo con Google al enlazar) y, aun asi, la app no escribe en el calendario.
+    // Nota: en esta base la web aun no lee el calendario de Google durante la prueba; tras rebasar sobre la 009 (E2E de
+    // calendario) conviene exigir tambien una lectura `GET /calendar/v3/` para que la prueba sea mas estricta.
+    const after = (await control<{ paths: string[] }>('/google/state?email=' + encodeURIComponent(email))).paths.slice(before);
+    expect(after.some((p) => p.startsWith('POST /token')), 'Calendar quedo vinculado: ' + JSON.stringify(after)).toBe(true);
+    expect(after.filter((p) => p.startsWith('POST /calendar/v3/') || p.startsWith('PATCH /calendar/v3/'))).toEqual([]);
+    const events = await control<Array<{ summary?: string }>>('/google/events?email=' + encodeURIComponent(email));
+    expect(events.filter((e) => /gym|entrenamiento/i.test(e.summary ?? ''))).toEqual([]);
+    expect(tap.pageErrors).toEqual([]);
+    await context.close();
   });
 });
