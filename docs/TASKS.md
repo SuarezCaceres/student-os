@@ -4,7 +4,7 @@
 > Las funcionalidades grandes viven en `docs/features.json`; aquí van las tareas concretas.
 
 ## En curso
-- [ ] Adopción del harness: Fase 7 (cierre) de `docs/PLAN_ADOPCION_HARNESS.md` · `chore/adopt-agent-harness` · agente + humano
+- [ ] Adopción del harness: PR de `chore/adopt-agent-harness` abierto, a la espera de tu revisión y merge (plan archivado en `docs/references/historial/PLAN_ADOPCION_HARNESS.md`) · agente + humano
 
 ## Pendiente (en orden de prioridad, decidido por el humano el 2026-11-23)
 
@@ -43,7 +43,7 @@
 
 ### Adopción del harness
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy `.claude/skills` es una copia sin versionar que hay que resincronizar a mano tras tocar una skill.
-- [ ] Fase 7: ADR 0002, borrar `docs/PLAN_ADOPCION_HARNESS.md` o archivarlo, `check.sh` completo, `revisor` y PR
+- [ ] `.claude/settings.json` deniega `Read(./.env.*)` y eso bloquea también leer `.env.example`, que el harness pide mantener al día. Decidir: listar solo los `.env` con secretos (`.env`, `.env.local`, `.env.production`…) o aceptar la limitación. Tras activar el enlace simbólico, quitar `.claude/skills/` de `.gitignore` solo si hiciera falta (el enlace no se ignora).
 
 ## Bloqueado
 - [ ] Enlace simbólico de skills · Windows exige Modo desarrollador o administrador · que el humano lo active

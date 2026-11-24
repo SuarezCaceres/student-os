@@ -8,7 +8,7 @@ Generales, valen para cualquier framework. Lo específico del stack está en `do
 - Reutiliza los componentes de UI existentes antes de crear uno nuevo.
 
 ## Datos y API
-- Todas las llamadas al backend pasan por una única capa cliente (p. ej. `src/lib/api/`). Nada de `fetch` disperso.
+- Todas las llamadas al backend pasan por una única capa cliente (en este proyecto, `src/services/api.ts`). Nada de `fetch` disperso.
 - Usa los tipos compartidos de `packages/` para las respuestas de la API. No los dupliques.
 - Gestiona siempre los tres estados: cargando, error y vacío.
 

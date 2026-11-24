@@ -40,6 +40,9 @@ dist-ssr
 # Claude Code: solo lo local
 .claude/worktrees/
 .claude/settings.local.json
+# Copia temporal de las skills (Windows sin enlace simbólico). Con barra final solo ignora el
+# directorio: el enlace simbólico real .claude/skills -> ../.agents/skills SÍ se versiona.
+.claude/skills/
 .playwright-mcp/
 
 # Artefactos de ejecución de Playwright (contienen rutas locales)

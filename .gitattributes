@@ -1,0 +1,4 @@
+# Los scripts y hooks deben llevar siempre finales de línea LF (si no, fallan en Linux, macOS, WSL y CI).
+*.sh text eol=lf
+.githooks/* text eol=lf
+.claude/hooks/* text eol=lf
