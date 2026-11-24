@@ -105,7 +105,7 @@
         { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": true },
         { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": true },
         { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": true },
-        { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": false },
+        { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": true },
         { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": false },
         { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": false },
         { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": true },

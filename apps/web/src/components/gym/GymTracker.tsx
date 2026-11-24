@@ -574,7 +574,7 @@ export const GymTracker: React.FC<GymTrackerProps> = ({
                     ? 'Sincronizando gym...'
                     : isGoogleConnected
                       ? 'Sincronizar Gym con Google'
-                      : 'Conectar avisos Google'}
+                      : 'Ver estado de Google'}
                 </span>
               </button>
             )}

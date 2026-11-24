@@ -3,28 +3,19 @@ import {
   Calendar,
   CheckCircle2,
   Download,
-  LogOut,
   RefreshCw,
   Send,
   Unplug,
   AlertTriangle,
-  ShieldCheck,
 } from 'lucide-react';
 import type { CalendarBlock, DayOfWeek } from '../../types';
 import {
-  beginGoogleCloudConnect,
-  connectGoogleCalendar,
-  consumeGoogleRedirectResult,
-  disconnectGoogleCalendar,
-  disconnectGoogleCalendarCloud,
   fetchGoogleEventsAndBusyForWeek,
-  getStoredAccessToken,
   getStoredGoogleMeta,
   refreshGoogleCloudConnection,
   upsertGoogleGymEvent,
   type GoogleCalendarEvent,
   type GoogleCalendarMeta,
-  type GoogleRedirectResult,
 } from '../../services/googleCalendar';
 import type { BusyInterval } from '../../utils/calendarSlotFinder';
 import { getCurrentWeekDateMap } from '../../utils/gymAttendance';
@@ -64,31 +55,11 @@ interface SyncContentProps {
   onConnectionChange?: (connected: boolean, accessToken?: string | null) => void;
 }
 
-/** Mensajes (en espanol, sin jerga) para el resultado de volver del consentimiento de Google. */
-function describeRedirectResult(result: GoogleRedirectResult): StatusBanner {
-  if (result.status === 'connected') {
-    return {
-      type: 'ok',
-      text: 'Google Calendar quedó conectado. Ya puedes sincronizar tu semana.',
-    };
-  }
-  switch (result.reason) {
-    case 'denied':
-      return { type: 'warn', text: 'Cancelaste el permiso en Google, así que no se conectó nada. Puedes intentarlo cuando quieras.' };
-    case 'expired':
-      return { type: 'warn', text: 'El intento de conexión caducó. Vuelve a pulsar "Conectar Google Calendar".' };
-    case 'missing_scopes':
-      return {
-        type: 'error',
-        text: 'Faltó el permiso para crear eventos. Vuelve a conectar y marca todas las casillas del calendario.',
-      };
-    case 'not_configured':
-      return { type: 'error', text: 'El servidor aún no tiene configurada la conexión con Google Calendar.' };
-    default:
-      return { type: 'error', text: 'No se pudo conectar con Google Calendar. Inténtalo de nuevo en un momento.' };
-  }
-}
-
+/**
+ * Estado y acciones de Google Calendar. La vinculacion ocurre sola al iniciar sesion con Google (spec 009): aqui NO hay
+ * boton para conectar ni para desvincular, solo un indicador de estado. Si Google dejo de aceptar el acceso, se pide volver
+ * a iniciar sesion con Google.
+ */
 const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
   calendarBlocks,
   weekDates,
@@ -98,27 +69,24 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
   onConnectionChange,
 }) => {
   const [meta, setMeta] = useState<GoogleCalendarMeta>(() => getStoredGoogleMeta());
-  const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAccessToken());
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [pushReminderMinutes, setPushReminderMinutes] = useState<number[]>(
     DEFAULT_BLOCK_REMINDER_MINUTES
   );
 
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isSyncingBusy, setIsSyncingBusy] = useState(false);
   const [isPushingBlocks, setIsPushingBlocks] = useState(false);
   const [pushProgress, setPushProgress] = useState<{ current: number; total: number } | null>(null);
   const [busyEventCount, setBusyEventCount] = useState<number | null>(null);
   const [status, setStatus] = useState<StatusBanner | null>(null);
 
-  // Modo nube (sync persistente): el estado real lo tiene el servidor. `null` = aun no se sabe / modo GIS.
+  // El estado real lo tiene el servidor. `null` = aun no se sabe.
   const [cloud, setCloud] = useState<{ serverConfigured: boolean } | null>(null);
   const [isCheckingCloud, setIsCheckingCloud] = useState(true);
-  const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
-  const isCloud = cloud !== null;
   const needsReconnect = meta.connected && !accessToken;
-  const isBusy = isConnecting || isSyncingBusy || isPushingBlocks || isDisconnecting;
+  const isReady = meta.connected && Boolean(accessToken);
+  const isBusy = isSyncingBusy || isPushingBlocks;
   const resolvedWeekDates = weekDates ?? getCurrentWeekDateMap();
 
   const applyCloudState = useCallback(
@@ -131,13 +99,9 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
     [onConnectionChange]
   );
 
-  // Al abrir: si hay nube, consultar al servidor si la conexion persistente sigue viva y mostrar el resultado de
-  // volver de Google (?google=connected|error). Sin nube no hace nada: el flujo GIS queda como siempre.
+  // Al abrir: consultar al servidor si la conexion guardada sigue viva.
   useEffect(() => {
     let cancelled = false;
-    const redirect = consumeGoogleRedirectResult();
-    if (redirect) setStatus(describeRedirectResult(redirect));
-
     refreshGoogleCloudConnection({ force: true })
       .then((state) => {
         if (cancelled || !state) return;
@@ -145,7 +109,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
       })
       .catch(() => {
         if (cancelled) return;
-        // Servidor dormido o sin red: se muestra lo ultimo conocido y se avisa sin bloquear nada.
+        // Servidor dormido o sin red: se avisa sin bloquear nada.
         setCloud({ serverConfigured: true });
         setStatus((prev) =>
           prev ?? {
@@ -164,96 +128,16 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const acquireTokenOrThrow = async (): Promise<string> => {
+  const requireToken = (): string => {
     if (accessToken) return accessToken;
-    const result = await connectGoogleCalendar();
-    setAccessToken(result.accessToken);
-    setMeta(result.meta);
-    onConnectionChange?.(true, result.accessToken);
-    return result.accessToken;
-  };
-
-  const handleConnect = async () => {
-    setStatus(null);
-    setIsConnecting(true);
-    let leavingPage = false;
-    try {
-      if (isCloud) {
-        // Redirige a Google; al volver, la API agrega ?google=connected|error. La pagina se abandona aqui.
-        await beginGoogleCloudConnect();
-        leavingPage = true;
-        return;
-      }
-      const result = await connectGoogleCalendar();
-      setAccessToken(result.accessToken);
-      setMeta(result.meta);
-      onConnectionChange?.(true, result.accessToken);
-      setStatus({
-        type: 'ok',
-        text: result.meta.email
-          ? `Conectado a Google Calendar como ${result.meta.email}.`
-          : 'Conectado a Google Calendar correctamente.',
-      });
-    } catch (err) {
-      setStatus({
-        type: 'error',
-        text: err instanceof Error ? err.message : 'No se pudo conectar con Google Calendar.',
-      });
-    } finally {
-      // Si ya se esta navegando a Google, el boton se queda en "Abriendo Google..." hasta salir de la pagina.
-      if (!leavingPage) setIsConnecting(false);
-    }
-  };
-
-  const handleDisconnectCloud = async () => {
-    setStatus(null);
-    setIsDisconnecting(true);
-    try {
-      const { revoked } = await disconnectGoogleCalendarCloud();
-      setAccessToken(null);
-      setMeta({ connected: false });
-      setBusyEventCount(null);
-      setConfirmingDisconnect(false);
-      onConnectionChange?.(false, null);
-      setStatus(
-        revoked
-          ? { type: 'ok', text: 'Google Calendar desconectado. StudentOS ya no tiene acceso a tu calendario.' }
-          : {
-              type: 'warn',
-              text: 'Borramos la conexión de StudentOS, pero Google no confirmó la revocación. Puedes quitar el acceso en myaccount.google.com/permissions.',
-            }
-      );
-    } catch (err) {
-      setStatus({
-        type: 'error',
-        text: err instanceof Error ? err.message : 'No se pudo desconectar Google Calendar. Inténtalo de nuevo.',
-      });
-    } finally {
-      setIsDisconnecting(false);
-    }
-  };
-
-  const handleDisconnect = () => {
-    if (isCloud) {
-      setConfirmingDisconnect(true);
-      return;
-    }
-    disconnectGoogleCalendar(accessToken ?? undefined);
-    setAccessToken(null);
-    setMeta({ connected: false });
-    setBusyEventCount(null);
-    onConnectionChange?.(false, null);
-    setStatus({
-      type: 'warn',
-      text: 'Cuenta de Google Calendar desconectada de esta sesión.',
-    });
+    throw new Error('Google Calendar no está conectado. Cierra sesión y vuelve a entrar con Google para renovar el acceso.');
   };
 
   const handleSyncWeeklyAvailability = async () => {
     setStatus(null);
     setIsSyncingBusy(true);
     try {
-      const token = await acquireTokenOrThrow();
+      const token = requireToken();
       const { events, busyByDate } = await fetchGoogleEventsAndBusyForWeek(
         token,
         resolvedWeekDates
@@ -271,10 +155,6 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
             : `Sincronizado: ${events.length} evento${events.length === 1 ? '' : 's'} de Google (${totalBusy} bloque${totalBusy === 1 ? '' : 's'} ocupado${totalBusy === 1 ? '' : 's'}) cargado${events.length === 1 ? '' : 's'} en tu Horario.`,
       });
     } catch (err) {
-      const refreshedToken = getStoredAccessToken();
-      if (!refreshedToken) {
-        setAccessToken(null);
-      }
       setStatus({
         type: 'error',
         text:
@@ -301,7 +181,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
     setPushProgress({ current: 0, total: calendarBlocks.length });
 
     try {
-      const token = await acquireTokenOrThrow();
+      const token = requireToken();
       let exportedCount = 0;
 
       for (let idx = 0; idx < calendarBlocks.length; idx++) {
@@ -343,9 +223,6 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
         text: `Se enviaron ${exportedCount} bloque${exportedCount === 1 ? '' : 's'} de tu semana actual a Google Calendar con avisos configurados.`,
       });
     } catch (err) {
-      if (!getStoredAccessToken()) {
-        setAccessToken(null);
-      }
       setStatus({
         type: 'error',
         text:
@@ -376,110 +253,54 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
 
   return (
     <div className="space-y-0">
-      {/* Row 1: Connection Status */}
-      <div className="t-row flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="space-y-1.5 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {isCloud && isCheckingCloud ? (
-              <span className="t-badge">
-                <RefreshCw className="w-3.5 h-3.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-                <span>Revisando conexión...</span>
-              </span>
-            ) : isCloud && needsReconnect ? (
-              <span className="t-badge t-badge-warn">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                <span>Requiere reconexión</span>
-              </span>
-            ) : meta.connected ? (
-              <span className="t-badge t-badge-ok">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                <span>Conectado</span>
-              </span>
-            ) : (
-              <span className="t-badge">
-                <Unplug className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                <span>Sin conectar</span>
-              </span>
-            )}
+      {/* Row 1: estado de la conexion (solo lectura: se vincula sola al iniciar sesion) */}
+      <div className="t-row space-y-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          {isCheckingCloud ? (
+            <span className="t-badge">
+              <RefreshCw className="w-3.5 h-3.5 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              <span>Revisando conexión...</span>
+            </span>
+          ) : needsReconnect ? (
+            <span className="t-badge t-badge-warn">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Requiere reconexión</span>
+            </span>
+          ) : meta.connected ? (
+            <span className="t-badge t-badge-ok">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Conectado</span>
+            </span>
+          ) : (
+            <span className="t-badge">
+              <Unplug className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>Sin conectar</span>
+            </span>
+          )}
 
-            {meta.connected && (meta.email || meta.calendarName) && (
-              <span className="text-[14px] font-medium text-[var(--ink)] truncate">
-                {meta.email || meta.calendarName}
-              </span>
-            )}
+          {meta.connected && (meta.email || meta.calendarName) && (
+            <span className="text-[14px] font-medium text-[var(--ink)] truncate">
+              {meta.email || meta.calendarName}
+            </span>
+          )}
 
-            {busyEventCount !== null && (
-              <span className="t-badge t-badge-accent t-num">
-                {busyEventCount} evento{busyEventCount === 1 ? '' : 's'} esta semana
-              </span>
-            )}
-          </div>
-
-          <p className="text-[13px] text-[var(--muted)] leading-relaxed">
-            {isCloud
-              ? needsReconnect
-                ? 'Google dejó de aceptar el acceso (puede pasar si lo quitaste desde tu cuenta de Google o si pasaron 7 días con la app en modo de prueba). Vuelve a autorizar para seguir sincronizando.'
-                : meta.connected
-                  ? 'Conexión guardada en tu cuenta de StudentOS: no tendrás que volver a iniciar sesión en Google cada hora. Puedes sincronizar tus eventos ocupados o enviar tu horario a Google.'
-                  : 'Conecta tu Google Calendar una sola vez y StudentOS mantendrá la sincronización, o descarga un archivo .ics sin iniciar sesión.'
-              : meta.connected && !accessToken
-                ? 'La sesión temporal OAuth expiró al recargar. Vuelve a conectar para leer disponibilidad o enviar eventos.'
-                : meta.connected
-                  ? 'Sesión activa. Puedes sincronizar tus eventos ocupados o enviar tu horario actual a Google.'
-                  : 'Conecta tu cuenta con Google en 1 clic o descarga un archivo .ics sin iniciar sesión.'}
-          </p>
+          {busyEventCount !== null && (
+            <span className="t-badge t-badge-accent t-num">
+              {busyEventCount} evento{busyEventCount === 1 ? '' : 's'} esta semana
+            </span>
+          )}
         </div>
 
-        {meta.connected && !confirmingDisconnect && (
-          <button
-            type="button"
-            onClick={handleDisconnect}
-            disabled={isBusy}
-            className="t-btn t-btn-ghost shrink-0 text-[14px] text-[var(--muted)] hover:text-[var(--danger)]"
-          >
-            <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>Desconectar</span>
-          </button>
-        )}
+        <p className="text-[13px] text-[var(--muted)] leading-relaxed">
+          {needsReconnect
+            ? 'Google dejó de aceptar el acceso (puede pasar si lo quitaste desde tu cuenta de Google). Cierra sesión y vuelve a entrar con Google para renovarlo.'
+            : meta.connected
+              ? 'Tu Google Calendar se conectó al iniciar sesión y queda guardado en tu cuenta: no tendrás que hacer nada más. Puedes sincronizar tus eventos ocupados o enviar tu horario a Google.'
+              : 'Tu Google Calendar se conecta al iniciar sesión con Google. Si no aparece conectado, cierra sesión y vuelve a entrar aceptando el permiso de Calendar, o descarga un archivo .ics.'}
+        </p>
       </div>
 
-      {isCloud && confirmingDisconnect && (
-        <div
-          role="group"
-          aria-label="Confirmar desconexión de Google Calendar"
-          className="my-4 p-3.5 rounded-[12px] border border-[var(--line-strong)] bg-[var(--surface-2)] space-y-3"
-        >
-          <p className="text-[14px] text-[var(--ink)] leading-snug flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-[var(--action)]" aria-hidden="true" />
-            <span>
-              Vamos a quitar el acceso de StudentOS a tu Google Calendar y a borrar la conexión guardada. Tus eventos en
-              Google no se tocan.
-            </span>
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2.5">
-            <button
-              type="button"
-              onClick={() => setConfirmingDisconnect(false)}
-              disabled={isDisconnecting}
-              className="t-btn t-btn-secondary"
-              autoFocus
-            >
-              Cancelar
-            </button>
-            <button
-              type="button"
-              onClick={handleDisconnectCloud}
-              disabled={isDisconnecting}
-              className="t-btn t-btn-primary"
-            >
-              <LogOut className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span>{isDisconnecting ? 'Desconectando...' : 'Sí, desconectar'}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {isCloud && cloud && !cloud.serverConfigured && (
+      {cloud && !cloud.serverConfigured && (
         <div
           role="alert"
           className="my-4 p-3.5 rounded-[12px] border border-[var(--warn)] bg-[color-mix(in_oklab,var(--warn)_10%,var(--surface))] text-[14px] text-[var(--ink)] leading-snug flex items-start gap-2.5"
@@ -524,33 +345,11 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
         <p className="text-[14px] font-medium text-[var(--ink)]">Acciones disponibles</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {!meta.connected || !accessToken ? (
-            <button
-              type="button"
-              onClick={handleConnect}
-              disabled={isBusy || (isCloud && (isCheckingCloud || cloud?.serverConfigured === false))}
-              className="t-btn t-btn-primary !whitespace-normal !py-2.5 text-center leading-snug sm:col-span-2"
-            >
-              <Calendar className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span>
-                {isConnecting
-                  ? isCloud
-                    ? 'Abriendo Google...'
-                    : 'Abriendo inicio de sesión de Google...'
-                  : meta.connected
-                    ? 'Reconectar con Google Calendar'
-                    : 'Conectar con Google Calendar'}
-              </span>
-            </button>
-          ) : null}
-
           <button
             type="button"
             onClick={handleSyncWeeklyAvailability}
-            disabled={isBusy}
-            className={`t-btn ${
-              meta.connected && accessToken ? 't-btn-primary' : 't-btn-secondary'
-            } !whitespace-normal !py-2.5 text-center leading-snug`}
+            disabled={isBusy || !isReady}
+            className={`t-btn ${isReady ? 't-btn-primary' : 't-btn-secondary'} !whitespace-normal !py-2.5 text-center leading-snug`}
           >
             <RefreshCw
               className={`w-4 h-4 shrink-0 ${isSyncingBusy ? 'animate-spin motion-reduce:animate-none' : ''}`}
@@ -566,7 +365,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
           <button
             type="button"
             onClick={handlePushCurrentBlocks}
-            disabled={isBusy}
+            disabled={isBusy || !isReady}
             className="t-btn t-btn-secondary !whitespace-normal !py-2.5 text-center leading-snug"
           >
             <Send className="w-4 h-4 shrink-0 text-[var(--action)]" aria-hidden="true" />
@@ -584,7 +383,7 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
             className="t-btn t-btn-secondary !whitespace-normal !py-2.5 text-center leading-snug sm:col-span-2"
           >
             <Download className="w-4 h-4 shrink-0" aria-hidden="true" />
-            <span>Descargar .ics (sin login)</span>
+            <span>Descargar .ics</span>
           </button>
         </div>
 
@@ -618,7 +417,7 @@ export const GoogleCalendarSyncModal: React.FC<GoogleCalendarSyncModalProps> = (
       onClose={onClose}
       maxWidth="lg"
       badge="Google Calendar"
-      title="Sincronizar con Google Calendar"
+      title="Google Calendar"
       subtitle="Detecta tus reuniones ocupadas de la semana o exporta tus bloques académicos y de gimnasio."
       icon={<Calendar className="w-5 h-5" aria-hidden="true" />}
       footer={

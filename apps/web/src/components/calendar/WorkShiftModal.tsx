@@ -358,7 +358,7 @@ const WorkShiftFormBody: React.FC<FormBodyProps> = ({
 
               {!isGoogleConnected && onOpenGoogleSync && (
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[13px] text-[var(--muted)]">
-                  <span>Conecta tu cuenta Google para reflejar los turnos en tu celular.</span>
+                  <span>Tu Google Calendar no está conectado ahora mismo, así que los turnos no se reflejarán en tu celular.</span>
                   <button
                     type="button"
                     onClick={() => {
@@ -367,7 +367,7 @@ const WorkShiftFormBody: React.FC<FormBodyProps> = ({
                     }}
                     className="t-btn t-btn-ghost text-[13px] text-[var(--action)] px-2.5 min-h-[44px]"
                   >
-                    Conectar Google Calendar
+                    Ver estado de Google Calendar
                   </button>
                 </div>
               )}

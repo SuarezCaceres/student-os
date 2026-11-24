@@ -92,7 +92,7 @@ export const SmartSlotReschedulePicker: React.FC<SmartSlotReschedulePickerProps>
             >
               <Calendar className="w-4 h-4 shrink-0 text-[var(--action)]" aria-hidden="true" />
               <span>
-                {isGoogleConnected ? 'Sincronizar Google Calendar' : 'Conectar Google Calendar'}
+                {isGoogleConnected ? 'Sincronizar Google Calendar' : 'Ver estado de Google Calendar'}
               </span>
             </button>
           )}
