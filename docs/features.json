@@ -120,7 +120,7 @@
       "id": "010",
       "nombre": "entorno-de-trabajo-por-usuario",
       "spec": "docs/specs/010-entorno-de-trabajo-por-usuario/spec.md",
-      "estado": "plan",
+      "estado": "en_curso",
       "criterios": [
         { "id": "C1", "descripcion": "En produccion, dos cuentas reales distintas ven solo sus propios datos (tareas, entregas, gym, calendario, habitos) desde cualquier dispositivo (manual: necesita 007 y 008)", "pasa": false },
         { "id": "C2", "descripcion": "Quien edita y cierra sesion con conexion ve esa ultima edicion al volver a entrar, en el mismo u otro dispositivo", "pasa": false },

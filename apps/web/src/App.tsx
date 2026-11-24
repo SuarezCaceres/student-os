@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
-import { initialData } from './data/initialData';
+import { emptyAppState } from './data/emptyState';
 import { useSyncedAppState } from './hooks/useSyncedAppState';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
@@ -105,7 +105,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import type { UserSession } from './components/auth/AuthModal';
 
 export const App: React.FC = () => {
-  const [state, setState, resetState] = useSyncedAppState(initialData);
+  const [state, setState, resetState] = useSyncedAppState(emptyAppState);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');

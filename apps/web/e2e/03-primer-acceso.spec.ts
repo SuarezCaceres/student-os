@@ -45,10 +45,26 @@ test.describe('3. primer acceso sin importador', () => {
     }
     expect(downloads, 'ya no se descargan respaldos del importador').toEqual([]);
     await expect.poll(async () => (await rowsOf(session.userId)).profiles, { timeout: 10_000 }).toBe(1);
-    // Estado de una cuenta nueva: nombre de pila de su cuenta de Google y sin los bloques de horario de ejemplo.
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('student_os_state_v1') ?? '{}') as { studentName?: string; calendarBlocks?: Array<{ id: string }> });
+    // Estado de una cuenta nueva (spec 010, C5): nombre de pila de su cuenta de Google y todos los modulos vacios.
+    const stored = await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem('student_os_state_v1') ?? '{}') as {
+          studentName?: string;
+          kanbanItems?: unknown[];
+          universityAssignments?: unknown[];
+          gymRoutines?: unknown[];
+          calendarBlocks?: unknown[];
+          weeklyReflections?: Record<string, unknown>;
+        },
+    );
     expect(stored.studentName).toBe('Usuario');
-    expect((stored.calendarBlocks ?? []).some((b) => /^cb-\d+$/.test(b.id))).toBe(false);
+    expect(stored.kanbanItems).toEqual([]);
+    expect(stored.universityAssignments).toEqual([]);
+    expect(stored.gymRoutines).toEqual([]);
+    expect(stored.calendarBlocks).toEqual([]);
+    expect(Object.keys(stored.weeklyReflections ?? {})).toEqual([]);
+    // Y en pantalla no hay rastro de los datos de ejemplo de Mateo.
+    await expect(page.getByText('Mateo')).toHaveCount(0);
     await evidence(page, '03-primer-acceso-directo');
     expect(tap.pageErrors).toEqual([]);
     expect(relevantConsoleErrors(tap)).toEqual([]);
