@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · chore/puertos-pruebas-configurables
+- **Hecho:** variable `E2E_PORT_OFFSET` (entero, por defecto 0) que desplaza todos los puertos fijos de las pruebas (integración del API y E2E) para poder correr varias sesiones a la vez. Fuente única en `apps/api/test/ports.cjs`; prueba `ports.e2e-spec.ts`; documentado en `docs/stack/backend.md` y `frontend.md`.
+- **Verificación:** con `E2E_PORT_OFFSET=500`: `./scripts/check.sh --rapido` pasa, 14 E2E pasan y el hook de pre-commit pasa. Con offset 0 solo se comprobó que la lista de puertos es la original (prueba unitaria): los puertos 54329-54337 estaban ocupados por otras sesiones.
+- **Pendiente:** nada. Cada sesión debe usar un offset distinto (separados al menos 20).
+- **Problemas:** en Windows hay rangos de puertos reservados (`netsh int ipv4 show excludedportrange protocol=tcp`); un offset de 2000 cayó en uno y Postgres embebido falló sin mensaje.
+
 ## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 7, cierre)
 - **Hecho:** ADR 0002, plan de adopción archivado en `docs/references/historial/`, `check.sh` completo (5 de 5, 169 s) y revisión con la skill `revisor`. Correcciones de la revisión: permisos de ejecución (`100755`) en scripts y hooks, `.gitattributes` con LF para scripts, `.claude/skills/` ignorado como directorio y rutas corregidas.
 - **Verificación:** `./scripts/check.sh` completo pasa (lint, tipos, unitarias, integración del API y 14 E2E).
