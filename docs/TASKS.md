@@ -23,8 +23,9 @@ Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y q
 - **Decisiones del humano (2026-11-24):** login **estrictamente con Google** (se eliminan el registro con correo, el modo local y «Explorar demo»); permisos de Calendar los mismos de hoy (leer y crear/editar); **sin botón de desvincular**; el calendario se comporta como hoy (se lee todo de Google y se publican gym, turno de trabajo y los bloques marcados).
 - **Más decisiones (2026-11-24):** Calendar forma parte del login y es **obligatorio** (si el usuario lo desmarca en la pantalla de Google, no entra); los datos locales del prototipo **se descartan** (sin importador).
 - **Preguntas abiertas** (ver la spec): ¿se mantiene la landing pública?, ¿basta sin botón de desvincular para la verificación de Google?, y aprobar dejar obsoletos la funcionalidad 001, la 003 (importador) y el ADR 0004. Los permisos de Calendar son «sensibles» para Google y exigen verificación completa *(deducido; confirmar con `docs/google-verification-checklist.md`)*.
-- [x] Spec escrita en `docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md` (borrador, a la espera de aprobación)
-- [ ] Plan (`plan.md`) tras aprobar la spec
+- [x] Spec aprobada por el humano el 2026-11-24 (`docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md`)
+- [x] Plan escrito (`plan.md`), **a la espera de tu aprobación**: decisión técnica D1 (cómo llega el refresh token al servidor; recomendada la opción B), relajar C10, actualizar la prueba que congela las firmas de `googleCalendar.ts` y añadir el estado `obsoleta` a `features.json`
+- [ ] Implementar (9 pasos del plan) tras aprobar el plan
 
 #### A2 · Entorno de trabajo por usuario: cada uno guarda sus propios datos (funcionalidad 010)
 Objetivo del humano: que cada usuario tenga su espacio y se guarden **por usuario** sus tareas pendientes y demás datos.

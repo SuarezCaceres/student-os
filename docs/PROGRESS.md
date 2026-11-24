@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico (plan)
+- **Hecho:** spec 009 aprobada (landing se mantiene, sin botón de desvincular, 001/003 y ADR 0004 obsoletos) y `plan.md` escrito con 9 pasos. Verificado en la documentación de Supabase que **no guarda los tokens del proveedor** y recomienda enviarlos a un servidor propio. `features.json` en estado `plan`.
+- **Pendiente:** que apruebes el plan, en especial D1 (opción B recomendada) y la nueva redacción de C10. Luego empezar por el paso 1 (prueba de viabilidad).
+- **Problemas:** el comportamiento real de Supabase y Google solo se confirma en producción (007 y 008). El criterio C12 es manual.
+
 ## 2026-11-24 · Claude Code · feat/009-login-google-calendar-automatico
 - **Hecho:** análisis del login y del calendario y spec 009 en borrador (`docs/specs/009-…/spec.md`, 13 criterios, `features.json` en estado `spec`). Hallazgos: hoy hay tres caminos de entrada (Google por GIS, Google por Supabase y una cuenta local falsa); en Vercel solo existe `VITE_GOOGLE_CLIENT_ID`, así que producción funciona en modo GIS; el calendario ya es casi el mismo entorno que Google una vez conectado (los eventos se leen en vivo y gym, turno y bloques marcados se publican), y lo que falta es vincular sin botón en el login.
 - **Decisiones del humano:** solo Google (sin registro, sin modo local, sin demo), mismos permisos de Calendar, Calendar obligatorio como parte del login (si lo desmarca no entra), datos locales del prototipo descartados (se retira el importador), sin botón de desvincular, calendario como hoy.

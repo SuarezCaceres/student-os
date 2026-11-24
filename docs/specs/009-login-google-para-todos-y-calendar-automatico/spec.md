@@ -1,6 +1,6 @@
 # Spec · 009 · Login solo con Google para todos y Calendar vinculado automáticamente
 
-> Estado: **borrador** (a la espera de tu aprobación)
+> Estado: **aprobada** por el humano el 2026-11-24 (incluye retirar la funcionalidad 003, el importador, y dejar obsoletos la 001 y el ADR 0004)
 > Dice **qué** y **por qué**, no **cómo**. El cómo va en `plan.md`, después de aprobar esta spec.
 > Prioridad: Alto, marcada como importante (`docs/TASKS.md` → A1). Depende de la producción (007) y de la verificación de Google (008).
 
@@ -81,7 +81,10 @@ Esta funcionalidad toca el **importador del primer inicio** (se retira por compl
 - Datos locales del prototipo: se descartan (C14).
 - El calendario se comporta como hoy.
 
+## Preguntas resueltas (2026-11-24)
+1. **La landing pública se mantiene** como única pantalla sin sesión. ✔
+2. **Sin botón de desvincular:** el usuario puede revocar desde su cuenta de Google o borrando la cuenta. Queda como **punto a comprobar con `docs/google-verification-checklist.md`** dentro de la 008, por si Google lo exigiera. ✔
+3. **Se aprueba** dejar obsoletos la funcionalidad 001 y el ADR 0004, y retirar la 003 (importador). ✔
+
 ## Preguntas abiertas
-1. **¿La landing pública se mantiene?** Se asume que sí, como única pantalla sin sesión.
-2. **¿Basta con no ofrecer botón de desvincular?** El usuario podría revocar desde su cuenta de Google o borrando la cuenta. Hay que confirmar con `docs/google-verification-checklist.md` si Google lo acepta para la verificación (008).
-3. **¿Se aprueba dejar obsoletas la funcionalidad 001 y el ADR 0004, y retirar la 003 (importador)?**
+Ninguna de producto. La única decisión pendiente es técnica y está en `plan.md` (D1).
