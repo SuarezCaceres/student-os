@@ -31,7 +31,7 @@ Objetivo del humano: en la pantalla principal, una lista de tareas cotidianas (t
   - «Hoy no puedo / estoy agobiado»: **día de descanso que no penaliza**; se guarda como «día difícil» en el historial, sin contar como fallo, con mensaje amable.
   - Historial: **gráfica semanal** para ver en qué día de la semana se hace más. Todo se guarda por usuario (sync).
 - **Falta:** confirmar con el humano la spec antes de implementar.
-- [ ] Escribir la spec en `docs/specs/012-quehaceres-diarios/spec.md` (espera tu aprobación)
+- [x] Spec escrita en `docs/specs/012-quehaceres-diarios/spec.md` con mis elecciones marcadas 🧭 (sin rachas, solo hoy editable, promedio de 8 semanas, motivo opcional, máximo 30 quehaceres). **A la espera de tu aprobación**; sin plan todavía
 
 ### 🔴 Alto
 
