@@ -11,6 +11,11 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · docs/prioriza-pendientes
+- **Hecho:** `docs/TASKS.md` reordenado por prioridad Alto/Medio/Bajo. Dos pendientes nuevos de prioridad Alta pedidos por el humano: **A1** login con Google para cualquier usuario y Calendar vinculado sin botón (funcionalidad 009, marcado importante) y **A2** entorno de trabajo por usuario (010). `features.json` con 009 y 010 y sus carpetas de spec. Verificado que el PR #7 está en `main` y que Vercel sirve la web en https://student-os-mocha-iota.vercel.app (HTTP 200).
+- **Pendiente:** escribir las specs 009 y 010 con `spec-plan-code`. Producción (A3) y verificación de Google (A4) son prerrequisitos y van en paralelo.
+- **Problemas:** la API no está desplegada, así que hoy el login y los datos por usuario no funcionan de verdad en producción; solo en local con servicios simulados. Posible riesgo al cambiar de cuenta en el mismo navegador (el importador podría ofrecer subir datos locales de otro usuario).
+
 ## 2026-11-24 · Claude Code · chore/puertos-pruebas-configurables
 - **Hecho:** variable `E2E_PORT_OFFSET` (entero, por defecto 0) que desplaza todos los puertos fijos de las pruebas (integración del API y E2E) para poder correr varias sesiones a la vez. Fuente única en `apps/api/test/ports.cjs`; prueba `ports.e2e-spec.ts`; documentado en `docs/stack/backend.md` y `frontend.md`.
 - **Verificación:** con `E2E_PORT_OFFSET=500`: `./scripts/check.sh --rapido` pasa, 14 E2E pasan y el hook de pre-commit pasa. Con offset 0 solo se comprobó que la lista de puertos es la original (prueba unitaria): los puertos 54329-54337 estaban ocupados por otras sesiones.
