@@ -51,6 +51,15 @@ export function getDayOfWeekForDate(iso: string): DayOfWeek {
   return WEEKDAY_BY_JS_INDEX[parseLocalDate(iso).getDay()];
 }
 
+const SHORT_WEEKDAYS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const SHORT_MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
+/** Fecha corta en español de una fecha local `AAAA-MM-DD` (p. ej. `mar 24 nov`). No depende de los datos de idioma del motor. */
+export function formatShortDateEs(iso: string): string {
+  const date = parseLocalDate(iso);
+  return `${SHORT_WEEKDAYS[date.getDay()]} ${date.getDate()} ${SHORT_MONTHS[date.getMonth()]}`;
+}
+
 /** Milisegundos hasta la proxima medianoche local (para el temporizador de cambio de dia). Siempre > 0. */
 export function msUntilNextLocalMidnight(now: Date = new Date()): number {
   const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);

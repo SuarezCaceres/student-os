@@ -12,6 +12,7 @@ import {
   closeChoreDay,
   computeWeekdayStats,
   getChoresForDate,
+  formatShortDateEs,
   getDayOfWeekForDate,
   getNextLevel,
   getReachedLevel,
@@ -57,6 +58,12 @@ describe('fechas locales', () => {
     expect(addDaysIso('2026-11-30', 1)).toBe('2026-12-01');
     expect(addDaysIso('2026-01-01', -1)).toBe('2025-12-31');
     expect(addDaysIso('2028-02-28', 1)).toBe('2028-02-29');
+  });
+
+  it('formatShortDateEs da una fecha corta en espanol sin depender de la zona horaria', () => {
+    expect(formatShortDateEs('2026-11-24')).toBe('mar 24 nov');
+    expect(formatShortDateEs('2026-01-01')).toBe('jue 1 ene');
+    expect(formatShortDateEs('2026-11-25')).toBe('mié 25 nov');
   });
 
   it('getTodayIso usa la fecha local del reloj (simulado), no UTC', () => {
