@@ -39,7 +39,7 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 - [ ] Variables de producción en Vercel (`VITE_*`) y Render (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `WEB_ORIGINS`, `GOOGLE_*`)
 - [ ] Desplegar la API en Render y verificar `/health`
 - [ ] Ping programado contra la pausa de Supabase a los 7 días
-- [ ] Escribir la spec en `docs/specs/007-produccion-student-os-prod/spec.md`
+- [x] Spec escrita en `docs/specs/007-produccion-student-os-prod/spec.md` (borrador, rama `docs/spec-007-produccion`): **a la espera de tu aprobación**; propone los criterios C6–C8 y deja 6 preguntas abiertas. El agente no toca producción: prepara la receta y la verificación
 
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
