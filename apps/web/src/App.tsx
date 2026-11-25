@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { initialData } from './data/initialData';
-import { useSyncedAppState } from './hooks/useSyncedAppState';
+import { useSyncedAppState, useSyncStatus } from './hooks/useSyncedAppState';
+import { useChores } from './hooks/useChores';
+import { isSyncConfigured } from './services/supabase';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
 import { LegalLinks } from './components/legal/LegalLinks';
@@ -1349,6 +1351,12 @@ export const App: React.FC = () => {
       dailyHabits,
     }));
   }, [setState]);
+
+  // Quehaceres diarios (spec 012): siembra de la lista base, estado de hoy y temporizador de medianoche. Se siembra solo tras la
+  // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo. La tarjeta de la UI
+  // recibira el objeto que devuelve `useChores` como prop `chores` de `OverviewBento` cuando exista (pasos 5-7 del plan).
+  const choreSyncStatus = useSyncStatus();
+  useChores(state, setState, { syncReady: !isSyncConfigured() || choreSyncStatus.lastSyncAt !== null });
 
   const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
