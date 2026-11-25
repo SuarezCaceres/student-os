@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useState } from 'react';
+import React, { useCallback, useEffect, useId, useState } from 'react';
 import { CalendarRange, CloudRain, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import type { ChoreHardReason } from '../../types';
 import type { UseChoresResult } from '../../hooks/useChores';
@@ -11,6 +11,9 @@ export interface ChoresCardProps {
   chores: UseChoresResult;
 }
 
+/** Tiempo de espera de la primera sincronización antes de dejar de mostrar el esqueleto. */
+const SYNC_WAIT_MS = 8_000;
+
 const HARD_REASONS = Object.keys(CHORE_HARD_REASON_LABELS) as ChoreHardReason[];
 
 export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
@@ -19,7 +22,27 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isChartOpen, setIsChartOpen] = useState(false);
   // Estable: ModalShell reengancha su efecto (y roba el foco) si `onClose` cambia en cada render.
+  const [waitedTooLong, setWaitedTooLong] = useState(false);
   const closeEditor = useCallback(() => setIsEditorOpen(false), []);
+
+  // Sin red o con la API caída `ready` puede tardar indefinidamente: tras un tiempo se explica en vez de seguir cargando.
+  // No se siembra nada en local (se pisaría lo que la cuenta ya tenga en otro dispositivo).
+  useEffect(() => {
+    if (ready) return;
+    const timer = setTimeout(() => setWaitedTooLong(true), SYNC_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [ready]);
+
+  if (!ready && waitedTooLong) {
+    return (
+      <div className="t-card p-6 md:col-span-2 lg:col-span-2" data-testid="chores-offline">
+        <h3 className="text-base font-medium text-[var(--ink)]">Quehaceres</h3>
+        <p role="status" className="text-[13px] text-[var(--muted)] mt-2">
+          Sin conexión: tus quehaceres aparecerán cuando se sincronice tu cuenta
+        </p>
+      </div>
+    );
+  }
 
   if (!ready) {
     return (

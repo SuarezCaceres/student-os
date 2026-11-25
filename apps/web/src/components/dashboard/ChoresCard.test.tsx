@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialData } from '../../data/initialData';
 import { useChores } from '../../hooks/useChores';
@@ -218,5 +218,58 @@ describe('ChoresCard: «Hoy no puedo»', () => {
     fireEvent.click(checkbox('Ducharme'));
     expect(counter(1, 5)).toBeTruthy();
     expect(screen.getByTestId('chores-message').textContent).toContain('día difícil y está bien');
+  });
+});
+
+describe('ChoresCard: sin sincronización (R2)', () => {
+  const OFFLINE_TEXT = 'Sin conexión: tus quehaceres aparecerán cuando se sincronice tu cuenta';
+
+  /** La sincronización se controla desde fuera: `syncReady` empieza en falso y la prueba lo cambia. */
+  function Controlled({ syncReady, onState }: { syncReady: boolean; onState?: (state: AppState) => void }) {
+    const [state, setState] = useState<AppState>({ ...initialData, chores: undefined, choreDays: undefined, choreSettings: undefined });
+    onState?.(state);
+    const chores = useChores(state, setState, { syncReady });
+    return <ChoresCard chores={chores} />;
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 10, 25, 12, 0, 0));
+  });
+
+  it('pasado un tiempo sin sincronizar cambia el esqueleto por un aviso informativo y no siembra nada', () => {
+    let latest: AppState | undefined;
+    render(<Controlled syncReady={false} onState={(state) => (latest = state)} />);
+    expect(screen.getByTestId('chores-skeleton')).toBeTruthy();
+    expect(screen.queryByText(OFFLINE_TEXT)).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(8_000);
+    });
+    const notice = screen.getByText(OFFLINE_TEXT);
+    expect(notice.closest('[role="status"]')).toBeTruthy();
+    expect(screen.queryByTestId('chores-skeleton')).toBeNull();
+    expect(latest?.chores).toBeUndefined();
+    expect(latest?.choreSettings).toBeUndefined();
+  });
+
+  it('antes del límite sigue mostrando el esqueleto', () => {
+    render(<Controlled syncReady={false} />);
+    act(() => {
+      vi.advanceTimersByTime(7_000);
+    });
+    expect(screen.getByTestId('chores-skeleton')).toBeTruthy();
+  });
+
+  it('cuando la sincronización llega después, vuelve a la lista normal', () => {
+    const { rerender } = render(<Controlled syncReady={false} />);
+    act(() => {
+      vi.advanceTimersByTime(9_000);
+    });
+    expect(screen.getByText(OFFLINE_TEXT)).toBeTruthy();
+    rerender(<Controlled syncReady={true} />);
+    expect(screen.queryByText(OFFLINE_TEXT)).toBeNull();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
   });
 });
