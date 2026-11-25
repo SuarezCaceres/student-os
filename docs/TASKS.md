@@ -11,6 +11,14 @@
 
 ### 🔴 Alto
 
+#### A0 · ⭐ MAÑANA (2026-11-25) · Fusionar los PRs pendientes a `main`, en orden · lo hace el humano
+El `AGENTS.md` prohíbe que el agente haga merge a `main`: estos pasos son de la persona. Ya están **sin conflictos entre sí** (comprobado con simulaciones locales de fusión en cualquier orden) y con 5 de 5 checks en verde.
+- [ ] Fusionar con **«Create a merge commit»** (no squash ni rebase, para conservar el historial encadenado), en este orden: **#12** puertos de pruebas configurables (`E2E_PORT_OFFSET`) → **#8** priorización de pendientes → **#13** spec 007 de producción → **#14** spec 008 de verificación de Google. Cualquier otro orden también funciona.
+- [ ] **No fusionar #9** (la 009, que ya lleva dentro el gym opcional, los datos por usuario y los quehaceres diarios) hasta que producción (A3) esté lista: sigue en borrador a propósito. Antes de fusionarlo, pasarlo a «Ready for review» y confirmar que sus checks están en verde.
+- [ ] Después de fusionar: `git pull` en los worktrees locales desfasados (`student-os-008`, `student-os-011` y el directorio principal); borrar las ramas remotas ya fusionadas (`chore/adopt-agent-harness`, `feat/agent-1-university-kanban`, `feat/agent-2-gym-calendar-dashboard`, `feat/student-os-core-hub`, `feat/ui-taste-foundation`, `integration/backend`) y las obsoletas (`feat/011-gym-opcional`, `feat/overview-summary`) **solo con confirmación del humano**.
+- [ ] Limpiar lo que dejaron los agentes: un Postgres de pruebas huérfano (procesos 33604 y 36648, puerto 55395) y la carpeta `C:\Users\Sergio Suarez\Projects\student-os-int-009`.
+- [ ] Decisiones del humano que siguen abiertas: en la 012, qué cuenta un día sin registro (hoy 0), si se añade una vista de historial y si una cuenta sin red siembra la lista base localmente; las 6 preguntas de la spec 007 (PR #13) y las Q1–Q10 de la spec 008 (PR #14); y confirmar que sembrar los quehaceres cuente como «cambios sin subir» al cerrar sesión (aserciones 6b y 6d de la E2E `06-cerrar-sesion`).
+
 #### A1 · ⭐ IMPORTANTE · Login con Google para cualquier usuario y Calendar vinculado automáticamente (funcionalidad 009)
 Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y que su Google Calendar quede **ya vinculado, sin pulsar ningún botón «Conectar»**.
 - **Hoy:** el login usa Supabase Auth con Google (`apps/web/src/services/supabase.ts`). Vincular Calendar es **otro flujo aparte** que exige pulsar «Conectar» en `GoogleCalendarSyncModal` (`POST /google/connect`, PKCE, refresh token cifrado en el servidor). Además la web en producción **no tiene API desplegada**, así que el login con la nube no funciona de verdad todavía.
