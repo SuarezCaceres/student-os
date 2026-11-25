@@ -124,7 +124,8 @@ test.describe('7. quehaceres diarios', () => {
   test('7g. la gráfica semanal muestra un estado vacío claro con pocos días (C13)', async () => {
     await a.page.getByRole('button', { name: 'Ver tu semana' }).click();
     await expect(card(a.page).getByText(/Aún no hay suficientes días/)).toBeVisible();
-    await expect(card(a.page).getByRole('img')).toHaveCount(0); // sin gráfica en ceros
+    // Sin gráfica en ceros: el contador de la tarjeta también es role=img, así que se busca solo la gráfica.
+    await expect(card(a.page).getByRole('img', { name: /Promedio de quehaceres completados por día/ })).toHaveCount(0);
   });
 
   test('7h. otro usuario parte con su propia lista, sin lo marcado por este (C15)', async ({ browser }) => {

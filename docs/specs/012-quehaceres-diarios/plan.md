@@ -1,6 +1,6 @@
 # Plan · 012 · Quehaceres diarios con meta, motivación e historial
 
-> Estado: **borrador** (espera la aprobación del humano)
+> Estado: **aprobado** por el humano el 2026-11-24
 > Se escribe después de aprobar la spec. Dice **cómo** se implementa.
 > Orden: se implementa **después** de la 011 y de que la 009 llegue a `main` (todas tocan `OverviewBento.tsx`).
 
@@ -40,7 +40,7 @@ Un módulo nuevo, separado de «Hábitos diarios», con tres tipos de dato que v
 | C10 | unit (lógica) con reloj simulado | `utils/chores.test.ts` + componente: cierre de día a medianoche |
 | C11 | unit (lógica) | `utils/chores.test.ts`: renombrar/borrar no cambia el historial |
 | C12, C13 | unit (lógica + componente) | `utils/chores.test.ts` (promedio, excluye difíciles) y `ChoresChart.test.tsx` (mejor día, vacío) |
-| C14 | integración + E2E | `sync/adapters/__tests__/calendar.test.ts` y `apps/web/e2e/06-quehaceres.spec.ts` (otro dispositivo, Supabase simulado) |
+| C14 | integración + E2E | `sync/adapters/__tests__/calendar.test.ts` y `apps/web/e2e/07-quehaceres.spec.ts` (otro dispositivo, Supabase simulado) |
 | C15 | integración (API) | `apps/api/test/*.e2e-spec.ts`: aislamiento entre dos usuarios |
 
 ## Pasos

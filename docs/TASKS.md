@@ -31,7 +31,7 @@ Objetivo del humano: en la pantalla principal, una lista de tareas cotidianas (t
   - «Hoy no puedo / estoy agobiado»: **día de descanso que no penaliza**; se guarda como «día difícil» en el historial, sin contar como fallo, con mensaje amable.
   - Historial: **gráfica semanal** para ver en qué día de la semana se hace más. Todo se guarda por usuario (sync).
 - **Falta:** confirmar con el humano la spec antes de implementar.
-- [x] Spec escrita en `docs/specs/012-quehaceres-diarios/spec.md` con mis elecciones marcadas 🧭 (sin rachas, solo hoy editable, promedio de 8 semanas, motivo opcional, máximo 30 quehaceres). **A la espera de tu aprobación**; sin plan todavía
+- [x] Spec 012 aprobada (lista base: tender la cama, pasear al perro, ducharme, limpiar mi cuarto y proyectos de IA) y plan aprobado. **Implementada** en `feat/012-quehaceres-diarios`: contrato, sync, lógica, tarjeta, editor, gráfica semanal, revisión independiente corregida y E2E `07-quehaceres`. **14 de 15 criterios cumplidos; el C11 solo a nivel de datos** (el nombre se guarda en el historial, pero ninguna pantalla muestra días pasados). Decisiones tuyas pendientes: qué cuenta un día sin registro (hoy cuenta 0 en el promedio), si se añade una vista de historial, y si una cuenta sin red debe sembrar la lista base localmente. Toca `apps/web/src/sync/adapters/calendar.ts` (zona protegida, aditivo, incluido en el plan aprobado).
 
 ### 🔴 Alto
 
