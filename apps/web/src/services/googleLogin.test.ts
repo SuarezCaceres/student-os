@@ -52,10 +52,11 @@ afterEach(() => {
 });
 
 describe('permisos que se piden en el login (C4)', () => {
-  it('pide exactamente leer y crear/editar eventos de Calendar (los mismos de siempre)', () => {
+  it('pide exactamente los permisos estrechos de Calendar verificados en Google (spec 008, C9)', () => {
     expect(GOOGLE_LOGIN_CALENDAR_SCOPES.split(' ')).toEqual([
-      'https://www.googleapis.com/auth/calendar.readonly',
-      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar.events.owned',
+      'https://www.googleapis.com/auth/calendar.freebusy',
+      'https://www.googleapis.com/auth/calendar.calendars.readonly',
     ]);
   });
 });

@@ -7,18 +7,22 @@ export const GOOGLE_CLOCK = Symbol('GOOGLE_CLOCK');
 export const GOOGLE_FETCH = Symbol('GOOGLE_FETCH');
 
 /**
- * Scopes minimos: los de calendario que la app ya usa (leer disponibilidad/eventos y escribir eventos) mas `openid email`
- * para saber QUE cuenta de Google se conecto. No se pide `profile`: el servidor no necesita nombre ni foto.
+ * Scopes minimos (spec 008, C9; tabla en `docs/specs/008-verificacion-app-google/scopes.md`), cada uno el mas estrecho
+ * que acepta la referencia oficial para lo que hace el proxy: `calendar.events.owned` (leer y escribir eventos del
+ * calendario `primary`, que es del usuario), `calendar.freebusy` (`freebusy.query`) y `calendar.calendars.readonly`
+ * (`calendars.get`, nombre del calendario). Mas `openid email` para saber QUE cuenta de Google se conecto. No se pide
+ * `profile`: el servidor no necesita nombre ni foto. Cambiarlos obliga a reverificar la app (`scopes-verificados.spec.ts`).
  */
 export const GOOGLE_SCOPES = [
   'openid',
   'email',
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.events.owned',
+  'https://www.googleapis.com/auth/calendar.freebusy',
+  'https://www.googleapis.com/auth/calendar.calendars.readonly',
 ] as const;
 
 /** Scope sin el cual el sync no puede escribir eventos (el usuario puede desmarcarlo en el consentimiento granular). */
-export const REQUIRED_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+export const REQUIRED_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
 
 /** Endpoints reales por defecto. Solo las pruebas los sobrescriben (GOOGLE_OAUTH_BASE, GOOGLE_API_BASE, GOOGLE_AUTH_URL). */
 export const DEFAULT_GOOGLE_OAUTH_BASE = 'https://oauth2.googleapis.com';

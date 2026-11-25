@@ -257,7 +257,7 @@ export async function startFakeGoogle({ port, host = '::' }) {
      * Por defecto concede los 4 permisos de la app; `grantedScopes` simula que el usuario desmarco alguno.
      */
     issueRefreshToken(email, grantedScopes) {
-      const scope = (grantedScopes ?? ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events']).join(' ');
+      const scope = (grantedScopes ?? ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events.owned', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly']).join(' ');
       const token = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;
       refreshTokens.set(token, { account: email, revoked: false, scope });
       return token;

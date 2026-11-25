@@ -84,8 +84,9 @@ test.describe('2. login con sesion en la nube', () => {
     const asked = new URL(req.url()).searchParams;
     expect((asked.get('scopes') ?? '').split(/[\s,+]+/)).toEqual(
       expect.arrayContaining([
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar.events.owned',
+        'https://www.googleapis.com/auth/calendar.freebusy',
+        'https://www.googleapis.com/auth/calendar.calendars.readonly',
       ]),
     );
     expect(asked.get('access_type')).toBe('offline');
@@ -125,7 +126,7 @@ test.describe('2. login con sesion en la nube', () => {
     const key = userKey('s2e');
     await control('/supabase/config', {
       loginUserKey: key,
-      grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
+      grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly'],
     });
     try {
       const s = await sessionFor(key);

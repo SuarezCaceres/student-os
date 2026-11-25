@@ -167,7 +167,7 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
       expect(row.refreshTokenEnc).toMatch(/^v1\.[\w-]+\.[\w-]+\.[\w-]+$/);
       expect(row.keyVersion).toBe(1);
       expect(row.accountEmail).toBe('ana@gmail.example');
-      expect(row.scopes).toContain('https://www.googleapis.com/auth/calendar.events');
+      expect(row.scopes).toContain('https://www.googleapis.com/auth/calendar.events.owned');
       expect(row.needsReauth).toBe(false);
       // El state PKCE de este intento se consumio (solo quedan los que otros tests dejaron pendientes).
       expect(await prisma.googleOAuthState.count({ where: { userId: USER_A } })).toBe(pendingBefore);
@@ -481,7 +481,7 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
     it('C9: sin el permiso de eventos responde 409 google_missing_scopes y no guarda nada', async () => {
       const userE = '55555555-5555-4555-8555-555555555555';
       const tokenE = await jwks.sign({ sub: userE, email: 'eva@example.com' });
-      const noEvents = fake.issueRefreshToken('eva@example.com', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly']);
+      const noEvents = fake.issueRefreshToken('eva@example.com', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly']);
       const res = await http()
         .post('/google/link-login')
         .set({ Authorization: `Bearer ${tokenE}` })

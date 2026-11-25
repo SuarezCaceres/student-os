@@ -57,8 +57,9 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(p.get('scope')?.split(' ')).toEqual([
         'openid',
         'email',
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar.events.owned',
+        'https://www.googleapis.com/auth/calendar.freebusy',
+        'https://www.googleapis.com/auth/calendar.calendars.readonly',
       ]);
       // El verifier NO viaja en la URL: se guarda cifrado en servidor.
       expect(url).not.toMatch(/code_verifier/);
@@ -79,7 +80,7 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(stored?.refreshTokenEnc.startsWith('v1.')).toBe(true);
       expect(stored?.accountEmail).toBe('ana@gmail.example');
       expect(stored?.needsReauth).toBe(false);
-      expect(stored?.scopes).toContain('calendar.events');
+      expect(stored?.scopes).toContain('calendar.events.owned');
       // El estado PKCE se consumio.
       expect(h.repo.states.size).toBe(0);
 
@@ -176,7 +177,7 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
     it('consentimiento granular sin permiso de eventos: error y se revoca lo concedido', async () => {
       const redirect = await connectUser(h, USER_A, {
-        grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
+        grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly'],
       });
       expect(new URL(redirect).searchParams.get('reason')).toBe('missing_scopes');
       expect(await h.repo.getConnection(USER_A)).toBeNull();
@@ -222,14 +223,14 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
   describe('vinculacion al terminar el login (link-login, spec 009)', () => {
     const EMAIL = 'ana@gmail.example';
-    const NO_EVENTS_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'];
+    const NO_EVENTS_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly'];
 
     it('C5: valida el token con Google, lo guarda CIFRADO y deja Calendar conectado sin pasos manuales', async () => {
       const token = h.fake.issueRefreshToken(EMAIL);
       const status = await h.service.linkFromLogin(USER_A, EMAIL, token);
 
       expect(status).toMatchObject({ configured: true, connected: true, needsReauth: false, email: EMAIL });
-      expect(status.scopes).toContain('https://www.googleapis.com/auth/calendar.events');
+      expect(status.scopes).toContain('https://www.googleapis.com/auth/calendar.events.owned');
       const stored = await h.repo.getConnection(USER_A);
       expect(stored?.refreshTokenEnc.startsWith('v1.')).toBe(true);
       expect(stored?.refreshTokenEnc).not.toContain(token);

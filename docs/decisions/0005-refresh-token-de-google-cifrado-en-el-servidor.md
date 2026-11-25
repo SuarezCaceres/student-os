@@ -7,7 +7,7 @@
 Antes, el token de Google Calendar vivía en el navegador (GIS, 1 hora, se perdía al cerrar). Se quería que la conexión persistiera al día siguiente sin que el navegador viera ningún token. Fuente: `docs/agent-notes/GOOGLE.md`.
 
 ## Decisión
-- Flujo OAuth con **PKCE**, `access_type=offline` y `prompt=consent`. Scopes mínimos: `openid email calendar.readonly calendar.events`.
+- Flujo OAuth con **PKCE**, `access_type=offline` y `prompt=consent`. Scopes mínimos: `openid email calendar.readonly calendar.events` (desde el 2026-11-25, los más estrechos del ADR 0008).
 - El servidor guarda el *refresh token* **cifrado con AES-256-GCM** (`apps/api/src/google/token-cipher.ts`): IV aleatorio de 12 bytes por registro, versión de clave en el blob y `userId` como AAD (un blob copiado a otra fila no descifra). La clave sale de `GOOGLE_TOKEN_ENC_KEY` con HKDF-SHA256.
 - El servidor hace de proxy a Calendar v3; el navegador nunca ve un token de Google.
 - Un error de refresco (`invalid_grant`, clave cambiada o blob ilegible) responde **409** `google_reauth_required`, no 401, para que `services/api.ts` no lo confunda con una sesión de Supabase caducada.

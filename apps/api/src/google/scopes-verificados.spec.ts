@@ -12,8 +12,9 @@ import { GOOGLE_SCOPES, REQUIRED_EVENTS_SCOPE } from './google.constants';
 const SCOPES_VERIFICADOS = [
   'openid',
   'email',
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/calendar.events.owned',
+  'https://www.googleapis.com/auth/calendar.freebusy',
+  'https://www.googleapis.com/auth/calendar.calendars.readonly',
 ] as const;
 
 const AVISO =
@@ -33,9 +34,11 @@ describe('Scopes verificados en Google (spec 008, C8)', () => {
     expect(new Set(GOOGLE_SCOPES).size).toBe(GOOGLE_SCOPES.length);
   });
 
-  it('no se pide profile ni el acceso total a Calendar', () => {
+  it('no se pide profile ni ningún scope amplio de Calendar', () => {
     expect(GOOGLE_SCOPES).not.toContain('profile');
-    expect(GOOGLE_SCOPES).not.toContain('https://www.googleapis.com/auth/calendar');
+    for (const amplio of ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events']) {
+      expect(GOOGLE_SCOPES).not.toContain(amplio);
+    }
   });
 
   it('el scope obligatorio para escribir eventos está entre los verificados', () => {

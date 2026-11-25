@@ -56,6 +56,29 @@ interface AccessEntry {
   account: string;
   expiresAtMs: number;
   refreshToken?: string;
+  /** Scopes concedidos, separados por espacios (como los devuelve Google). */
+  scope: string;
+}
+
+const AUTH = 'https://www.googleapis.com/auth/';
+const EVENTS_READ = ['calendar.readonly', 'calendar', 'calendar.events.readonly', 'calendar.events', 'calendar.app.created', 'calendar.events.freebusy', 'calendar.events.owned', 'calendar.events.owned.readonly', 'calendar.events.public.readonly'];
+const EVENTS_WRITE = ['calendar', 'calendar.events', 'calendar.app.created', 'calendar.events.owned'];
+
+/**
+ * Scopes que acepta cada metodo de Calendar API v3 segun la referencia oficial (seccion Authorization), consultada el
+ * 2026-11-25. Fuente y enlaces: `docs/specs/008-verificacion-app-google/scopes.md`. El servidor falso responde 403 como
+ * Google si el token no tiene ninguno: asi las pruebas demuestran que `GOOGLE_SCOPES` cubre cada ruta del proxy.
+ */
+export function acceptedCalendarScopes(method: string, rest: string): string[] | null {
+  let names: string[] | null = null;
+  if (rest === 'calendars/primary' && method === 'GET') {
+    names = ['calendar.readonly', 'calendar', 'calendar.app.created', 'calendar.calendars', 'calendar.calendars.readonly'];
+  } else if (rest === 'freeBusy' && method === 'POST') {
+    names = ['calendar.readonly', 'calendar', 'calendar.events.freebusy', 'calendar.freebusy'];
+  } else if (/^calendars\/primary\/events(\/[^/]+(\/instances)?)?$/.test(rest)) {
+    names = method === 'GET' ? EVENTS_READ : EVENTS_WRITE;
+  }
+  return names ? names.map((name) => AUTH + name) : null;
 }
 
 export interface FakeGoogle {
@@ -77,7 +100,7 @@ export interface FakeGoogle {
   refreshTokensOf(email: string): string[];
   /**
    * Emite directamente un refresh token para una cuenta, como el que Supabase recibe de Google al iniciar sesion con
-   * `scopes` de Calendar (sin pasar por el flujo del API). Por defecto concede los 4 scopes de la app.
+   * `scopes` de Calendar (sin pasar por el flujo del API). Por defecto concede los scopes de la app (`GOOGLE_SCOPES`).
    */
   issueRefreshToken(email: string, grantedScopes?: string[]): string;
   /** Hace que las proximas N llamadas de Calendar devuelvan este estado/cuerpo. */
@@ -167,19 +190,20 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
     return map;
   };
 
-  const mintAccessToken = (account: string, refreshToken?: string): { token: string; expiresIn: number } => {
+  const mintAccessToken = (account: string, scope: string, refreshToken?: string): { token: string; expiresIn: number } => {
     const token = `fake-at-${++counter}-${b64u(randomBytes(6))}`;
-    accessTokens.set(token, { account, expiresAtMs: Date.now() + lifetimeSeconds * 1000, refreshToken });
+    accessTokens.set(token, { account, expiresAtMs: Date.now() + lifetimeSeconds * 1000, refreshToken, scope });
     return { token, expiresIn: lifetimeSeconds };
   };
 
-  const accountFor = (req: IncomingMessage): string | null => {
+  const accessFor = (req: IncomingMessage): AccessEntry | null => {
     const header = req.headers.authorization ?? '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : '';
     const entry = accessTokens.get(token);
     if (!entry || entry.expiresAtMs <= Date.now()) return null;
-    return entry.account;
+    return entry;
   };
+  const accountFor = (req: IncomingMessage): string | null => accessFor(req)?.account ?? null;
 
   const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const url = new URL(req.url ?? '/', 'http://fake.local');
@@ -211,7 +235,7 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
         if (form.redirect_uri !== entry.redirectUri) return send(res, 400, { error: 'redirect_uri_mismatch' });
         const refreshToken = entry.includeRefresh ? `fake-rt-${++counter}-${b64u(randomBytes(8))}` : undefined;
         if (refreshToken) refreshTokens.set(refreshToken, { account: entry.account, revoked: false, scope: entry.scope });
-        const access = mintAccessToken(entry.account, refreshToken);
+        const access = mintAccessToken(entry.account, entry.scope, refreshToken);
         return send(res, 200, {
           access_token: access.token,
           expires_in: access.expiresIn,
@@ -224,7 +248,7 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
         counters.refreshes++;
         const entry = refreshTokens.get(form.refresh_token);
         if (!entry || entry.revoked) return send(res, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
-        const access = mintAccessToken(entry.account, form.refresh_token);
+        const access = mintAccessToken(entry.account, entry.scope, form.refresh_token);
         return send(res, 200, { access_token: access.token, expires_in: access.expiresIn, scope: entry.scope, token_type: 'Bearer' });
       }
       return send(res, 400, { error: 'unsupported_grant_type' });
@@ -248,12 +272,20 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
 
     // --- Calendar API v3 --------------------------------------------------------------
     if (path.startsWith('/calendar/v3/')) {
-      const account = accountFor(req);
-      if (!account) return send(res, 401, { error: { code: 401, message: 'Invalid Credentials', errors: [{ reason: 'authError' }] } });
+      const access = accessFor(req);
+      if (!access) return send(res, 401, { error: { code: 401, message: 'Invalid Credentials', errors: [{ reason: 'authError' }] } });
+      const account = access.account;
       const forced = failures.shift();
       if (forced) return send(res, forced.status, forced.body ?? { error: { code: forced.status, message: 'fallo simulado' } });
 
       const rest = path.slice('/calendar/v3/'.length);
+      const accepted = acceptedCalendarScopes(req.method ?? 'GET', rest);
+      const granted = access.scope.split(' ');
+      if (accepted && !accepted.some((scope) => granted.includes(scope))) {
+        return send(res, 403, {
+          error: { code: 403, message: 'Request had insufficient authentication scopes.', status: 'PERMISSION_DENIED', errors: [{ reason: 'insufficientPermissions' }] },
+        });
+      }
       const store = events(account);
 
       if (rest === 'calendars/primary' && req.method === 'GET') {
@@ -382,8 +414,9 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
         grantedScopes ?? [
           'openid',
           'email',
-          'https://www.googleapis.com/auth/calendar.readonly',
-          'https://www.googleapis.com/auth/calendar.events',
+          'https://www.googleapis.com/auth/calendar.events.owned',
+          'https://www.googleapis.com/auth/calendar.freebusy',
+          'https://www.googleapis.com/auth/calendar.calendars.readonly',
         ]
       ).join(' ');
       const token = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;

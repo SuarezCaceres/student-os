@@ -32,7 +32,7 @@ Siempre el calendario `primary` del usuario del JWT (`userId` nunca viene del bo
 
 ### Decisiones
 
-- **PKCE + `access_type=offline` + `prompt=consent`** (siempre se entrega refresh token). Scopes: `openid email calendar.readonly calendar.events` (los de calendario que la app ya usaba; se quito `profile`, el servidor no necesita nombre ni foto). Si el usuario desmarca `calendar.events` en el consentimiento granular, se revoca lo concedido y se vuelve con `reason=missing_scopes`.
+- **PKCE + `access_type=offline` + `prompt=consent`** (siempre se entrega refresh token). Scopes: `openid email calendar.events.owned calendar.freebusy calendar.calendars.readonly` (los mas estrechos que acepta Google para lo que hace el proxy, ADR 0008; se quito `profile`, el servidor no necesita nombre ni foto). Si el usuario desmarca `calendar.events.owned` en el consentimiento granular, se revoca lo concedido y se vuelve con `reason=missing_scopes`.
 - **`state` = `base64url(json{u,n,e}).HMAC-SHA256`**: ligado al usuario (`u`), a un nonce de un solo uso (`n`) y a una expiracion de 10 min (`e`). La clave HMAC se deriva con HKDF de `GOOGLE_TOKEN_ENC_KEY` con otro `info` que la de cifrado. El **verifier PKCE** se guarda en `google_oauth_states` (cifrado, TTL 10 min, fila borrada al usarse: un solo uso, tambien contra carreras con `deleteMany`). El callback cruza `state.u` con `fila.userId`.
 - **Sin open redirect**: el `returnTo` se valida contra `WEB_ORIGINS` (origen exacto, sin credenciales, sin `\`, sin caracteres de control; solo se conserva `origen + ruta`) al crear el flujo Y otra vez al redirigir. Si el `state` es invalido se redirige al primer origen de `WEB_ORIGINS`.
 - **Cifrado AES-256-GCM** (`token-cipher.ts`): IV aleatorio de 12 bytes por registro, version de clave en el blob (`v1.<iv>.<tag>.<ct>`) y columna `keyVersion`, **AAD = `userId`** (un blob copiado a otra fila no descifra). Clave = HKDF-SHA256 del secreto (>= 32 bytes). Rotacion: `GOOGLE_TOKEN_ENC_KEY_VERSION` (+ `GOOGLE_TOKEN_ENC_KEY_PREVIOUS[_VERSION]`); un blob con clave anterior se re-cifra solo al usarse.
@@ -77,7 +77,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/google/callback
 ## Que debe configurar el USUARIO en Google Cloud
 
 1. Proyecto con **Google Calendar API habilitada**.
-2. **Pantalla de consentimiento**: scopes `openid`, `email`, `.../auth/calendar.readonly` y `.../auth/calendar.events`; agregar usuarios de prueba mientras este en *Testing*.
+2. **Pantalla de consentimiento**: scopes `openid`, `email`, `.../auth/calendar.events.owned`, `.../auth/calendar.freebusy` y `.../auth/calendar.calendars.readonly` (ADR 0008); agregar usuarios de prueba mientras este en *Testing*.
 3. Credenciales -> ID de cliente OAuth tipo **Aplicacion web** (puede ser el mismo que usa GIS, o uno nuevo). En **URI de redireccionamiento autorizados** agregar EXACTAMENTE el callback de la API (sin barra final, mismo esquema/host/puerto que `GOOGLE_REDIRECT_URI`):
    - Produccion: `https://<tu-api>.onrender.com/google/callback`
    - Local: `http://localhost:3000/google/callback`
@@ -86,7 +86,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/google/callback
 ## Limites que hay que conocer (honestidad)
 
 - **Modo *Testing*: el refresh token caduca a los 7 dias** (y hay un maximo de 100 usuarios de prueba). El servidor lo detecta como `invalid_grant`, marca `needsReauth` y la UI muestra "Requiere reconexión" con una explicacion en espanol. Para que la persistencia sea real hay que pasar la pantalla de consentimiento a **In production**.
-- **En produccion sin verificar**: maximo **100 usuarios** y aviso de "app no verificada". `calendar.events`/`calendar.readonly` son scopes *sensibles*: para pasar de 100 usuarios hay que enviar la app a **verificacion de Google** (politica de privacidad, dominio verificado, video de demostracion; el agente PUBLIC aporta las paginas legales). Puede tardar semanas.
+- **En produccion sin verificar**: maximo **100 usuarios** y aviso de "app no verificada". Los scopes de Calendar son *sensibles* (confirmar la clasificacion de cada uno en la consola, spec 008 C9): para pasar de 100 usuarios hay que enviar la app a **verificacion de Google** (politica de privacidad, dominio verificado, video de demostracion; el agente PUBLIC aporta las paginas legales). Puede tardar semanas.
 - Google tambien invalida refresh tokens sin uso durante 6 meses, o si el usuario cambia su contrasena de Google / quita el acceso (se ve igual que `invalid_grant`), y guarda como maximo 100 refresh tokens por usuario y cliente.
 - El access token vive en memoria del proceso: tras un reinicio/dormida de Render se vuelve a renovar con el refresh token (1 llamada extra, transparente).
 

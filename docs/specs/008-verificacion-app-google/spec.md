@@ -13,7 +13,7 @@ La app pide a Google permisos de Calendar, que Google clasifica como **sensibles
 Hoy la verificación solo existe como una lista de tareas (`docs/google-verification-checklist.md`) y no hay nada acordado sobre qué es «estar listo para enviar», quién hace cada cosa, qué se enseña a Google ni qué hacer si Google pide cambios. Además, hay **incoherencias en el repo** que Google detectaría y rechazaría (ver «Incoherencias detectadas»).
 
 ## Objetivo
-Que Google **apruebe** la app StudentOS para los permisos `openid`, `email`, `calendar.readonly` y `calendar.events`, de modo que cualquier cuenta de Google pueda entrar sin el aviso de «app no verificada» y sin el tope de 100 usuarios (habilita 009-C12). Y que, hasta entonces, la app esté en **producción sin verificar** (no en Testing) para que los tokens no caduquen.
+Que Google **apruebe** la app StudentOS para los permisos `openid`, `email`, `calendar.events.owned`, `calendar.freebusy` y `calendar.calendars.readonly` (estrechados el 2026-11-25, Q9 y ADR 0008), de modo que cualquier cuenta de Google pueda entrar sin el aviso de «app no verificada» y sin el tope de 100 usuarios (habilita 009-C12). Y que, hasta entonces, la app esté en **producción sin verificar** (no en Testing) para que los tokens no caduquen.
 
 ## Alcance
 - **Incluye:**
@@ -68,7 +68,7 @@ Cada criterio debe poder comprobarse. Entre paréntesis, **cómo**: *prueba* (au
 
 **Pantalla de consentimiento**
 - **C7:** Dada la consola de Google (Branding / Audience / Data access), cuando se revisa, entonces: nombre «StudentOS»; logotipo válido; correo de asistencia y de contacto del desarrollador que el humano lee; dominio autorizado = el verificado; URLs de inicio, privacidad y términos = las de C3; tipo de usuario *External*; **estado *In production***; y los scopes declarados son exactamente los de C8. *(evidencia: capturas de cada pantalla)*
-- **C8:** Dada la configuración de OAuth del servidor, cuando se compara con los scopes declarados en la consola, entonces **coinciden exactamente** (hoy: `openid`, `email`, `calendar.readonly`, `calendar.events`, o el subconjunto que acuerde C9), y una prueba falla si alguien cambia `GOOGLE_SCOPES` sin actualizar la lista «scopes verificados». El fallo debe avisar de que cambiar scopes obliga a reverificar. *(prueba unitaria en `apps/api/src/google/`)*
+- **C8:** Dada la configuración de OAuth del servidor, cuando se compara con los scopes declarados en la consola, entonces **coinciden exactamente** (hoy: `openid`, `email`, `calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`; antes `openid`, `email`, `calendar.readonly`, `calendar.events`, o el subconjunto que acuerde C9), y una prueba falla si alguien cambia `GOOGLE_SCOPES` sin actualizar la lista «scopes verificados». El fallo debe avisar de que cambiar scopes obliga a reverificar. *(prueba unitaria en `apps/api/src/google/`)*
 - **C9:** Dada la tabla «endpoint → scope mínimo aceptado», cuando se revisa, entonces cada endpoint que usa el proxy (`calendars.get`, `events.list/get/instances/insert/patch/delete`, `freebusy.query`) cita el scope que lo autoriza según la **referencia oficial** (con enlace), cada scope declarado tiene al menos un endpoint que lo necesita, y se confirma en la consola que los scopes de Calendar son **sensibles y no restringidos** (sin CASA). *(revisión + captura de la consola)*
 - **C10:** Dado un cliente OAuth de producción, cuando se revisan sus URIs de redirección, entonces son solo HTTPS y exactas (sin comodines), e incluyen el callback de la API (`GOOGLE_REDIRECT_URI`) y el de Supabase Auth. *(evidencia)*
 
@@ -148,4 +148,5 @@ El humano debe contestarlas; no se han rellenado con datos inventados.
 - **Q7 · Cuándo enviar:** ¿se espera a que 009 esté en producción para grabar el vídeo y enviar (recomendado) o se envía antes con el flujo actual y se regraba después?
 - **Q8 · Revocación y `POST /google/disconnect`:** como la 009 elimina el botón, ¿se deja el endpoint sin uso en la API, se retira o se mantiene para el borrado de cuenta? Hay que responder a Google con exactitud cómo revoca el usuario.
 - **Q9 · Retirada de scopes:** si C9 demuestra que algún scope sobra o hay uno más estrecho, ¿se autoriza modificar 009-C4 y el ADR 0005 («Scopes mínimos»)?
+  - **Respuesta (2026-11-25):** sí, **estrechar todo**: `calendar.events.owned`, `calendar.freebusy` y `calendar.calendars.readonly` en lugar de `calendar.readonly` y `calendar.events`. Registrado en el ADR 0008. El Anexo B queda sustituido por `scopes.md`.
 - **Q10 · Texto legal:** reescribir la política y los términos es una decisión con efecto jurídico; ¿quién los revisa antes de publicarse (el humano, un tercero)?
