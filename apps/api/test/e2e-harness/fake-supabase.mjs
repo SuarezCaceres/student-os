@@ -1,4 +1,4 @@
-// Supabase FALSO para el E2E (puerto 54341). Solo lo minimo que necesitan la API (JWKS) y @supabase/supabase-js
+// Supabase FALSO para el E2E (puerto base 54341). Solo lo minimo que necesitan la API (JWKS) y @supabase/supabase-js
 // (sesion en localStorage + refresh + PKCE + logout). Todas las claves se generan al arrancar: no hay secretos.
 //
 //   /auth/v1/.well-known/jwks.json          claves publicas ES256 (la API real las descarga con `jose`)

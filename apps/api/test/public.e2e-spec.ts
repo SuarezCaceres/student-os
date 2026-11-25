@@ -15,7 +15,7 @@ import type { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * PUBLIC e2e: HTTP real (supertest) con el guard real de Supabase JWT (JWKS local), AppModule completo y
- * Postgres REAL embebido (puerto 54335, schema privado `dev_public`, `prisma db push`). Sin Docker, sin Supabase.
+ * Postgres REAL embebido (puerto base 54335 + E2E_PORT_OFFSET, schema privado `dev_public`, `prisma db push`). Sin Docker, sin Supabase.
  */
 jest.setTimeout(180_000);
 

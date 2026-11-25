@@ -9,8 +9,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import EmbeddedPostgres from 'embedded-postgres';
+import ports from '../ports.cjs';
 
-const port = Number(process.argv[2] ?? 54334);
+// Sin argumento: puerto base 54334 + E2E_PORT_OFFSET (el padre, google-pg.ts, siempre lo pasa ya calculado).
+const port = Number(process.argv[2] ?? ports.TEST_PORTS.googlePg);
 const database = process.argv[3] ?? 'google_test';
 const password = 'google-test-only';
 

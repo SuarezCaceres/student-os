@@ -1,7 +1,9 @@
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { join } from 'node:path';
+import { TEST_PORTS } from '../ports.cjs';
 
-export const SYNC_PG_PORT = 54329;
+/** Puerto base 54329 + E2E_PORT_OFFSET (ver test/ports.cjs). */
+export const SYNC_PG_PORT = TEST_PORTS.syncPg;
 export const SYNC_PG_DATABASE = 'sync_api_test';
 /** Schema privado del agente (convencion `dev_<agente>`): nada se crea en `public`. */
 export const SYNC_PG_SCHEMA = 'dev_sync_api';
@@ -15,7 +17,7 @@ export interface SyncPg {
 }
 
 /**
- * Arranca un Postgres real embebido (sin Docker) en el puerto 54329 con una base temporal y crea las tablas
+ * Arranca un Postgres real embebido (sin Docker) en el puerto `SYNC_PG_PORT` con una base temporal y crea las tablas
  * con `prisma db push` en el schema privado `dev_sync_api`. NO usa credenciales reales ni Supabase y NO genera
  * migraciones.
  */

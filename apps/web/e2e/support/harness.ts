@@ -7,18 +7,20 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 import type { Browser, BrowserContext, Page, Request, Response } from '@playwright/test';
+import { DATABASE_URL, PORTS } from '../../../api/test/e2e-harness/config.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(HERE, '..', '..', '..', '..');
 export const EVIDENCE_DIR = join(REPO_ROOT, 'docs', 'qa', 'evidence');
 
-export const PORTS = { pg: 54340, supabase: 54341, google: 54342, control: 54343, api: 3100, web: 5293, webNoCloud: 5294 } as const;
+// Una sola fuente de verdad para los puertos: la comparte el arnes (stack.mjs). Ya incluyen E2E_PORT_OFFSET
+// (ver apps/api/test/ports.cjs), asi que varias sesiones pueden correr la suite a la vez con desplazamientos distintos.
+export { DATABASE_URL, PORTS };
 export const WEB = `http://localhost:${PORTS.web}`;
 export const WEB_NOCLOUD = `http://localhost:${PORTS.webNoCloud}`;
 export const API = `http://localhost:${PORTS.api}`;
 export const CONTROL = `http://127.0.0.1:${PORTS.control}`;
 export const GOOGLE_FAKE = `http://localhost:${PORTS.google}`;
-export const DATABASE_URL = `postgresql://postgres:e2e-only-password@127.0.0.1:${PORTS.pg}/e2e?schema=dev_e2e`;
 
 export const VIEWPORTS = {
   desktop: { width: 1440, height: 960 },
