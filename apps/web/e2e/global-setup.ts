@@ -61,7 +61,11 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     await warmUp();
     return async () => {};
   }
-  if (await isUp()) throw new Error('Ya hay un stack E2E en el puerto 54343. Apagalo (POST /shutdown) o usa E2E_REUSE_STACK=1.');
+  if (await isUp()) {
+    throw new Error(
+      `Ya hay un stack E2E en el puerto ${PORTS.control}. Apagalo (POST /shutdown), usa E2E_REUSE_STACK=1 o desplaza los puertos con E2E_PORT_OFFSET.`,
+    );
+  }
 
   mkdirSync(RUN_DIR, { recursive: true });
   const out = createWriteStream(join(RUN_DIR, 'stack.log'), { flags: 'w' });

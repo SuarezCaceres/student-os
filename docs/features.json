@@ -1,5 +1,5 @@
 {
-  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho. Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad de lo pendiente: 007, 008, luego BUG-01 y deuda en docs/TASKS.md.",
+  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho. Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad (ver docs/TASKS.md): Alto = 009 (login para todos + Calendar automatico, marcado importante), 010 (entorno por usuario), 007 (produccion) y 008 (verificacion de Google); Medio y Bajo = bugs y deuda.",
   "features": [
     {
       "id": "001",
@@ -75,7 +75,7 @@
       "id": "007",
       "nombre": "produccion-student-os-prod",
       "spec": "docs/specs/007-produccion-student-os-prod/spec.md",
-      "estado": "pendiente",
+      "estado": "spec",
       "criterios": [
         { "id": "C1", "descripcion": "Existe el proyecto Supabase student-os-prod con las migraciones de apps/api/prisma/migrations aplicadas y rls-baseline.sql ejecutado sin errores", "pasa": false },
         { "id": "C2", "descripcion": "Vercel (VITE_*) y Render (DATABASE_URL, DIRECT_URL, SUPABASE_URL, WEB_ORIGINS, GOOGLE_*) tienen sus variables de produccion", "pasa": false },
@@ -107,6 +107,32 @@
         { "id": "C15", "descripcion": "En produccion, GET /account/export y DELETE /account funcionan con una cuenta real y el borrado revoca el token en Google", "pasa": false },
         { "id": "C16", "descripcion": "El envio queda registrado en docs/PROGRESS.md (fecha, dominio, URLs, video) y existe un registro de rondas con Google actualizado con cada correo", "pasa": false },
         { "id": "C17", "descripcion": "Cada cambio pedido por Google se responde en el mismo hilo y los que tocan el repo pasan por un PR enlazado a esta spec", "pasa": false }
+      ]
+    },
+    {
+      "id": "009",
+      "nombre": "login-google-para-todos-y-calendar-automatico",
+      "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
+      "estado": "pendiente",
+      "criterios": [
+        { "id": "C1", "descripcion": "Cualquier persona con una cuenta de Google puede iniciar sesion en produccion, sin estar en una lista de usuarios de prueba", "pasa": false },
+        { "id": "C2", "descripcion": "Tras iniciar sesion, su Google Calendar queda vinculado sin pulsar ningun boton 'Conectar'", "pasa": false },
+        { "id": "C3", "descripcion": "Si el usuario niega los permisos de Calendar, la app sigue funcionando y puede vincularlo mas tarde", "pasa": false },
+        { "id": "C4", "descripcion": "El refresh token se guarda cifrado en el servidor y el navegador nunca lo ve (se mantiene lo del criterio 005-C1)", "pasa": false },
+        { "id": "C5", "descripcion": "El flujo funciona con Google y Supabase reales de produccion, no solo con los simulados", "pasa": false }
+      ]
+    },
+    {
+      "id": "010",
+      "nombre": "entorno-de-trabajo-por-usuario",
+      "spec": "docs/specs/010-entorno-de-trabajo-por-usuario/spec.md",
+      "estado": "pendiente",
+      "criterios": [
+        { "id": "C1", "descripcion": "En produccion, dos cuentas reales distintas ven solo sus propios datos (tareas, entregas, gym, calendario, habitos)", "pasa": false },
+        { "id": "C2", "descripcion": "Los datos de cada usuario se conservan al cerrar sesion y al entrar desde otro dispositivo", "pasa": false },
+        { "id": "C3", "descripcion": "Al cambiar de cuenta en el mismo navegador, los datos locales de un usuario nunca se suben a la cuenta de otro", "pasa": false },
+        { "id": "C4", "descripcion": "Los datos que hoy se guardan solo en localStorage (AuthModal, BackupModal, DailyHabitsCard, GymTracker) se sincronizan por usuario o se documenta por que no", "pasa": false },
+        { "id": "C5", "descripcion": "Un usuario nuevo empieza con un estado definido (vacio o de ejemplo) y respeta los limites por cuenta", "pasa": false }
       ]
     }
   ]

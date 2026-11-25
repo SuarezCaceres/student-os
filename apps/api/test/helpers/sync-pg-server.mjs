@@ -9,8 +9,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import EmbeddedPostgres from 'embedded-postgres';
+import ports from '../ports.cjs';
 
-const port = Number(process.argv[2] ?? 54329);
+// Sin argumento: puerto base 54329 + E2E_PORT_OFFSET (el padre, sync-pg.ts, siempre lo pasa ya calculado).
+const port = Number(process.argv[2] ?? ports.TEST_PORTS.syncPg);
 const database = process.argv[3] ?? 'sync_api_test';
 const password = 'sync-api-test-only';
 

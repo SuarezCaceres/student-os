@@ -1,7 +1,9 @@
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { join } from 'node:path';
+import { TEST_PORTS } from '../ports.cjs';
 
-export const PUBLIC_PG_PORT = 54335;
+/** Puerto base 54335 + E2E_PORT_OFFSET (ver test/ports.cjs). */
+export const PUBLIC_PG_PORT = TEST_PORTS.publicPg;
 export const PUBLIC_PG_DATABASE = 'public_test';
 /** Schema privado del agente (convencion `dev_<agente>`): nada se crea en `public`. */
 export const PUBLIC_PG_SCHEMA = 'dev_public';
@@ -15,7 +17,7 @@ export interface PublicPg {
 }
 
 /**
- * Arranca un Postgres real embebido (sin Docker) en el puerto 54335 con una base temporal y crea las tablas
+ * Arranca un Postgres real embebido (sin Docker) en el puerto `PUBLIC_PG_PORT` con una base temporal y crea las tablas
  * con `prisma db push` en el schema privado `dev_public`. NO usa credenciales reales ni Supabase y NO genera
  * migraciones.
  */
