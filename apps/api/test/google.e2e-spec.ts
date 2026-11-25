@@ -7,7 +7,7 @@ import { startJwksServer, type JwksServer } from './helpers/jwks-server';
 
 /**
  * HTTP de punta a punta de /google/* sobre la app real (AppModule: guard JWT, throttler, filtros, Prisma) con:
- *  - Postgres REAL embebido (puerto 54334, schema privado `dev_google`, `prisma db push`),
+ *  - Postgres REAL embebido (puerto base 54334 + E2E_PORT_OFFSET, schema privado `dev_google`, `prisma db push`),
  *  - JWKS local para firmar los JWT de Supabase,
  *  - un servidor local que imita a Google (OAuth + Calendar), apuntado con GOOGLE_OAUTH_BASE/GOOGLE_API_BASE/GOOGLE_AUTH_URL.
  * Todo con valores FALSOS: ni Supabase, ni Google, ni credenciales reales.

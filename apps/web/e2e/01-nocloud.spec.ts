@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { PageTap, WEB_NOCLOUD, evidence, newContext, openTab, relevantConsoleErrors } from './support/harness';
+import { PORTS, PageTap, WEB_NOCLOUD, evidence, newContext, openTab, relevantConsoleErrors } from './support/harness';
 
 /**
- * Escenario 1 - Modo sin nube: el servidor Vite del puerto 5294 se arranca SIN VITE_SUPABASE_* ni VITE_API_URL.
+ * Escenario 1 - Modo sin nube: el servidor Vite de PORTS.webNoCloud (5294 + E2E_PORT_OFFSET) se arranca SIN VITE_SUPABASE_* ni VITE_API_URL.
  * La app debe comportarse como antes de existir el backend: sin red hacia la API/Supabase, sin errores de consola.
  */
 test('1. modo sin nube: la app arranca y funciona como hoy, sin errores de consola ni red de nube', async ({ browser }) => {
@@ -16,7 +16,7 @@ test('1. modo sin nube: la app arranca y funciona como hoy, sin errores de conso
     // Hacia la API, Supabase/Google falsos, o la libreria supabase-js (que no debe ni descargarse sin variables).
     // (Google Fonts es una peticion estatica conocida y declarada en la politica de privacidad: no es "nube".)
     const isFonts = /^fonts\.(googleapis|gstatic)\.com$/.test(hostname);
-    if (!isFonts && (['3100', '54341', '54342'].includes(port) || /supabase\.co|googleapis\.com|accounts\.google\.com/.test(hostname) || /supabase_supabase-js|@supabase\/supabase-js/.test(url))) {
+    if (!isFonts && ([PORTS.api, PORTS.supabase, PORTS.google].map(String).includes(port) || /supabase\.co|googleapis\.com|accounts\.google\.com/.test(hostname) || /supabase_supabase-js|@supabase\/supabase-js/.test(url))) {
       cloudRequests.push(url);
     }
   });
