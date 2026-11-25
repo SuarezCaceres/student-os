@@ -137,7 +137,7 @@ export type {
   ChoreSettings,
 } from '@student-os/shared';
 
-export type ResourceType ='youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';
+export type ResourceType = 'youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';
 
 export type ResourceCategory =
   | 'ia_claude'
