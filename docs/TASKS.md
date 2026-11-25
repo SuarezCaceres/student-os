@@ -85,7 +85,11 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Completar `docs/google-verification-checklist.md` en Google Cloud Console (lo hace el humano)
-- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (borrador, espera tu aprobación)
+- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (aprobada el 2026-11-24)
+- [x] Plan aprobado el 2026-11-25 y **bloque A hecho** (rama `feat/008-verificacion-app-google`, apilada sobre la 009): `scopes.md`, prueba `scopes-verificados.spec.ts`, `justificaciones.md`, `video-guion.md`, `rondas-google.md` y checklist reescrito.
+- [x] Q9 decidida: **scopes estrechos** (`calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`), ADR 0008.
+- [ ] Antes de declarar los scopes en la consola (H2), con una cuenta real: comprobar que `calendar.events.owned` devuelve los eventos de invitaciones y qué scopes de identidad añade Supabase (¿`profile`?).
+- [ ] Revisar tras la 009 el paso 7 del guion: los avisos de `App.tsx` dicen «reconecta en Google Sync», pero la 009 quitó el botón «Conectar».
 
 > **Orden de ejecución sugerido:** A3 (producción) y A4 (verificación, que tarda semanas) **en paralelo y cuanto antes**; después A1 y A2, que se pueden desarrollar ya con servicios simulados y se validan al final contra producción.
 

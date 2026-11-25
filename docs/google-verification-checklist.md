@@ -1,102 +1,60 @@
 # Checklist de verificación de Google (StudentOS)
 
-Objetivo: pasar la pantalla de consentimiento OAuth de **Testing** a **In production** y que Google **verifique** la app, para que los usuarios no vean el aviso de "Google no ha verificado esta app" ni choquen con el tope de usuarios.
+> Lista de tareas de la **spec 008** (`docs/specs/008-verificacion-app-google/`). El *qué* y el *por qué* están en `spec.md`, y el orden en `plan.md`. Esta lista solo marca el avance; el detalle vive en los documentos enlazados, así que hay una sola fuente de verdad.
+> Criterio C1: al terminar no queda ninguna casilla sin marcar. Cada paso indica quién lo hace (**humano** o **repo**) y el criterio que cubre.
 
-> Esto lo hace el **usuario** en Google Cloud Console (compuerta humana, ver `docs/references/historial/PLAN_BACKEND.md` §7). Nada de esto se automatiza desde el repo. Lo que sí está listo en el repo: páginas legales, borrado/exportación de cuenta y los textos de justificación de abajo.
-
-## 0. Por qué importa (qué pasa si NO se verifica)
-
+## Por qué importa
 | Situación | Consecuencia |
-| :--- | :--- |
-| Pantalla de consentimiento en **Testing** | Solo usuarios de prueba (máx. 100). **El refresh token caduca a los 7 días**: la sincronización con Calendar se rompe cada semana. |
-| **In production sin verificar** | Aviso "Google no ha verificado esta app" al conectar. **Tope de 100 usuarios** en total (cuenta de por vida, no se libera al desconectarse). Los refresh tokens ya no caducan a los 7 días. |
-| **In production y verificada** | Sin aviso y sin tope de 100. |
+|---|---|
+| Consentimiento en **Testing** | Solo usuarios de prueba (máx. 100) y el **refresh token caduca a los 7 días**: Calendar se desconecta cada semana. |
+| **In production sin verificar** | Aviso «Google no ha verificado esta app» y **tope de 100 usuarios de por vida**. El refresh token ya no caduca a los 7 días. |
+| **In production y verificada** | Sin aviso y sin tope. |
 
-La verificación puede tardar **semanas** (suele haber varias rondas de correo con el equipo de Google). Mientras tanto el producto funciona para ≤ 100 usuarios con el aviso. Recomendación: pasar a *In production* ya (para que los tokens no caduquen) y enviar la verificación en paralelo.
+La verificación tarda **semanas** y suele tener varias rondas. Hay que pasar a *In production* cuanto antes (H3) y enviar en paralelo.
 
-## 1. Requisitos previos (hacer antes de enviar)
+## Documentos de la 008
+| Documento | Para qué |
+|---|---|
+| [`scopes.md`](specs/008-verificacion-app-google/scopes.md) | Tabla endpoint → scope, por qué cada scope es el mínimo, pendientes y clasificación en la consola (C9) |
+| [`justificaciones.md`](specs/008-verificacion-app-google/justificaciones.md) | Textos en inglés para el formulario, con su respaldo en el código (C11) |
+| [`video-guion.md`](specs/008-verificacion-app-google/video-guion.md) | Guion del vídeo y qué hay que comprobar antes de grabar (C12, C13) |
+| [`rondas-google.md`](specs/008-verificacion-app-google/rondas-google.md) | Datos del envío y registro de cada correo con Google (C16, C17) |
+| ADR 0008 | Por qué se piden estos scopes y no otros |
 
-- [ ] **Dominio propio**. `*.vercel.app` NO sirve: es un sufijo público y no se puede verificar como dominio autorizado. Comprar un dominio (p. ej. `studentos.app`) y asignarlo al proyecto de Vercel.
-- [ ] **Verificar la propiedad del dominio** en [Google Search Console](https://search.google.com/search-console) con la misma cuenta de Google que es propietaria/editora del proyecto de Cloud.
-- [ ] Páginas legales publicadas en ese dominio y accesibles **sin iniciar sesión**:
-  - Política de privacidad: `https://<tu-dominio>/legal/privacidad.html`
-  - Términos de uso: `https://<tu-dominio>/legal/terminos.html`
-- [ ] **Completar los marcadores** de ambas páginas (`[CORREO DE CONTACTO]`, `[NOMBRE DEL RESPONSABLE]`, `[PAÍS O JURISDICCIÓN]`). Google rechaza políticas con datos de contacto vacíos o de relleno. Buscar con: `grep -rn "\[CORREO DE CONTACTO\]\|\[NOMBRE DEL RESPONSABLE\]\|\[PAÍS O JURISDICCIÓN\]" apps/web/public/legal`
-- [ ] **Enlace a la política de privacidad visible en la página de inicio** (pie de la landing) y en la pantalla donde se pide el acceso: montar `components/legal/LegalLinks.tsx`. Google comprueba que el enlace de la pantalla de consentimiento coincida con uno visible en la home.
-- [ ] Correo de soporte y de contacto del desarrollador que **lees de verdad** (Google escribe ahí).
-- [ ] Logotipo de la app (120×120 px, PNG/JPG, < 1 MB) sin marcas de Google.
-- [ ] Redirect URIs de producción en el cliente OAuth: solo **HTTPS** y exactas (sin comodines). Incluir el callback de Supabase Auth (`https://<ref>.supabase.co/auth/v1/callback`) y el callback del flujo de Calendar del agente GOOGLE.
-- [ ] **Borrado de cuenta y exportación funcionando** y probados en producción (Google pregunta cómo el usuario borra sus datos y revoca el acceso): `DELETE /account` y `GET /account/export`; la revocación del token de Google la hace el gancho de borrado del módulo GOOGLE.
-- [ ] Probar con una cuenta de Google que **no** sea la del desarrollador.
+Scopes que se declaran (fuente única: `GOOGLE_SCOPES`, fijados por `apps/api/src/google/scopes-verificados.spec.ts`): `openid`, `email`, `calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`. **Cambiarlos después de aprobar obliga a reverificar.**
 
-## 2. Pantalla de consentimiento (Google Auth Platform → Branding / Audience / Data access)
+## Bloque A · repo, sin esperar a nadie
+- [x] **A1** · Tabla endpoint → scope con la referencia oficial (C9) → `scopes.md`
+- [x] **A1** · Decisión sobre los scopes (Q9): estrechar todo → ADR 0008
+- [x] **A2** · Prueba que fija los scopes y avisa de reverificar (C8) → `scopes-verificados.spec.ts`
+- [x] **A3** · Justificación en inglés de cada permiso, con respaldo (C11) → `justificaciones.md`
+- [x] **A4** · Guion del vídeo (C12) y registro de rondas (C16) → `video-guion.md`, `rondas-google.md`
+- [x] **A5** · Este checklist como única lista de tareas (C1)
 
-- [ ] **Nombre de la app**: igual al que ven los usuarios ("StudentOS"). No usar "Google" ni nombres engañosos.
-- [ ] **Tipo de usuario**: External.
-- [ ] **Dominios autorizados**: tu dominio verificado (y `supabase.co` si la consola lo pide por el redirect de Supabase).
-- [ ] **URL de la página de inicio**: `https://<tu-dominio>/`
-- [ ] **URL de política de privacidad** y **URL de términos**: las del punto 1.
-- [ ] **Scopes** (pestaña *Data access*): declarar **solo** los que la app usa (sección 3).
-- [ ] **Estado de publicación**: *Publish app* → **In production**.
-- [ ] Enviar a verificación (*Verification Center*).
+## Bloque H1 · humano, con la 007 desplegada
+- [ ] **H1** · Comprar el dominio propio (Q1) y asignarlo en Vercel. `*.vercel.app` y `*.onrender.com` no sirven como dominio autorizado.
+- [ ] **H1** · Verificar el dominio en [Search Console](https://search.google.com/search-console) con la **misma cuenta** que es propietaria o editora del proyecto de Google Cloud (C3).
+- [ ] **H1** · Comprobar sin sesión que la home, `/legal/privacidad.html` y `/legal/terminos.html` responden 200 (C3; el agente lo comprueba con `curl -I`).
+- [ ] **H2** · Comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos a los que el usuario está invitado, y qué scopes de identidad añade Supabase en la URL de consentimiento (`scopes.md`, «Pendiente»). **Antes** de declarar nada en la consola.
+- [ ] **H2** · Branding: nombre «StudentOS», logotipo de 120×120 sin marcas de Google y de menos de 1 MB (Q5), correo de asistencia y de contacto del desarrollador que se lean a diario (Q3), URLs de inicio, privacidad y términos, y dominio autorizado = el verificado (C7). Capturas en `docs/qa/evidence/`.
+- [ ] **H2** · Audience: tipo *External* (C7).
+- [ ] **H2** · Data access: declarar **exactamente** los scopes de arriba y anotar su clasificación en `scopes.md` (C7, C9). Confirmar que ninguno es «restringido» (sin evaluación CASA).
+- [ ] **H2** · Cliente OAuth de producción (Q4): URIs de redirección solo HTTPS y exactas, con el callback de Supabase Auth (`https://<ref>.supabase.co/auth/v1/callback`) y el del API (`GOOGLE_REDIRECT_URI`) (C10). Captura.
+- [ ] **H3** · Publicar a **In production** sin verificar y entrar con una cuenta ajena. Comprobar que la conexión sigue viva pasados más de 7 días (C14).
 
-## 3. Scopes: mínimo necesario y justificación
+## Bloque B · repo, cuando haya datos y la 009 esté lista
+- [ ] **B1** · Páginas legales (Q2, Q10): rellenar `[NOMBRE DEL RESPONSABLE]`, `[CORREO DE CONTACTO]` y `[PAÍS O JURISDICCIÓN]`; listar exactamente los scopes de arriba sin `profile`; Calendar como parte del acceso, sin «desconectar desde la app»; cómo retirar el acceso; conservar la declaración de uso limitado y el enlace a la política de Google. Prueba `legalPages.test.ts` (C4, C5). **Se despliega a la vez que la 009.**
+- [ ] **B2** · Landing: texto que explica StudentOS y para qué usa los datos de Google, con el mismo nombre que la consola; E2E de los enlaces legales (C6).
 
-Estado actual en el código (`apps/web/src/services/googleCalendar.ts`): `openid profile email`, `calendar.readonly`, `calendar.events`.
+## Bloque H2 · humano, con la 009 en producción
+- [ ] **H4** · En producción, con una cuenta real: «Descargar mis datos» y «Borrar mi cuenta», y comprobar que StudentOS desaparece de `myaccount.google.com/permissions` (C15).
+- [ ] **H5** · Revisar que la columna «¿Existe tras la 009?» de `video-guion.md` no tiene nada pendiente, grabar el vídeo y subirlo como **No listado**. Anotar la URL en `docs/PROGRESS.md` (C12, C13).
+- [ ] **H6** · Rellenar y enviar el formulario con el dominio, las URLs, los textos de `justificaciones.md` y el vídeo. Anotar el envío en `rondas-google.md` y `docs/PROGRESS.md` (C16).
 
-| Scope | Para qué lo usa StudentOS | Clasificación* |
-| :--- | :--- | :--- |
-| `openid`, `email`, `profile` | Iniciar sesión con Google (Supabase Auth) y mostrar el nombre. | No sensible |
-| `https://www.googleapis.com/auth/calendar.events` | Leer los eventos del calendario principal para evitar choques y encontrar huecos; crear, modificar y eliminar **solo** los eventos de sesiones de gym que el usuario programa (incluye series con `RRULE`/`UNTIL`). | Sensible |
-| `https://www.googleapis.com/auth/calendar.readonly` | Hoy se usa para leer datos del calendario principal (nombre del calendario, disponibilidad). | Sensible |
+## Seguimiento
+- [ ] **S** · Registrar cada correo de Google en `rondas-google.md` y responder en el mismo hilo en pocos días. Los cambios en el repo van en un PR enlazado a la spec 008 (C17).
+- [ ] **S** · Cuando Google apruebe: comprobar con una cuenta ajena que el aviso de «app no verificada» desapareció (C2, 009-C12).
 
-\* Los scopes de Calendar figuran como **sensibles** (no "restringidos"), por lo que **no** exigen la evaluación de seguridad anual (CASA). Confírmalo en la lista de scopes de la consola antes de enviar.
-
-**Acción de minimización (revisar con el agente/dueño de GOOGLE antes de enviar):** Google rechaza scopes más amplios de lo necesario. Comprobar en la documentación de cada endpoint que se llama (`events.*`, `calendars.get`, `freebusy.query`) cuál es el scope **más estrecho** aceptado. Si todo se cubre con `calendar.events`, **retirar `calendar.readonly`** del flujo y de la consola. Si hace falta algo más que `calendar.events`, justificarlo con el endpoint concreto. No se declara `calendar` (acceso total) ni ningún scope de Drive/Gmail.
-
-### Textos de justificación (para pegar en el formulario; Google los revisa en inglés)
-
-**calendar.events**
-
-> StudentOS is a planner for university students. The user can optionally connect Google Calendar so the app can (1) read the events of their primary calendar to show their weekly schedule and detect conflicts, (2) find free time slots, and (3) create, update and delete calendar events for the gym sessions the user explicitly schedules inside StudentOS (including weekly recurring series). The app only writes events when the user triggers the action in the UI. Calendar content is read on demand and is not stored in our database. We store only an encrypted refresh token (AES-256-GCM, server side) so the connection works across sessions; it is never exposed to the browser. The user can disconnect at any time from the app (we revoke the token and delete it) or from their Google account permissions, and can delete their whole account from within the app.
-
-**calendar.readonly** (solo si tras la minimización sigue siendo necesario)
-
-> Used to read the name of the user's primary calendar and the free/busy information needed to suggest conflict-free time slots. No data obtained with this scope is written, shared or stored beyond the user's session.
-
-**openid / email / profile**
-
-> Used only for Sign in with Google: to identify the account and show the user's name. We do not use it for advertising.
-
-**Declaración de uso limitado** (ya incluida en la política de privacidad; no quitarla): *"The use and transfer to any other app of information received from Google APIs will adhere to the Google API Services User Data Policy, including the Limited Use requirements."*
-
-## 4. Vídeo de demostración (YouTube, "No listado")
-
-Requisitos de Google: en inglés (o con subtítulos), mostrar el flujo OAuth completo y cómo se usa cada scope.
-
-- [ ] Grabar con una cuenta de Google normal en el **dominio de producción** (no `localhost`).
-- [ ] Mostrar la barra de direcciones con el **client ID** visible en la URL de la pantalla de consentimiento (`client_id=...`).
-- [ ] Recorrido sugerido (≈ 3–5 min):
-  1. Abrir la home → mostrar el enlace visible a la política de privacidad.
-  2. Pulsar "Continuar con Google" → pantalla de consentimiento (nombre de la app, scopes solicitados). Aceptar.
-  3. Conectar Google Calendar → mostrar de nuevo la pantalla con los scopes de Calendar.
-  4. Mostrar la vista de horario leyendo eventos reales (`calendar.events` lectura).
-  5. Programar una sesión de gym → ver el evento creado en calendar.google.com; editarlo y borrarlo desde la app (`calendar.events` escritura).
-  6. Desconectar Google Calendar desde la app → ver que el permiso desaparece en `myaccount.google.com/permissions`.
-  7. Mostrar "Descargar mis datos" y "Borrar mi cuenta" (con la confirmación escrita).
-- [ ] Narración o subtítulos que digan **qué dato se usa y para qué** en cada paso.
-- [ ] Pegar la URL del vídeo en el formulario de verificación.
-
-## 5. Envío y seguimiento
-
-- [ ] Rellenar el formulario de verificación: dominio, URLs, justificación de cada scope, vídeo.
-- [ ] Mantener abierto el correo de contacto; responder en pocos días (si no, la solicitud se cierra).
-- [ ] Si piden cambios (política, scopes, vídeo), corregir y responder en el **mismo hilo**.
-- [ ] Tras la aprobación: comprobar que el aviso de "app no verificada" ya no aparece.
-- [ ] Acordarse de que **cambiar los scopes** más adelante obliga a volver a verificar.
-
-## 6. Mientras no esté verificada
-
-- Máximo **100 usuarios** en total y aviso de app no verificada (el usuario debe pulsar "Avanzado → Ir a StudentOS").
-- Con la app en *Testing*: solo usuarios de prueba y **refresh token de 7 días** (la sync de Calendar se cae). Por eso conviene pasar a *In production* aunque aún no esté verificada.
-- Vigilar el contador de usuarios en la consola (*Audience*): el tope se refiere a quienes autorizan scopes sensibles (Calendar); el inicio de sesión básico por sí solo no debería consumirlo (confírmalo en la propia consola).
+## Mientras no esté verificada
+- Máximo **100 usuarios** en total, con el aviso (el usuario pulsa «Avanzado → Ir a StudentOS»). Vigila el contador en *Audience* y no hagas campañas hasta que se apruebe.
+- Un refresh token sin uso durante 6 meses, o con la contraseña de Google cambiada, se ve como `invalid_grant` y la app pide volver a entrar. No es un fallo de verificación.
