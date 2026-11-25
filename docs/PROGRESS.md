@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-25 · Claude Code · feat/012-historial
+- **Hecho:** vista mínima de historial en la tarjeta de quehaceres (`ChoresHistory`, plegada tras «Ver historial», solo lectura, 14 días y «Ver más»), con el nombre copiado en cada registro y etiqueta amable para los días difíciles. Cierra el criterio C11 de la spec 012 (`features.json`). PR apilado sobre la 009; no se fusiona antes de producción.
+- **Verificación:** vitest web, `tsc -b`, lint y E2E 07 (9 pruebas, con `E2E_PORT_OFFSET=1300`); cada commit pasó `./scripts/check.sh --rapido` en el hook.
+- **Pendiente:** nada propio; el PR espera a la 009.
+- **Problemas:** un registro sin nada completado ni día difícil no se lista en el historial (decisión de diseño).
+
 ## 2026-11-24 · Claude Code · feat/012-quehaceres-diarios
 - **Hecho:** 012 implementada por pasos con sub-agentes: contrato (`chores.ts` en shared, kinds `chore`/`choreDay`/`choreSettings` dentro de la colección `calendar`, sin migración), adaptador de sync, lógica pura (`utils/chores.ts`), hook `useChores`, `ChoresCard`, `ChoresEditor`, `ChoresChart` y E2E `07-quehaceres`. Una revisión independiente encontró 2 bloqueantes (foco robado por el editor y documentos sin cerrar) y 4 recomendados (re-render de App por el store de sync, esqueleto sin fin sin red, datos dañados, gráfica en ceros); se corrigieron con una prueba que reproduce cada fallo.
 - **Verificación:** hook de cada commit (lint, tipos, unitarias, integración del API) con `E2E_PORT_OFFSET`; 450 pruebas de la web; E2E `03`, `04`, `05-calendario`, `05-gym-opcional` y `07-quehaceres` pasan (con puertos desplazados temporalmente). **No corrí `./scripts/check.sh` completo ni las E2E `01` y `02`** (puertos fijos ocupados por otras sesiones hasta fusionar el PR #12). El diseño se vio en capturas solo en tema oscuro.
