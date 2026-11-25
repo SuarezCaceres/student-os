@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialData } from '../../data/initialData';
 import { useChores } from '../../hooks/useChores';
@@ -250,5 +250,21 @@ describe('ChoresEditor: accesibilidad del modal', () => {
     render(<Harness initial={baseState({ chores: [{ id: 'x', name: 'Solo sábado', days: ['Sábado'], order: 0 }] })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Añadir un quehacer' }));
     expect(screen.getByRole('dialog', { name: 'Editar quehaceres' })).toBeTruthy();
+  });
+});
+
+describe('ChoresEditor: el foco no se roba al re-renderizar', () => {
+  const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+
+  it('cambiar un día con el teclado mantiene el foco en ese botón y no salta a «Nuevo quehacer»', async () => {
+    render(<Harness initial={baseState()} />);
+    openEditor();
+    await wait(120); // el modal enfoca el primer campo 50 ms despues de abrir
+    const toggle = within(daysGroup('Tender la cama')).getByRole('button', { name: 'Lunes' });
+    act(() => toggle.focus());
+    fireEvent.click(toggle); // re-renderiza la tarjeta (estado nuevo)
+    await wait(150);
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(toggle);
   });
 });

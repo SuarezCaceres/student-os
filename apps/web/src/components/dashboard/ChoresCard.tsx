@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useCallback, useId, useState } from 'react';
 import { CalendarRange, CloudRain, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import type { ChoreHardReason } from '../../types';
 import type { UseChoresResult } from '../../hooks/useChores';
@@ -18,6 +18,8 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
   const chartId = useId();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  // Estable: ModalShell reengancha su efecto (y roba el foco) si `onClose` cambia en cada render.
+  const closeEditor = useCallback(() => setIsEditorOpen(false), []);
 
   if (!ready) {
     return (
@@ -172,7 +174,7 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
         </div>
       )}
 
-      <ChoresEditor isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} chores={chores} />
+      <ChoresEditor isOpen={isEditorOpen} onClose={closeEditor} chores={chores} />
     </div>
   );
 };
