@@ -11,6 +11,9 @@ import {
   needsChoreSeed,
   normalizeChoreLevels,
   removeChore,
+  sanitizeChoreDays,
+  sanitizeChoreLevels,
+  sanitizeChores,
   setChoreCompleted,
   setHardDay,
   sortChores,
@@ -115,8 +118,9 @@ export function useChores(
         todayRef.current = current;
         // El dia que termina queda guardado tal como estaba; solo se normaliza (sin inventar marcas).
         setState((prev) => {
-          const closed = closeChoreDay(prev.choreDays, previous);
-          return closed === prev.choreDays ? prev : { ...prev, choreDays: closed };
+          const days = sanitizeChoreDays(prev.choreDays);
+          const closed = closeChoreDay(days, previous);
+          return closed === days ? prev : { ...prev, choreDays: closed };
         });
         setToday(current);
       }
@@ -141,24 +145,29 @@ export function useChores(
   }, [setState]);
 
   // --- Datos derivados ---
-  const { chores: rawChores, choreDays, choreSettings } = state;
+  // Todo lo que se lee pasa por los esquemas compartidos: una entrada dañada se descarta y no rompe el resumen.
+  const { chores: storedChores, choreDays: storedDays, choreSettings } = state;
+  const rawChores = useMemo(() => sanitizeChores(storedChores), [storedChores]);
+  const choreDays = useMemo(() => sanitizeChoreDays(storedDays), [storedDays]);
+  const validLevels = useMemo(() => sanitizeChoreLevels(choreSettings?.levels), [choreSettings]);
   const summary = useMemo(
-    () => summarizeChoreDay({ chores: rawChores, choreDays, choreSettings }, today),
-    [rawChores, choreDays, choreSettings, today],
+    () => summarizeChoreDay({ chores: rawChores, choreDays, choreSettings: { seeded: true, levels: validLevels } }, today),
+    [rawChores, choreDays, validLevels, today],
   );
-  const chores = useMemo(() => sortChores(rawChores ?? []), [rawChores]);
-  const levels = useMemo(() => sortLevels(choreSettings?.levels ?? []), [choreSettings]);
-  const history = useMemo(() => [...(choreDays ?? [])].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), [choreDays]);
+  const chores = useMemo(() => sortChores(rawChores), [rawChores]);
+  const levels = useMemo(() => sortLevels(validLevels), [validLevels]);
+  const history = useMemo(() => [...choreDays].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), [choreDays]);
   const stats = useMemo(() => computeWeekdayStats({ chores: rawChores, choreDays }, today), [rawChores, choreDays, today]);
 
   // --- Acciones ---
   const setDone = useCallback(
     (choreId: string, done: boolean) => {
       setState((prev) => {
-        const chore = prev.chores?.find((c) => c.id === choreId);
+        const chore = sanitizeChores(prev.chores).find((c) => c.id === choreId);
         if (!chore) return prev;
-        const next = setChoreCompleted(prev.choreDays, chore, todayRef.current, done);
-        return next === prev.choreDays ? prev : { ...prev, choreDays: next };
+        const days = sanitizeChoreDays(prev.choreDays);
+        const next = setChoreCompleted(days, chore, todayRef.current, done);
+        return next === days ? prev : { ...prev, choreDays: next };
       });
     },
     [setState],
@@ -166,7 +175,7 @@ export function useChores(
 
   const toggle = useCallback(
     (choreId: string) => {
-      setDone(choreId, !isChoreCompletedOn(stateRef.current.choreDays, choreId, todayRef.current));
+      setDone(choreId, !isChoreCompletedOn(sanitizeChoreDays(stateRef.current.choreDays), choreId, todayRef.current));
     },
     [setDone],
   );
@@ -174,8 +183,9 @@ export function useChores(
   const markHardDay = useCallback(
     (reason?: ChoreHardReason) => {
       setState((prev) => {
-        const next = setHardDay(prev.choreDays, todayRef.current, true, reason);
-        return next === prev.choreDays ? prev : { ...prev, choreDays: next };
+        const days = sanitizeChoreDays(prev.choreDays);
+        const next = setHardDay(days, todayRef.current, true, reason);
+        return next === days ? prev : { ...prev, choreDays: next };
       });
     },
     [setState],
@@ -183,18 +193,19 @@ export function useChores(
 
   const undoHardDay = useCallback(() => {
     setState((prev) => {
-      const next = setHardDay(prev.choreDays, todayRef.current, false);
-      return next === prev.choreDays ? prev : { ...prev, choreDays: next };
+      const days = sanitizeChoreDays(prev.choreDays);
+      const next = setHardDay(days, todayRef.current, false);
+      return next === days ? prev : { ...prev, choreDays: next };
     });
   }, [setState]);
 
   const add = useCallback(
     (name: string, days?: ReadonlyArray<DayOfWeek>): ChoreEditResult<Chore> => {
-      const attempt = addChore(stateRef.current.chores, name, days);
+      const attempt = addChore(sanitizeChores(stateRef.current.chores), name, days);
       if (!attempt.ok) return attempt;
       const created = attempt.value[attempt.value.length - 1];
       setState((prev) => {
-        const result = addChore(prev.chores, name, days, created.id);
+        const result = addChore(sanitizeChores(prev.chores), name, days, created.id);
         return result.ok ? { ...prev, chores: result.value } : prev;
       });
       return { ok: true, value: created };
@@ -204,10 +215,10 @@ export function useChores(
 
   const edit = useCallback(
     (choreId: string, changes: { name?: string; days?: ReadonlyArray<DayOfWeek> }): ChoreEditResult<Chore> => {
-      const attempt = updateChore(stateRef.current.chores, choreId, changes);
+      const attempt = updateChore(sanitizeChores(stateRef.current.chores), choreId, changes);
       if (!attempt.ok) return attempt;
       setState((prev) => {
-        const result = updateChore(prev.chores, choreId, changes);
+        const result = updateChore(sanitizeChores(prev.chores), choreId, changes);
         return result.ok ? { ...prev, chores: result.value } : prev;
       });
       return { ok: true, value: attempt.value.find((c) => c.id === choreId)! };
@@ -220,10 +231,10 @@ export function useChores(
 
   const remove = useCallback(
     (choreId: string): ChoreEditResult<null> => {
-      const attempt = removeChore(stateRef.current.chores, choreId);
+      const attempt = removeChore(sanitizeChores(stateRef.current.chores), choreId);
       if (!attempt.ok) return attempt;
       setState((prev) => {
-        const result = removeChore(prev.chores, choreId);
+        const result = removeChore(sanitizeChores(prev.chores), choreId);
         return result.ok ? { ...prev, chores: result.value } : prev;
       });
       return { ok: true, value: null };
@@ -252,7 +263,7 @@ export function useChores(
     levels,
     history,
     stats,
-    canAdd: (rawChores?.length ?? 0) < MAX_CHORES,
+    canAdd: rawChores.length < MAX_CHORES,
     setDone,
     toggle,
     markHardDay,

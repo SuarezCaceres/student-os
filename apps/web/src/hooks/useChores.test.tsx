@@ -255,4 +255,39 @@ describe('useChores', () => {
       expect(vi.getTimerCount()).toBe(0);
     });
   });
+  describe('datos dañados (R3)', () => {
+    const corrupt = (extra: Record<string, unknown> = {}): AppState =>
+      ({
+        ...initialData,
+        chores: [{ id: 'x' }, { id: 'ok', name: 'Regar plantas', days: ['Lunes'], order: 0 }, null, 'basura'],
+        choreDays: [{ date: '2026-11-23' }, { date: '2026-11-22', hard: false, completed: [{ choreId: 'ok', name: 'Regar plantas' }] }, 42],
+        choreSettings: { seeded: true, levels: [{ min: 'cinco' }, { min: 3, message: 'Bien' }] },
+        ...extra,
+      }) as unknown as AppState;
+
+    it('no lanza y descarta las entradas inválidas al leer', () => {
+      const { result } = setup(corrupt());
+      const c = result.current.chores;
+      expect(c.chores.map((chore) => chore.id)).toEqual(['ok']);
+      expect(c.history.map((day) => day.date)).toEqual(['2026-11-22']);
+      expect(c.levels.map((level) => level.min)).toEqual([3]);
+      expect(c.summary.applicableCount).toBe(1);
+      expect(c.summary.completedCount).toBe(0);
+    });
+
+    it('un registro dañado de hoy no rompe el marcado ni el día difícil', () => {
+      const { result } = setup(corrupt());
+      act(() => result.current.chores.setDone('ok', true));
+      expect(result.current.chores.summary.completedCount).toBe(1);
+      act(() => result.current.chores.markHardDay('cansado'));
+      expect(result.current.chores.summary.hard).toBe(true);
+    });
+
+    it('tolera listas que no son arreglos', () => {
+      const { result } = setup(corrupt({ chores: 'roto', choreDays: { a: 1 }, choreSettings: { seeded: true, levels: 'x' } }));
+      expect(result.current.chores.chores).toEqual([]);
+      expect(result.current.chores.history).toEqual([]);
+      expect(result.current.chores.levels).toEqual([]);
+    });
+  });
 });

@@ -1,4 +1,7 @@
 import {
+  ChoreDaySchema,
+  ChoreLevelSchema,
+  ChoreSchema,
   MAX_CHORES,
   MAX_CHORE_LEVELS,
   MAX_CHORE_LEVEL_MESSAGE_LENGTH,
@@ -90,6 +93,33 @@ export function buildChoreSeed(): { chores: Chore[]; choreSettings: ChoreSetting
 /** Hay que sembrar solo si nunca se creo `choreSettings` (si el usuario borra todo, no se vuelve a sembrar). */
 export function needsChoreSeed(state: { choreSettings?: ChoreSettings }): boolean {
   return state.choreSettings === undefined;
+}
+
+// --- Datos dañados -------------------------------------------------------------------
+
+function keepValid<T>(list: unknown, schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } }): T[] {
+  if (!Array.isArray(list)) return [];
+  const valid: T[] = [];
+  for (const entry of list) {
+    const parsed = schema.safeParse(entry);
+    if (parsed.success) valid.push(parsed.data);
+  }
+  return valid;
+}
+
+/** Descarta (sin lanzar) los quehaceres que no cumplen el esquema compartido: datos dañados o de una version futura. */
+export function sanitizeChores(chores: unknown): Chore[] {
+  return keepValid<Chore>(chores, ChoreSchema);
+}
+
+/** Descarta (sin lanzar) los registros de dia que no cumplen el esquema compartido. */
+export function sanitizeChoreDays(choreDays: unknown): ChoreDay[] {
+  return keepValid<ChoreDay>(choreDays, ChoreDaySchema);
+}
+
+/** Descarta (sin lanzar) los niveles de motivacion que no cumplen el esquema compartido. */
+export function sanitizeChoreLevels(levels: unknown): ChoreLevel[] {
+  return keepValid<ChoreLevel>(levels, ChoreLevelSchema);
 }
 
 // --- Consultas: quehaceres de un dia ------------------------------------------------
