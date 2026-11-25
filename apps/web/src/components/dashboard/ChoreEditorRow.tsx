@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { UseChoresResult } from '../../hooks/useChores';
 import type { Chore } from '../../types';
@@ -8,14 +8,29 @@ import { ChoreDayToggles } from './ChoreDayToggles';
 export interface ChoreEditorRowProps {
   chore: Chore;
   chores: UseChoresResult;
+  /** Se llama cuando el quehacer se eliminó, para que el editor reubique el foco (la fila ya no existe). */
+  onRemoved?: () => void;
 }
 
 /** Una fila del editor: renombrar (al salir del campo o con Enter), días de la semana y eliminar con confirmación. */
-export const ChoreEditorRow: React.FC<ChoreEditorRowProps> = ({ chore, chores }) => {
+export const ChoreEditorRow: React.FC<ChoreEditorRowProps> = ({ chore, chores, onRemoved }) => {
   const inputId = useId();
   const [draft, setDraft] = useState(chore.name);
   const [error, setError] = useState<string | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const removeButtonRef = useRef<HTMLButtonElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreFocusRef = useRef(false);
+
+  // El icono de eliminar se desmonta al pedir confirmación: el foco pasa a «Cancelar» y vuelve al icono si se cancela.
+  useEffect(() => {
+    if (confirmingRemove) {
+      cancelButtonRef.current?.focus();
+    } else if (restoreFocusRef.current) {
+      restoreFocusRef.current = false;
+      removeButtonRef.current?.focus();
+    }
+  }, [confirmingRemove]);
 
   const duplicate = draft.trim() !== chore.name && hasDuplicateChoreName(chores.chores, draft, chore.id);
 
@@ -41,7 +56,13 @@ export const ChoreEditorRow: React.FC<ChoreEditorRowProps> = ({ chore, chores })
 
   const remove = () => {
     const result = chores.remove(chore.id);
-    if (!result.ok) setError(CHORE_EDIT_ERROR_MESSAGES[result.error]);
+    if (result.ok) onRemoved?.();
+    else setError(CHORE_EDIT_ERROR_MESSAGES[result.error]);
+  };
+
+  const cancelRemove = () => {
+    restoreFocusRef.current = true;
+    setConfirmingRemove(false);
   };
 
   return (
@@ -72,6 +93,7 @@ export const ChoreEditorRow: React.FC<ChoreEditorRowProps> = ({ chore, chores })
         />
         {!confirmingRemove && (
           <button
+            ref={removeButtonRef}
             type="button"
             onClick={() => setConfirmingRemove(true)}
             className="t-btn t-btn-ghost t-btn-icon shrink-0"
@@ -88,7 +110,7 @@ export const ChoreEditorRow: React.FC<ChoreEditorRowProps> = ({ chore, chores })
           <span className="text-[13px] text-[var(--ink)] mr-auto">
             ¿Eliminar «{chore.name}»? Lo que ya completaste en días pasados se conserva.
           </span>
-          <button type="button" onClick={() => setConfirmingRemove(false)} className="t-btn t-btn-secondary px-3 text-[13px]">
+          <button ref={cancelButtonRef} type="button" onClick={cancelRemove} className="t-btn t-btn-secondary px-3 text-[13px]">
             Cancelar
           </button>
           <button type="button" onClick={remove} className="t-btn t-btn-primary px-3 text-[13px]" aria-label={`Sí, eliminar ${chore.name}`}>

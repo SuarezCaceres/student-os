@@ -1,4 +1,4 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
 import { Plus, SlidersHorizontal } from 'lucide-react';
 import type { UseChoresResult } from '../../hooks/useChores';
 import type { DayOfWeek } from '../../types';
@@ -20,7 +20,7 @@ export interface ChoresEditorProps {
   chores: UseChoresResult;
 }
 
-const AddChoreForm: React.FC<{ chores: UseChoresResult }> = ({ chores }) => {
+const AddChoreForm: React.FC<{ chores: UseChoresResult; inputRef: React.RefObject<HTMLInputElement | null> }> = ({ chores, inputRef }) => {
   const inputId = useId();
   const [name, setName] = useState('');
   const [days, setDays] = useState<DayOfWeek[]>([...ALL_DAYS]);
@@ -46,6 +46,7 @@ const AddChoreForm: React.FC<{ chores: UseChoresResult }> = ({ chores }) => {
       </label>
       <div className="flex items-center gap-2">
         <input
+          ref={inputRef}
           id={inputId}
           type="text"
           value={name}
@@ -77,51 +78,57 @@ const AddChoreForm: React.FC<{ chores: UseChoresResult }> = ({ chores }) => {
 };
 
 /** Editor de quehaceres (añadir, renombrar, días, eliminar) y de metas con mensajes. Vive en un modal. */
-export const ChoresEditor: React.FC<ChoresEditorProps> = ({ isOpen, onClose, chores }) => (
-  <ModalShell
-    isOpen={isOpen}
-    onClose={onClose}
-    title="Editar quehaceres"
-    subtitle="Tu lista, los días de cada uno y tus metas de ánimo."
-    icon={<SlidersHorizontal className="w-5 h-5" aria-hidden="true" />}
-    maxWidth="xl"
-    footer={
-      <button type="button" onClick={onClose} className="t-btn t-btn-primary px-4">
-        Listo
-      </button>
-    }
-  >
-    <div className="space-y-7">
-      <section aria-labelledby="chores-editor-list">
-        <div className="flex items-baseline justify-between gap-2 mb-3">
-          <h3 id="chores-editor-list" className="text-base font-medium text-[var(--ink)]">
-            Tus quehaceres
-          </h3>
-          <span className="t-num text-[13px] text-[var(--muted)]" aria-label={`${chores.chores.length} de ${MAX_CHORES} quehaceres`}>
-            {chores.chores.length}/{MAX_CHORES}
-          </span>
-        </div>
-        <AddChoreForm chores={chores} />
-        {chores.chores.length === 0 ? (
-          <p className="text-[13px] text-[var(--muted)] mt-4">Todavía no tienes quehaceres. Añade el primero arriba.</p>
-        ) : (
-          <ul aria-label="Lista de quehaceres" className="mt-4 border-t border-[var(--line)]">
-            {chores.chores.map((chore) => (
-              <ChoreEditorRow key={chore.id} chore={chore} chores={chores} />
-            ))}
-          </ul>
-        )}
-      </section>
+export const ChoresEditor: React.FC<ChoresEditorProps> = ({ isOpen, onClose, chores }) => {
+  const addInputRef = useRef<HTMLInputElement>(null);
+  // Al eliminar, la fila (y el botón con el foco) desaparece: el foco pasa al campo de añadir.
+  const focusAddInput = () => addInputRef.current?.focus();
 
-      <section aria-labelledby="chores-editor-levels">
-        <h3 id="chores-editor-levels" className="text-base font-medium text-[var(--ink)]">
-          Metas y mensajes
-        </h3>
-        <p className="text-[13px] text-[var(--muted)] mt-0.5 mb-3">
-          Al completar esa cantidad en un día verás el mensaje de la meta.
-        </p>
-        <ChoreLevelsForm chores={chores} />
-      </section>
-    </div>
-  </ModalShell>
-);
+  return (
+    <ModalShell
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Editar quehaceres"
+      subtitle="Tu lista, los días de cada uno y tus metas de ánimo."
+      icon={<SlidersHorizontal className="w-5 h-5" aria-hidden="true" />}
+      maxWidth="xl"
+      footer={
+        <button type="button" onClick={onClose} className="t-btn t-btn-primary px-4">
+          Listo
+        </button>
+      }
+    >
+      <div className="space-y-7">
+        <section aria-labelledby="chores-editor-list">
+          <div className="flex items-baseline justify-between gap-2 mb-3">
+            <h3 id="chores-editor-list" className="text-base font-medium text-[var(--ink)]">
+              Tus quehaceres
+            </h3>
+            <span className="t-num text-[13px] text-[var(--muted)]" aria-label={`${chores.chores.length} de ${MAX_CHORES} quehaceres`}>
+              {chores.chores.length}/{MAX_CHORES}
+            </span>
+          </div>
+          <AddChoreForm chores={chores} inputRef={addInputRef} />
+          {chores.chores.length === 0 ? (
+            <p className="text-[13px] text-[var(--muted)] mt-4">Todavía no tienes quehaceres. Añade el primero arriba.</p>
+          ) : (
+            <ul aria-label="Lista de quehaceres" className="mt-4 border-t border-[var(--line)]">
+              {chores.chores.map((chore) => (
+                <ChoreEditorRow key={chore.id} chore={chore} chores={chores} onRemoved={focusAddInput} />
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section aria-labelledby="chores-editor-levels">
+          <h3 id="chores-editor-levels" className="text-base font-medium text-[var(--ink)]">
+            Metas y mensajes
+          </h3>
+          <p className="text-[13px] text-[var(--muted)] mt-0.5 mb-3">
+            Al completar esa cantidad en un día verás el mensaje de la meta.
+          </p>
+          <ChoreLevelsForm chores={chores} />
+        </section>
+      </div>
+    </ModalShell>
+  );
+};

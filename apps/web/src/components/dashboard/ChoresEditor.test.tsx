@@ -268,3 +268,39 @@ describe('ChoresEditor: el foco no se roba al re-renderizar', () => {
     expect(document.activeElement).toBe(toggle);
   });
 });
+
+describe('ChoresEditor: foco al eliminar un quehacer', () => {
+  const wait = (ms: number) => act(() => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const trash = (name: string) => screen.getByRole('button', { name: `Eliminar ${name}` });
+
+  async function openWithEditor() {
+    render(<Harness initial={baseState()} />);
+    openEditor();
+    await wait(120);
+  }
+
+  it('al pedir eliminar, el foco pasa a «Cancelar» (el icono se desmonta)', async () => {
+    await openWithEditor();
+    act(() => trash('Ducharme').focus());
+    fireEvent.click(trash('Ducharme'));
+    expect(screen.queryByRole('button', { name: 'Eliminar Ducharme' })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancelar' }));
+  });
+
+  it('al cancelar, el foco vuelve al icono de eliminar de ese quehacer', async () => {
+    await openWithEditor();
+    fireEvent.click(trash('Ducharme'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(document.activeElement).toBe(trash('Ducharme'));
+  });
+
+  it('al confirmar, el foco pasa al campo «Nuevo quehacer» y no se pierde en el body', async () => {
+    await openWithEditor();
+    fireEvent.click(trash('Ducharme'));
+    const confirm = screen.getByRole('button', { name: 'Sí, eliminar Ducharme' });
+    act(() => confirm.focus());
+    fireEvent.click(confirm);
+    expect(screen.queryByLabelText('Nombre de Ducharme')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByLabelText('Nuevo quehacer'));
+  });
+});
