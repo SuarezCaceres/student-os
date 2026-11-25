@@ -131,6 +131,7 @@ export function useSyncedAppState(a: AppState | string, b?: AppState): SyncedTup
         syncStore.publish(created.getStatus());
         syncStore.setController({
           syncNow: () => created.syncNow(),
+          observeNow: () => created.notifyLocalChange({ immediate: true }),
         });
         const detach = created.attachBrowserEvents();
         void created.start();

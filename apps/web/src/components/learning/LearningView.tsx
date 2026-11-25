@@ -1017,7 +1017,7 @@ Al presionar 'Guardar semana' (o Ctrl+S), podrás etiquetar tu nivel de energía
               {filteredResources.length === 0 ? (
                 <p className="text-xs font-mono text-[var(--muted)] py-3 text-center border border-dashed border-[var(--line)] rounded-xl">
                   {resources.length === 0
-                    ? 'No hay fuentes guardadas en esta semana. Agrega videos de YouTube o TikTok arriba.'
+                    ? 'Aún no guardaste fuentes esta semana. Pega un enlace de YouTube o TikTok.'
                     : 'No hay fuentes en la categoría seleccionada.'}
                 </p>
               ) : (

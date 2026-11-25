@@ -5,6 +5,7 @@
 > Prioridad: **Alto** (bloquea que el producto sea público o que los datos de un usuario estén a salvo), **Medio** (afecta a la calidad o a un flujo, pero hay alternativa) y **Bajo** (limpieza y deuda). Calificada por el agente el 2026-11-23 a partir de lo que pediste; corrígela si no coincide.
 
 ## En curso
+- [ ] **Spec 010 en revisión** (rama `feat/010-entorno-de-trabajo-por-usuario`, PR apilado sobre la 009): C2 y C5 a C9 con prueba; C1 es manual y espera a producción (A3) y a la verificación de Google (A4).
 - [ ] **Spec 009 en revisión** (rama `feat/009-login-google-calendar-automatico`, sin subir) · agente + humano. Código completo; falta la revisión final y el PR. **No fusionar hasta que producción (A3) esté configurada.**
 
 ## Pendiente
@@ -63,7 +64,7 @@ Objetivo del humano: que cada usuario tenga su espacio y se guarden **por usuari
   - [ ] Los 4 componentes que usan `localStorage` directo (`AuthModal`, `BackupModal`, `DailyHabitsCard`, `GymTracker`) no sincronizan en modo nube: hábitos y gym podrían quedarse en el navegador y no «seguir» al usuario a otro dispositivo (ver M2).
   - [ ] **Riesgo a analizar:** si el usuario A cierra sesión y el B entra en el mismo navegador, el importador del primer inicio podría ofrecer subir los datos locales de A a la cuenta de B. Decidir qué pasa con el estado local al cambiar de cuenta.
   - [ ] Definir qué ve un usuario nuevo (estado vacío o datos de ejemplo) y los límites por cuenta (hoy 5000 registros y 64 KB por registro).
-- [ ] Escribir la spec en `docs/specs/010-entorno-de-trabajo-por-usuario/spec.md`
+- [x] Spec escrita en `docs/specs/010-entorno-de-trabajo-por-usuario/spec.md` (rama `feat/010-entorno-de-trabajo-por-usuario`, **aprobada**; `plan.md` escrito, **a la espera de tu aprobación**). Decisiones tuyas del 2026-11-24: cuenta nueva vacía con guía, subir antes de cerrar sesión y avisar al llegar al límite sin subirlo. Los puntos de `localStorage` directo y del cambio de cuenta ya los cubre la 009.
 
 #### A3 · Producción: `student-os-prod`, variables y API desplegada (funcionalidad 007)
 Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
@@ -92,9 +93,11 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 ### 🟢 Bajo
 - [ ] Crear el enlace simbólico `.claude/skills → ../.agents/skills` (requiere activar el Modo desarrollador de Windows). Hoy es una copia sin versionar que hay que resincronizar a mano tras tocar una skill.
 - [ ] El hook `.claude/hooks/guard.sh` da un falso positivo si el texto del comando contiene «git … push … main» (por ejemplo en el cuerpo de un PR). Afinar el regex.
-- [ ] **Volcar los cambios pendientes antes de cerrar sesión:** al cerrar sesión se limpia la cola de sync y lo que no se había subido se pierde. Intentar un `syncNow` con tiempo límite antes de `signOut`.
+- [x] **Volcar los cambios pendientes antes de cerrar sesión:** hecho en la spec 010 (`syncStore.flushPending`, máximo 5 s, aviso si no se puede).
 - [ ] **Quitar `VITE_GOOGLE_CLIENT_ID`** de Vercel y de `.env.example` (la web ya no la usa; `.env.example` está bloqueado por el hook, ver M4).
 - [ ] **E2E y worktrees:** el harness E2E usa puertos fijos (54340-54343, 3100, 5293, 5294). Dos sesiones que lo ejecuten a la vez desde worktrees distintos se pisan (caídas a mitad de corrida y pruebas contra el código del otro worktree). Hacer los puertos configurables o detectar el conflicto con un mensaje claro.
+- [ ] `apps/web/src/data/initialData.ts` ya solo lo usan las pruebas (la app parte de `emptyAppState`): moverlo a fixtures de pruebas.
+- [ ] El aviso de «Cerrar sesión» no se actualiza si la sync termina mientras está abierto; la guía de Aprendizaje no tiene aserción E2E.
 - [ ] Los módulos `kanban`, `university`, `gym` y `calendar` de `apps/api/src/` son controladores vacíos de 6 líneas (el dato viaja por `/sync`). Decidir: eliminarlos o rellenarlos.
 - [ ] Bundle web de ~1 MB (aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).

@@ -9,7 +9,7 @@ export function getAccountDisplayName(user: { user_metadata?: unknown } | null |
 }
 
 /**
- * Estado con el que arranca una cuenta que la nube aun no conoce (spec 009): el de partida de la app SIN los bloques de
+ * Estado con el que arranca una cuenta que la nube aun no conoce (spec 009 y 010): el de partida (`emptyAppState`, vacio) SIN los bloques de
  * horario de ejemplo y con el nombre de pila de su cuenta de Google. Es una funcion pura: el mismo resultado en cada
  * dispositivo, de modo que el segundo dispositivo de una cuenta nueva no discrepa del primero.
  */

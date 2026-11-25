@@ -1,4 +1,4 @@
-import type { AppState, CalendarBlock, DayOfWeek, WorkShiftConfig } from '../types';
+import type { CalendarBlock, DayOfWeek, WorkShiftConfig } from '../types';
 import { ORDERED_DAYS } from './routineGenerator';
 
 export const WORK_SHIFT_BLOCK_ID_PREFIX = 'work-shift-';
