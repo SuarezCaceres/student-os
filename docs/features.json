@@ -158,21 +158,21 @@
       "spec": "docs/specs/012-quehaceres-diarios/spec.md",
       "estado": "spec",
       "criterios": [
-        { "id": "C1", "descripcion": "Un usuario nuevo ve la tarjeta Quehaceres con los cinco quehaceres de la lista base (tender la cama, pasear al perro, ducharme, limpiar mi cuarto, avanzar en proyectos de IA) sin marcar", "pasa": false },
-        { "id": "C2", "descripcion": "Anadir, renombrar y eliminar quehaceres se refleja y se conserva al recargar", "pasa": false },
-        { "id": "C3", "descripcion": "Un quehacer con dias de la semana elegidos solo aparece y cuenta en esos dias", "pasa": false },
-        { "id": "C4", "descripcion": "Marcar y desmarcar un quehacer de hoy actualiza el contador, sin poder marcarlo dos veces en el dia", "pasa": false },
-        { "id": "C5", "descripcion": "Con los umbrales por defecto, 5 completados muestran 'Eres lo maximo', 10 muestran 'Sigue asi' y menos de 5 muestran el progreso", "pasa": false },
-        { "id": "C6", "descripcion": "Cambiar los umbrales o mensajes aplica los nuevos y se conserva", "pasa": false },
-        { "id": "C7", "descripcion": "Si hoy aplican menos quehaceres que la meta, completarlos todos muestra el mensaje de 'completaste todos los de hoy'", "pasa": false },
-        { "id": "C8", "descripcion": "'Hoy no puedo' marca el dia como dificil, con mensaje amable y sin contarlo como fallo", "pasa": false },
-        { "id": "C9", "descripcion": "Deshacer el dia dificil conserva los quehaceres ya completados", "pasa": false },
-        { "id": "C10", "descripcion": "Al cambiar de dia, el dia anterior queda guardado en el historial y hoy empieza sin marcas", "pasa": false },
+        { "id": "C1", "descripcion": "Un usuario nuevo ve la tarjeta Quehaceres con los cinco quehaceres de la lista base (tender la cama, pasear al perro, ducharme, limpiar mi cuarto, avanzar en proyectos de IA) sin marcar", "pasa": true },
+        { "id": "C2", "descripcion": "Anadir, renombrar y eliminar quehaceres se refleja y se conserva al recargar", "pasa": true },
+        { "id": "C3", "descripcion": "Un quehacer con dias de la semana elegidos solo aparece y cuenta en esos dias", "pasa": true },
+        { "id": "C4", "descripcion": "Marcar y desmarcar un quehacer de hoy actualiza el contador, sin poder marcarlo dos veces en el dia", "pasa": true },
+        { "id": "C5", "descripcion": "Con los umbrales por defecto, 5 completados muestran 'Eres lo maximo', 10 muestran 'Sigue asi' y menos de 5 muestran el progreso", "pasa": true },
+        { "id": "C6", "descripcion": "Cambiar los umbrales o mensajes aplica los nuevos y se conserva", "pasa": true },
+        { "id": "C7", "descripcion": "Si hoy aplican menos quehaceres que la meta, completarlos todos muestra el mensaje de 'completaste todos los de hoy'", "pasa": true },
+        { "id": "C8", "descripcion": "'Hoy no puedo' marca el dia como dificil, con mensaje amable y sin contarlo como fallo", "pasa": true },
+        { "id": "C9", "descripcion": "Deshacer el dia dificil conserva los quehaceres ya completados", "pasa": true },
+        { "id": "C10", "descripcion": "Al cambiar de dia, el dia anterior queda guardado en el historial y hoy empieza sin marcas", "pasa": true },
         { "id": "C11", "descripcion": "Renombrar o eliminar un quehacer no cambia los nombres de los dias pasados", "pasa": false },
-        { "id": "C12", "descripcion": "La grafica muestra el promedio por dia de la semana de las ultimas 8 semanas, resalta el mejor dia y excluye los dias dificiles", "pasa": false },
-        { "id": "C13", "descripcion": "Sin historial suficiente la grafica muestra un estado vacio claro", "pasa": false },
-        { "id": "C14", "descripcion": "Quehaceres, historial y dias dificiles se conservan al cerrar sesion y entrar desde otro dispositivo", "pasa": false },
-        { "id": "C15", "descripcion": "Un usuario que marca quehaceres no afecta a otro usuario", "pasa": false }
+        { "id": "C12", "descripcion": "La grafica muestra el promedio por dia de la semana de las ultimas 8 semanas, resalta el mejor dia y excluye los dias dificiles", "pasa": true },
+        { "id": "C13", "descripcion": "Sin historial suficiente la grafica muestra un estado vacio claro", "pasa": true },
+        { "id": "C14", "descripcion": "Quehaceres, historial y dias dificiles se conservan al cerrar sesion y entrar desde otro dispositivo", "pasa": true },
+        { "id": "C15", "descripcion": "Un usuario que marca quehaceres no afecta a otro usuario", "pasa": true }
       ]
     }
   ]

@@ -4,6 +4,9 @@ import { emptyAppState } from './data/emptyState';
 import { ConfirmLogoutDialog } from './components/auth/ConfirmLogoutDialog';
 import { syncStore } from './sync/syncStore';
 import { useSyncedAppState } from './hooks/useSyncedAppState';
+import { useHasSynced } from './hooks/useHasSynced';
+import { useChores } from './hooks/useChores';
+import { isSyncConfigured } from './services/supabase';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
 import { LegalLinks } from './components/legal/LegalLinks';
@@ -1371,6 +1374,11 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
+  // Quehaceres diarios (spec 012): siembra de la lista base, estado de hoy y temporizador de medianoche. Se siembra solo tras la
+  // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo.
+  const hasSynced = useHasSynced();
+  const chores = useChores(state, setState, { syncReady: !isSyncConfigured() || hasSynced });
+
   const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
   }, [setState]);
@@ -2474,6 +2482,7 @@ export const App: React.FC = () => {
                 onUpdateKanbanStatus={handleUpdateKanbanStatus}
                 onOpenQuickAdd={handleOpenQuickAdd}
                 onHabitsChange={handleHabitsChange}
+                chores={chores}
                 onSaveReflection={handleSaveReflection}
                 onRestoreState={handleRestoreState}
               />

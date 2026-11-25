@@ -1,20 +1,38 @@
 import {
+  CHORE_SETTINGS_RECORD_ID,
   CalendarRecordDataSchema,
+  ChoreDaySchema,
+  ChoreSchema,
+  ChoreSettingsSchema,
   DAILY_HABITS_RECORD_ID,
   WORK_SHIFT_RECORD_ID,
+  choreDayRecordId,
+  isChoreDayRecordId,
   type SyncRecord,
 } from '@student-os/shared';
-import type { AppState, CalendarBlock, DailyHabits, WorkShiftConfig } from '../../types';
+import type {
+  AppState,
+  CalendarBlock,
+  Chore,
+  ChoreDay,
+  ChoreSettings,
+  DailyHabits,
+  WorkShiftConfig,
+} from '../../types';
 import type { SyncAdapter } from '../adapterTypes';
 import { stableStringify } from '../hash';
 
 /**
- * Adaptador de la coleccion `calendar`: bloques de calendario LOCALES, turno laboral y habitos diarios.
- * Todos los registros llevan `data = { kind, value }` (ver `packages/shared/src/calendar.ts`).
+ * Adaptador de la coleccion `calendar`: bloques de calendario LOCALES, turno laboral, habitos diarios y
+ * quehaceres diarios (spec 012). Todos los registros llevan `data = { kind, value }`
+ * (ver `packages/shared/src/calendar.ts`).
  *
- *   calendarBlocks -> kind 'block'       id = block.id
- *   workShift      -> kind 'workShift'   id = WORK_SHIFT_RECORD_ID   (singleton)
- *   dailyHabits    -> kind 'dailyHabits' id = DAILY_HABITS_RECORD_ID (singleton)
+ *   calendarBlocks -> kind 'block'         id = block.id
+ *   workShift      -> kind 'workShift'     id = WORK_SHIFT_RECORD_ID     (singleton)
+ *   dailyHabits    -> kind 'dailyHabits'   id = DAILY_HABITS_RECORD_ID   (singleton)
+ *   chores         -> kind 'chore'         id = chore.id
+ *   choreDays      -> kind 'choreDay'      id = choreDayRecordId(date)   (un registro por dia: el historial)
+ *   choreSettings  -> kind 'choreSettings' id = CHORE_SETTINGS_RECORD_ID (singleton)
  *
  * CRITERIO DE PROPIEDAD (que NO se sube nunca; ver docs/agent-notes/CALENDAR.md):
  *  - Los eventos de Google Calendar no viven en `AppState` (se leen en vivo de Google), asi que no hay nada
@@ -27,14 +45,28 @@ import { stableStringify } from '../hash';
  *    un bloque local (o la serie del turno laboral) en Google. Es un vinculo, y viaja con el bloque para
  *    que el otro dispositivo deduplique el evento de Google contra ese bloque.
  *
+ * QUEHACERES: el historial (`choreDays`) guarda el nombre copiado; aqui un dia remoto reemplaza al local
+ * del mismo dia (el servidor ya resolvio por `updatedAt`) y nunca se reescribe nada por nuestra cuenta.
+ * Los registros que no cumplen el contrato se ignoran en ambos sentidos (un dato danado o de una version
+ * futura no debe romper el resumen ni envenenar el lote de push).
+ *
  * Puro: sin I/O, sin React, sin red, sin reloj. `apply` es inmutable, idempotente, determinista (los
  * registros se procesan ordenados por id) y devuelve la MISMA referencia si no cambia nada.
  */
 
 const GYM_TITLE_PREFIX = 'gym:';
 const GOOGLE_MIRROR_ID_PREFIX = 'gcal-';
-const RESERVED_IDS: ReadonlySet<string> = new Set([WORK_SHIFT_RECORD_ID, DAILY_HABITS_RECORD_ID]);
+const RESERVED_IDS: ReadonlySet<string> = new Set([
+  WORK_SHIFT_RECORD_ID,
+  DAILY_HABITS_RECORD_ID,
+  CHORE_SETTINGS_RECORD_ID,
+]);
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Los ids de singleton y de historial (`chore-day-*`) no pueden usarse como id de un bloque ni de un quehacer. */
+function isReservedRecordId(id: string): boolean {
+  return RESERVED_IDS.has(id) || isChoreDayRecordId(id);
+}
 
 function isGymBlock(block: Pick<CalendarBlock, 'id' | 'category' | 'title'>): boolean {
   return (
@@ -46,7 +78,7 @@ function isGymBlock(block: Pick<CalendarBlock, 'id' | 'category' | 'title'>): bo
 
 /** true si el bloque es de propiedad local y puede viajar por la nube. */
 export function isSyncableCalendarBlock(block: CalendarBlock): boolean {
-  if (RESERVED_IDS.has(block.id)) return false;
+  if (isReservedRecordId(block.id)) return false;
   if (block.id.startsWith(GOOGLE_MIRROR_ID_PREFIX)) return false;
   if (isGymBlock(block)) return false;
   return true;
@@ -99,6 +131,23 @@ export const calendarAdapter: SyncAdapter = {
     if (state.dailyHabits !== undefined) {
       out.push({ id: DAILY_HABITS_RECORD_ID, data: { kind: 'dailyHabits', value: state.dailyHabits } });
     }
+
+    // Quehaceres: solo viajan los que cumplen el contrato (el servidor rechazaria el resto).
+    const choreIds = new Set<string>();
+    for (const chore of state.chores ?? []) {
+      if (isReservedRecordId(chore.id) || choreIds.has(chore.id) || !ChoreSchema.safeParse(chore).success) continue;
+      choreIds.add(chore.id);
+      out.push({ id: chore.id, data: { kind: 'chore', value: chore } });
+    }
+    const choreDates = new Set<string>();
+    for (const day of state.choreDays ?? []) {
+      if (choreDates.has(day.date) || !ChoreDaySchema.safeParse(day).success) continue;
+      choreDates.add(day.date);
+      out.push({ id: choreDayRecordId(day.date), data: { kind: 'choreDay', value: day } });
+    }
+    if (state.choreSettings !== undefined && ChoreSettingsSchema.safeParse(state.choreSettings).success) {
+      out.push({ id: CHORE_SETTINGS_RECORD_ID, data: { kind: 'choreSettings', value: state.choreSettings } });
+    }
     return out;
   },
 
@@ -108,9 +157,15 @@ export const calendarAdapter: SyncAdapter = {
     let blocks = state.calendarBlocks ?? [];
     let workShift = state.workShift;
     let dailyHabits = state.dailyHabits;
+    let chores = state.chores;
+    let choreDays = state.choreDays;
+    let choreSettings = state.choreSettings;
     let blocksChanged = false;
     let workShiftChanged = false;
     let habitsChanged = false;
+    let choresChanged = false;
+    let choreDaysChanged = false;
+    let choreSettingsChanged = false;
 
     // Orden determinista, independiente del orden de llegada (sort estable: mismo id conserva el orden).
     const ordered = records
@@ -132,6 +187,19 @@ export const calendarAdapter: SyncAdapter = {
             dailyHabits = undefined;
             habitsChanged = true;
           }
+        } else if (record.id === CHORE_SETTINGS_RECORD_ID) {
+          if (choreSettings !== undefined) {
+            choreSettings = undefined;
+            choreSettingsChanged = true;
+          }
+        } else if (isChoreDayRecordId(record.id)) {
+          if (choreDays?.some((d) => choreDayRecordId(d.date) === record.id)) {
+            choreDays = choreDays.filter((d) => choreDayRecordId(d.date) !== record.id);
+            choreDaysChanged = true;
+          }
+        } else if (chores?.some((c) => c.id === record.id)) {
+          chores = chores.filter((c) => c.id !== record.id);
+          choresChanged = true;
         } else {
           const target = blocks.find((b) => b.id === record.id);
           // Un bloque de gym local nunca se borra por la nube (no es propiedad de esta coleccion).
@@ -159,6 +227,35 @@ export const calendarAdapter: SyncAdapter = {
         if (dailyHabits !== undefined && stableStringify(dailyHabits) === stableStringify(data.value)) continue;
         dailyHabits = data.value as DailyHabits;
         habitsChanged = true;
+      } else if (data.kind === 'choreSettings') {
+        if (record.id !== CHORE_SETTINGS_RECORD_ID) continue;
+        if (choreSettings !== undefined && stableStringify(choreSettings) === stableStringify(data.value)) continue;
+        choreSettings = data.value as ChoreSettings;
+        choreSettingsChanged = true;
+      } else if (data.kind === 'choreDay') {
+        const incoming = data.value as ChoreDay;
+        if (record.id !== choreDayRecordId(incoming.date)) continue; // el id debe corresponder a la fecha
+        const list = choreDays ?? [];
+        const index = list.findIndex((d) => d.date === incoming.date);
+        if (index === -1) {
+          choreDays = [...list, incoming];
+        } else {
+          if (stableStringify(list[index]) === stableStringify(incoming)) continue;
+          choreDays = list.map((d, i) => (i === index ? incoming : d));
+        }
+        choreDaysChanged = true;
+      } else if (data.kind === 'chore') {
+        const incoming = data.value as Chore;
+        if (incoming.id !== record.id || isReservedRecordId(incoming.id)) continue;
+        const list = chores ?? [];
+        const index = list.findIndex((c) => c.id === incoming.id);
+        if (index === -1) {
+          chores = [...list, incoming];
+        } else {
+          if (stableStringify(list[index]) === stableStringify(incoming)) continue;
+          chores = list.map((c, i) => (i === index ? incoming : c));
+        }
+        choresChanged = true;
       } else {
         const incoming = data.value as CalendarBlock;
         if (incoming.id !== record.id) continue; // id del registro y del bloque deben coincidir
@@ -180,7 +277,16 @@ export const calendarAdapter: SyncAdapter = {
       }
     }
 
-    if (!blocksChanged && !workShiftChanged && !habitsChanged) return state;
+    if (
+      !blocksChanged &&
+      !workShiftChanged &&
+      !habitsChanged &&
+      !choresChanged &&
+      !choreDaysChanged &&
+      !choreSettingsChanged
+    ) {
+      return state;
+    }
 
     const next: AppState = { ...state };
     if (blocksChanged) next.calendarBlocks = blocks;
@@ -191,6 +297,12 @@ export const calendarAdapter: SyncAdapter = {
     if (habitsChanged) {
       if (dailyHabits === undefined) delete next.dailyHabits;
       else next.dailyHabits = dailyHabits;
+    }
+    if (choresChanged) next.chores = chores;
+    if (choreDaysChanged) next.choreDays = choreDays;
+    if (choreSettingsChanged) {
+      if (choreSettings === undefined) delete next.choreSettings;
+      else next.choreSettings = choreSettings;
     }
     return next;
   },

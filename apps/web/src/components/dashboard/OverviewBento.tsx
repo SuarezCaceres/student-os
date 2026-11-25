@@ -54,6 +54,8 @@ import { YoutubeIcon } from '../common/YoutubeIcon';
 import type { NavTab } from '../layout/Navbar';
 import { AssignmentDetailModal } from '../university/AssignmentDetailModal';
 import { BackupModal } from './BackupModal';
+import type { UseChoresResult } from '../../hooks/useChores';
+import { ChoresCard } from './ChoresCard';
 import { EmptyHint } from '../common/EmptyHint';
 import { DailyHabitsCard } from './DailyHabitsCard';
 
@@ -76,6 +78,8 @@ export interface OverviewBentoProps {
     tab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning'
   ) => void;
   onHabitsChange: (habits: DailyHabits) => void;
+  /** Quehaceres diarios (spec 012): estado y acciones de `useChores`. Sin él no se muestra la tarjeta. */
+  chores?: UseChoresResult;
   onSaveReflection?: (reflection: WeeklyReflection) => void;
   onRestoreState: (restored: AppState) => void;
 }
@@ -123,6 +127,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   onUpdateKanbanStatus,
   onOpenQuickAdd,
   onHabitsChange,
+  chores,
   onSaveReflection,
   onRestoreState,
 }) => {
@@ -902,6 +907,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           todayDateIso={resolvedTodayIso}
           onHabitsChange={onHabitsChange}
         />
+
+        {/* Card 4b: Quehaceres diarios */}
+        {chores && <ChoresCard chores={chores} />}
 
         {/* Card 5 (2 Cols on lg): Proyectos en foco (Kanban) */}
         <div className="t-card p-6 lg:col-span-2 flex flex-col justify-between">

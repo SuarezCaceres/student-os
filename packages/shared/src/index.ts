@@ -13,6 +13,7 @@ export * from './learning';
 export * from './gym';
 export * from './workShift';
 export * from './habits';
+export * from './chores';
 export * from './calendar';
 export * from './profile';
 export * from './appState';

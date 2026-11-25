@@ -4,6 +4,12 @@
 > Su objetivo es que la siguiente sesión, que no recuerda nada, sepa dónde retomar.
 
 <!-- Formato:
+## 2026-11-24 · Claude Code · feat/012-quehaceres-diarios
+- **Hecho:** 012 implementada por pasos con sub-agentes: contrato (`chores.ts` en shared, kinds `chore`/`choreDay`/`choreSettings` dentro de la colección `calendar`, sin migración), adaptador de sync, lógica pura (`utils/chores.ts`), hook `useChores`, `ChoresCard`, `ChoresEditor`, `ChoresChart` y E2E `07-quehaceres`. Una revisión independiente encontró 2 bloqueantes (foco robado por el editor y documentos sin cerrar) y 4 recomendados (re-render de App por el store de sync, esqueleto sin fin sin red, datos dañados, gráfica en ceros); se corrigieron con una prueba que reproduce cada fallo.
+- **Verificación:** hook de cada commit (lint, tipos, unitarias, integración del API) con `E2E_PORT_OFFSET`; 450 pruebas de la web; E2E `03`, `04`, `05-calendario`, `05-gym-opcional` y `07-quehaceres` pasan (con puertos desplazados temporalmente). **No corrí `./scripts/check.sh` completo ni las E2E `01` y `02`** (puertos fijos ocupados por otras sesiones hasta fusionar el PR #12). El diseño se vio en capturas solo en tema oscuro.
+- **Pendiente:** fusionar #12 y repetir la verificación completa; decisiones del humano (día sin registro, vista de historial, siembra sin red); C11 solo a nivel de datos; fusionar **después de la 009** (la 012 va apilada sobre ella).
+- **Problemas:** dos pruebas del sub-agente se reescribieron porque afirmaban lo contrario del C13 (gráfica en ceros). Al editar, las entradas inválidas se descartan del estado (los datos de una versión futura que no cumplan el esquema actual se perderían).
+
 ## AAAA-MM-DD · agente (Claude Code / Antigravity) · rama
 - **Hecho:** qué se completó (con referencia a commits o PR)
 - **Verificación:** resultado de ./scripts/check.sh
