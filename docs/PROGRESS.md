@@ -11,6 +11,17 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-25 · Claude Code · docs/tareas-fusion-hecha
+- **Hecho:** el humano fusionó #12, #8, #13 y #14 a `main` en el orden recomendado, sin conflictos. Se verificó `main` (`ecd9ad5`) con `./scripts/check.sh` completo y puertos por defecto: todo en verde, incluidas las 14 E2E. Se añade a `TASKS.md` la nota A0 con el estado real (la que se escribió el día anterior llegó a la rama de #14 después de fusionarse y solo está en la rama de la 009).
+- **Pendiente:** #9 (la 009 con la 010, la 011 y la 012 dentro) sigue en borrador **hasta que producción (007) esté lista**; decisiones abiertas del humano (012, specs 007 y 008); limpieza de ramas ya fusionadas con su confirmación. La rama de la 009 deberá incorporar `main` antes de fusionarse y **tendrá un conflicto previsible en `docs/TASKS.md` (la nota A0, versión antigua frente a esta)**: quedarse con esta versión.
+- **Problemas:** ninguno nuevo.
+- **Decisiones del 2026-11-25 y limpieza:** se borraron 4 worktrees y carpetas huérfanas, 24 ramas locales y 12 remotas ya fusionadas, y el directorio principal quedó limpio. 012: día sin registro = 0, historial sí (PR #17), sin red no se siembra. 007: vacía, dominio propio, ping con GitHub Actions, dos o más cuentas de prueba, criterios C6–C8 (PR #18). Siguen abiertos: dominio concreto, región, aprobar la 007 y Q1–Q10 de la 008.
+
+## 2026-11-24 · Claude Code · docs/spec-007-produccion
+- **Hecho:** spec 007 (producción) en borrador, partiendo de `origin/main`. Propone los criterios C6 a C8 (dos cuentas reales, sin secretos, respaldo de `GOOGLE_TOKEN_ENC_KEY`) y reparte qué hace el humano y qué prepara el agente. La spec 008 (verificación de Google) la redacta «agente 2» en su propia rama.
+- **Pendiente:** tu aprobación de la spec; después, el plan y el script de verificación de solo lectura. Mientras tanto A3 y A4 siguen siendo las acciones del humano que bloquean la 009.
+- **Problemas:** `.env.example` está bloqueado para lectura por `.claude/settings.json` (M4 de `TASKS.md`), así que las variables salen de `env.schema.ts` y `render.yaml`.
+
 ## 2026-11-24 · Claude Code · feat/012-quehaceres-diarios
 - **Hecho:** 012 implementada por pasos con sub-agentes: contrato (`chores.ts` en shared, kinds `chore`/`choreDay`/`choreSettings` dentro de la colección `calendar`, sin migración), adaptador de sync, lógica pura (`utils/chores.ts`), hook `useChores`, `ChoresCard`, `ChoresEditor`, `ChoresChart` y E2E `07-quehaceres`. Una revisión independiente encontró 2 bloqueantes (foco robado por el editor y documentos sin cerrar) y 4 recomendados (re-render de App por el store de sync, esqueleto sin fin sin red, datos dañados, gráfica en ceros); se corrigieron con una prueba que reproduce cada fallo.
 - **Verificación:** hook de cada commit (lint, tipos, unitarias, integración del API) con `E2E_PORT_OFFSET`; 450 pruebas de la web; E2E `03`, `04`, `05-calendario`, `05-gym-opcional` y `07-quehaceres` pasan (con puertos desplazados temporalmente). **No corrí `./scripts/check.sh` completo ni las E2E `01` y `02`** (puertos fijos ocupados por otras sesiones hasta fusionar el PR #12). El diseño se vio en capturas solo en tema oscuro.
@@ -67,11 +78,6 @@
 - **Decisiones del humano:** solo Google (sin registro, sin modo local, sin demo), mismos permisos de Calendar, Calendar obligatorio como parte del login (si lo desmarca no entra), datos locales del prototipo descartados (se retira el importador), sin botón de desvincular, calendario como hoy.
 - **Pendiente:** que apruebes la spec y respondas 3 preguntas abiertas (landing pública, desvincular y verificación de Google, y dejar obsoletos 001, 003 y el ADR 0004); después `plan.md`.
 - **Problemas:** el importador del primer inicio, el cifrado del token y el borrado de cuenta son zonas protegidas y esta spec los toca. Depende de 007 y 008.
-
-## 2026-11-24 · Claude Code · docs/spec-007-produccion
-- **Hecho:** spec 007 (producción) en borrador, partiendo de `origin/main`. Propone los criterios C6 a C8 (dos cuentas reales, sin secretos, respaldo de `GOOGLE_TOKEN_ENC_KEY`) y reparte qué hace el humano y qué prepara el agente. La spec 008 (verificación de Google) la redacta «agente 2» en su propia rama.
-- **Pendiente:** tu aprobación de la spec; después, el plan y el script de verificación de solo lectura. Mientras tanto A3 y A4 siguen siendo las acciones del humano que bloquean la 009.
-- **Problemas:** `.env.example` está bloqueado para lectura por `.claude/settings.json` (M4 de `TASKS.md`), así que las variables salen de `env.schema.ts` y `render.yaml`.
 
 ## 2026-11-24 · Claude Code · docs/prioriza-pendientes
 - **Hecho:** `docs/TASKS.md` reordenado por prioridad Alto/Medio/Bajo. Dos pendientes nuevos de prioridad Alta pedidos por el humano: **A1** login con Google para cualquier usuario y Calendar vinculado sin botón (funcionalidad 009, marcado importante) y **A2** entorno de trabajo por usuario (010). `features.json` con 009 y 010 y sus carpetas de spec. Verificado que el PR #7 está en `main` y que Vercel sirve la web en https://student-os-mocha-iota.vercel.app (HTTP 200).
