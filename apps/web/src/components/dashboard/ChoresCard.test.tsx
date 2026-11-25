@@ -74,6 +74,11 @@ describe('ChoresCard: lista de hoy', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
+  it('el contador se anuncia como imagen con nombre accesible (un span sin rol no anuncia su aria-label)', () => {
+    render(<Harness initial={stateWith()} />);
+    expect(screen.getByRole('img', { name: '0 de 5 quehaceres completados' }).textContent).toBe('0/5');
+  });
+
   it('C3: solo lista los quehaceres que aplican al dia de hoy', () => {
     const chores: Chore[] = [
       { id: 'a', name: 'Todos los dias', days: [...ALL_DAYS], order: 0 },

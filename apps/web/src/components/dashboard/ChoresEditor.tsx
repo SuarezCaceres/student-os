@@ -103,7 +103,7 @@ export const ChoresEditor: React.FC<ChoresEditorProps> = ({ isOpen, onClose, cho
             <h3 id="chores-editor-list" className="text-base font-medium text-[var(--ink)]">
               Tus quehaceres
             </h3>
-            <span className="t-num text-[13px] text-[var(--muted)]" aria-label={`${chores.chores.length} de ${MAX_CHORES} quehaceres`}>
+            <span className="t-num text-[13px] text-[var(--muted)]" role="img" aria-label={`${chores.chores.length} de ${MAX_CHORES} quehaceres`}>
               {chores.chores.length}/{MAX_CHORES}
             </span>
           </div>

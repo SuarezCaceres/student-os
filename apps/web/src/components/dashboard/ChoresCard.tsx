@@ -91,6 +91,7 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
           </button>
           <span
             className={`t-badge t-num ${reached ? 't-badge-ok' : 't-badge-accent'}`}
+            role="img"
             aria-label={`${completedCount} de ${total} quehaceres completados`}
           >
             {completedCount}/{total}
