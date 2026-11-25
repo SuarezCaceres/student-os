@@ -1353,10 +1353,9 @@ export const App: React.FC = () => {
   }, [setState]);
 
   // Quehaceres diarios (spec 012): siembra de la lista base, estado de hoy y temporizador de medianoche. Se siembra solo tras la
-  // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo. La tarjeta de la UI
-  // recibira el objeto que devuelve `useChores` como prop `chores` de `OverviewBento` cuando exista (pasos 5-7 del plan).
+  // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo.
   const choreSyncStatus = useSyncStatus();
-  useChores(state, setState, { syncReady: !isSyncConfigured() || choreSyncStatus.lastSyncAt !== null });
+  const chores = useChores(state, setState, { syncReady: !isSyncConfigured() || choreSyncStatus.lastSyncAt !== null });
 
   const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
@@ -2446,6 +2445,7 @@ export const App: React.FC = () => {
                 onUpdateKanbanStatus={handleUpdateKanbanStatus}
                 onOpenQuickAdd={handleOpenQuickAdd}
                 onHabitsChange={handleHabitsChange}
+                chores={chores}
                 onSaveReflection={handleSaveReflection}
                 onRestoreState={handleRestoreState}
               />
