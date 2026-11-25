@@ -1,0 +1,10 @@
+export const PORTS: Readonly<{ pg: number; supabase: number; google: number; control: number; api: number; web: number; webNoCloud: number }>;
+export const PORT_OFFSET: number;
+export const API_ROOT: string;
+export const REPO_ROOT: string;
+export const WEB_ROOT: string;
+export const RUN_DIR: string;
+export const PG_PASSWORD: string;
+export const PG_DATABASE: string;
+export const PG_SCHEMA: string;
+export const DATABASE_URL: string;

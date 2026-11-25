@@ -1,7 +1,9 @@
 import { execFileSync, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { join } from 'node:path';
+import { TEST_PORTS } from '../ports.cjs';
 
-export const GOOGLE_PG_PORT = 54334;
+/** Puerto base 54334 + E2E_PORT_OFFSET (ver test/ports.cjs). */
+export const GOOGLE_PG_PORT = TEST_PORTS.googlePg;
 export const GOOGLE_PG_DATABASE = 'google_test';
 /** Schema privado del agente (convencion `dev_<agente>`): nada se crea en `public`. */
 export const GOOGLE_PG_SCHEMA = 'dev_google';
@@ -15,7 +17,7 @@ export interface GooglePg {
 }
 
 /**
- * Arranca un Postgres real embebido (sin Docker) en el puerto 54334 con una base temporal y crea las tablas
+ * Arranca un Postgres real embebido (sin Docker) en el puerto `GOOGLE_PG_PORT` con una base temporal y crea las tablas
  * con `prisma db push` en el schema privado `dev_google`. NO usa credenciales reales ni Supabase y NO genera
  * migraciones.
  */

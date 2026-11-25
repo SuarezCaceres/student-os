@@ -13,7 +13,7 @@ import { PrismaSyncRepository } from '../src/sync/prisma-sync.repository';
 import { SyncService } from '../src/sync/sync.service';
 
 /**
- * Capa Prisma contra un Postgres REAL (embedded-postgres, puerto 54329, base temporal, schema privado
+ * Capa Prisma contra un Postgres REAL (embedded-postgres, puerto base 54329 + E2E_PORT_OFFSET, base temporal, schema privado
  * `dev_sync_api`, tablas creadas con `prisma db push`). Sin Docker, sin Supabase, sin credenciales reales.
  */
 jest.setTimeout(180_000);
