@@ -88,7 +88,7 @@
       "id": "008",
       "nombre": "verificacion-de-la-app-en-google",
       "spec": "docs/specs/008-verificacion-app-google/spec.md",
-      "estado": "spec",
+      "estado": "plan",
       "criterios": [
         { "id": "C1", "descripcion": "Todos los puntos de docs/google-verification-checklist.md estan completados", "pasa": false },
         { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false },

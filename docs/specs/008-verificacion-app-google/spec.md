@@ -1,6 +1,6 @@
 # Spec · 008 · Verificación de la app StudentOS en Google
 
-> Estado: **borrador** (espera la aprobación del humano; no hay plan todavía)
+> Estado: **aprobada** por el humano el 2026-11-24 (las preguntas abiertas Q1–Q10 siguen pendientes de respuesta)
 > Dice **qué** y **por qué**, no **cómo**. El cómo va en `plan.md`, después de aprobar esta spec.
 > Prioridad: Alto (`docs/TASKS.md` → 2). **Bloquea** que el login sea «para todos» (spec 009, C12) y tarda **semanas**, así que conviene empezar cuanto antes lo que no depende de nada.
 > Depende de: 007 (dominio y producción desplegada). Se coordina con: 009 (el flujo que Google verá).
