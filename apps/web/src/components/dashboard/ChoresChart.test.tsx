@@ -75,12 +75,13 @@ describe('ChoresChart: con historial suficiente', () => {
     expect(colors.filter((value): value is string => Boolean(value) && value !== 'none').every((value) => value.startsWith('var(--'))).toBe(true);
   });
 
-  it('con todos los promedios en cero no inventa un mejor día', () => {
+  it('con todos los promedios en cero no inventa un mejor día y no dibuja barras en cero (C13)', () => {
     const zeros = [day('2026-11-16', 0), day('2026-11-17', 0), day('2026-11-18', 0), day('2026-11-19', 0)].map((entry) => ({ ...entry, completed: [] }));
     // Un registro vacío no se guarda en la app, pero el cálculo debe seguir siendo correcto con uno.
     render(<ChoresChart stats={statsFor(zeros)} />);
-    expect(screen.getByTestId('chores-best-day').textContent).toContain('Todavía no hay un día destacado');
-    expect(screen.getByTestId('chores-bar-Lunes').getAttribute('data-best')).toBeNull();
+    expect(screen.getByTestId('chores-chart-empty')).toBeTruthy();
+    expect(screen.queryByTestId('chores-best-day')).toBeNull();
+    expect(screen.queryByTestId('chores-bar-Lunes')).toBeNull();
   });
 });
 

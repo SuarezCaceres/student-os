@@ -320,7 +320,7 @@ export interface WeekdayStats {
   bestDay: DayOfWeek | null;
   /** Dias que entraron en el calculo (sin contar los dificiles). */
   countedDays: number;
-  /** `false` = mostrar estado vacio en vez de la grafica. */
+  /** `false` = mostrar estado vacio en vez de la grafica (pocos dias o ningun quehacer completado). */
   hasEnoughData: boolean;
 }
 
@@ -342,6 +342,7 @@ export function computeWeekdayStats(
   const firstDate = days.reduce<string | null>((min, day) => (min === null || day.date < min ? day.date : min), null);
   const scheduledWeekdays = new Set((state.chores ?? []).flatMap((chore) => chore.days));
   let countedDays = 0;
+  let completedTotal = 0;
 
   if (firstDate !== null) {
     for (let back = 1; back <= weeks * 7; back += 1) {
@@ -352,7 +353,9 @@ export function computeWeekdayStats(
       const weekday = getDayOfWeekForDate(date);
       if (!record && !scheduledWeekdays.has(weekday)) continue;
       const bucket = sums.get(weekday)!;
-      bucket.total += record?.completed.length ?? 0;
+      const done = record?.completed.length ?? 0;
+      bucket.total += done;
+      completedTotal += done;
       bucket.samples += 1;
       countedDays += 1;
     }
@@ -370,7 +373,13 @@ export function computeWeekdayStats(
       bestDay = entry.day;
     }
   }
-  return { averages, bestDay, countedDays, hasEnoughData: countedDays >= MIN_CHART_DAYS };
+  return {
+    averages,
+    bestDay,
+    countedDays,
+    // Sin ningun quehacer completado en la ventana solo habria barras en cero: estado vacio (C13).
+    hasEnoughData: countedDays >= MIN_CHART_DAYS && completedTotal > 0,
+  };
 }
 
 // --- Edicion de la lista y de los niveles -------------------------------------------

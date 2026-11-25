@@ -435,12 +435,25 @@ describe('promedio por dia de la semana (C12, C13)', () => {
     expect(stats.averages.find((a) => a.day === 'Lunes')!.samples).toBe(8); // el lunes de hoy no entra
   });
 
-  it('todos los promedios en cero no resaltan ningun dia', () => {
+  it('todos los promedios en cero no dibujan grafica ni resaltan ningun dia (C13)', () => {
     const history = [day('2026-11-20', 0), day('2026-11-21', 0), day('2026-11-22', 0)];
     // dias vacios no existen como registro: se simulan con registros "a mano"
     const stats = computeWeekdayStats({ chores: list, choreDays: history }, TODAY);
-    expect(stats.hasEnoughData).toBe(true);
+    expect(stats.countedDays).toBe(3);
+    expect(stats.hasEnoughData).toBe(false);
     expect(stats.bestDay).toBeNull();
+  });
+
+  it('C13: un unico «Hoy no puedo» de hace 6 dias sin marcas no muestra grafica', () => {
+    const stats = computeWeekdayStats({ chores: list, choreDays: [day('2026-11-17', 0, true)] }, TODAY);
+    expect(stats.countedDays).toBeGreaterThanOrEqual(MIN_CHART_DAYS);
+    expect(stats.hasEnoughData).toBe(false);
+    expect(stats.bestDay).toBeNull();
+  });
+
+  it('con un solo quehacer completado en la ventana y dias suficientes ya hay grafica', () => {
+    const history = [day('2026-11-17', 1), day('2026-11-19', 0)];
+    expect(computeWeekdayStats({ chores: list, choreDays: history }, TODAY).hasEnoughData).toBe(true);
   });
 });
 
