@@ -75,7 +75,7 @@
       "id": "007",
       "nombre": "produccion-student-os-prod",
       "spec": "docs/specs/007-produccion-student-os-prod/spec.md",
-      "estado": "spec",
+      "estado": "plan",
       "criterios": [
         { "id": "C1", "descripcion": "Existe el proyecto Supabase student-os-prod con las migraciones de apps/api/prisma/migrations aplicadas y rls-baseline.sql ejecutado sin errores", "pasa": false },
         { "id": "C2", "descripcion": "Vercel (VITE_*) y Render (DATABASE_URL, DIRECT_URL, SUPABASE_URL, WEB_ORIGINS, GOOGLE_*) tienen sus variables de produccion", "pasa": false },
