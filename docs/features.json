@@ -81,7 +81,10 @@
         { "id": "C2", "descripcion": "Vercel (VITE_*) y Render (DATABASE_URL, DIRECT_URL, SUPABASE_URL, WEB_ORIGINS, GOOGLE_*) tienen sus variables de produccion", "pasa": false },
         { "id": "C3", "descripcion": "La API esta desplegada en Render y GET /health responde 200", "pasa": false },
         { "id": "C4", "descripcion": "Un ping programado evita la pausa de Supabase a los 7 dias", "pasa": false },
-        { "id": "C5", "descripcion": "Un usuario de prueba puede iniciar sesion y sincronizar contra produccion de punta a punta", "pasa": false }
+        { "id": "C5", "descripcion": "Un usuario de prueba puede iniciar sesion y sincronizar contra produccion de punta a punta", "pasa": false },
+        { "id": "C6", "descripcion": "Dos cuentas reales distintas ven solo sus propios datos en produccion, sin filas de una en la otra", "pasa": false },
+        { "id": "C7", "descripcion": "El repositorio y los logs de la API en produccion no contienen secretos (GOOGLE_CLIENT_SECRET, GOOGLE_TOKEN_ENC_KEY, claves de Supabase, contrasenas de base de datos) ni tokens de Google", "pasa": false },
+        { "id": "C8", "descripcion": "GOOGLE_TOKEN_ENC_KEY de produccion queda respaldada en un lugar seguro del humano antes de la primera vinculacion de Google Calendar", "pasa": false }
       ]
     },
     {
