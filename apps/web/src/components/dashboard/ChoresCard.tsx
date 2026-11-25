@@ -1,8 +1,9 @@
-import React, { useId } from 'react';
-import { CloudRain, Undo2 } from 'lucide-react';
+import React, { useId, useState } from 'react';
+import { CloudRain, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import type { ChoreHardReason } from '../../types';
 import type { UseChoresResult } from '../../hooks/useChores';
 import { CHORE_HARD_REASON_LABELS } from '../../utils/chores';
+import { ChoresEditor } from './ChoresEditor';
 
 export interface ChoresCardProps {
   /** Estado y acciones de los quehaceres (`useChores`), que `App` pasa por `OverviewBento`. */
@@ -14,6 +15,7 @@ const HARD_REASONS = Object.keys(CHORE_HARD_REASON_LABELS) as ChoreHardReason[];
 export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
   const { ready, summary } = chores;
   const chartId = useId();
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   if (!ready) {
     return (
@@ -50,6 +52,16 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
           <p className="text-[13px] text-[var(--muted)] mt-0.5">{summary.dayOfWeek} · reinicio diario</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsEditorOpen(true)}
+            aria-label="Editar quehaceres y metas"
+            className="t-btn t-btn-ghost px-2.5 text-[13px]"
+            title="Editar quehaceres y metas"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Editar</span>
+          </button>
           <span
             className={`t-badge t-num ${reached ? 't-badge-ok' : 't-badge-accent'}`}
             aria-label={`${completedCount} de ${total} quehaceres completados`}
@@ -105,7 +117,14 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
       )}
 
       {applicableCount === 0 ? (
-        null
+        !hard && (
+          <div className="mt-4 flex flex-col items-start gap-3" data-testid="chores-empty">
+            <button type="button" onClick={() => setIsEditorOpen(true)} className="t-btn t-btn-secondary px-3.5 text-[13px]">
+              <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Añadir un quehacer</span>
+            </button>
+          </div>
+        )
       ) : (
         <ul aria-label="Quehaceres de hoy" className="mt-3 grid grid-cols-1 lg:grid-cols-2 lg:gap-x-8">
           {summary.items.map(({ chore, done }) => (
@@ -135,6 +154,7 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
         )}
       </div>
 
+      <ChoresEditor isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} chores={chores} />
     </div>
   );
 };
