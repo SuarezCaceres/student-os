@@ -35,7 +35,7 @@ No marcaste de forma explícita Supabase de producción ni los deploys de Vercel
 ## Glosario
 | Término | Significado en este proyecto |
 |---------|------------------------------|
-| Cuenta nueva | Cuenta de Google que la nube aún no conoce: parte del estado de la app sin los bloques de ejemplo y con su nombre de Google |
+| Cuenta nueva | Cuenta de Google que la nube aún no conoce: parte de un estado vacío (`emptyAppState`) con su nombre de Google y una guía en cada módulo |
 | Vinculación de Calendar | Entrega única del refresh token de Google al servidor durante el login (`POST /google/link-login`) |
 | `AppState` | Objeto único con todo el estado de la app (esquema en `packages/shared`) |
 | Colección | Tipo de registro de sync: `profile`, `kanban`, `university`, `learning`, `gym`, `calendar` |

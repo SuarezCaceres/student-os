@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EmptyHint } from '../common/EmptyHint';
 import {
   Calculator,
   ExternalLink,
@@ -144,6 +145,9 @@ export const UniversityView: React.FC<UniversityViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {assignments.length === 0 && (
+        <EmptyHint>Aún no tienes entregas. Escribe la primera en «Nueva entrega para la semana» y pulsa Enter.</EmptyHint>
+      )}
       {/* Section Header */}
       <SectionHeader
         title="Entregas de la universidad"

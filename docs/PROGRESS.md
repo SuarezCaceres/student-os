@@ -11,6 +11,19 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (implementación)
+- **Hecho:** pasos 1 a 6 del plan. `emptyAppState` (cuenta nueva vacía), guías con `EmptyHint`, aviso visible de límite y de cambios rechazados, `syncStore.flushPending` (zona protegida, con tu permiso) y cierre de sesión que sube antes de salir o avisa. E2E `06-cerrar-sesion` (comprobado que falla sin la subida) y `03`/`04` adaptadas al estado vacío.
+- **Defecto real que cazó la E2E:** sin red, `signOut` dejaba la sesión guardada y la app la volvía a adoptar (no se podía salir). Ahora cae al cierre local.
+- **Verificación:** `./scripts/check.sh` completo pasa: 381 unitarias del API, 35 de shared, 321 del frontend, 151 de integración y 22 E2E.
+- **Pendiente:** C1 es manual (dos cuentas reales en producción: 007 y 008). Mover `initialData` a fixtures. **No fusionar antes de la 009 ni de producción.**
+- **Problemas:** C5 pide guía en Aprendizaje y hábitos: la de Aprendizaje es solo texto y no tiene aserción E2E; hábitos usa valores por defecto. `docs/rules/frontend.md` línea 24 sigue citando excepciones de `localStorage` ya resueltas (necesita tu permiso).
+
+## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (spec)
+- **Hecho:** spec 010 redactada (10 criterios; C3, C4 y C10 ya los cubren la 009 y las pruebas del API) y `features.json` en estado `spec`. Decisiones del humano: cuenta nueva **vacía con guía**, **subir antes de cerrar sesión** (con tiempo máximo y aviso sin red) y **avisar claro al llegar al límite** (5000 registros, 64 KB) sin subirlo.
+- **Hecho también:** spec aprobada y `plan.md` escrito (7 pasos, sin migraciones ni dependencias; los cambios son solo de la web).
+- **Pendiente:** que apruebes el plan, en especial el permiso para añadir `flushPending` a `sync/syncStore.ts` (zona protegida), los textos de las guías y `career` por defecto. La rama parte de la 009 (PR #9, sin fusionar) y puede chocar con la 011 en `GymTracker`.
+- **Problemas:** C1 es manual y necesita producción (007) y la verificación de Google (008).
+
 ## 2026-11-24 · Claude Code · feat/011-gym-opcional
 - **Hecho:** specs 011 (gym opcional) y 012 (quehaceres diarios) con su plan; la 011 implementada: contrato (`gymDisabled`, registro `preference` en la colección `gym`), adaptador de sync, aislamiento en el API, estado en `App.tsx`, navegación, resumen y agregado rápido sin gym, botón «No voy al gimnasio» (asistente, pestaña y resumen) y «Reactivar». Rebasada sobre la 009. Sin migración ni dependencias nuevas.
 - **Revisión (skill `revisor`):** 2 bloqueantes corregidos (la pestaña Gym del agregado rápido y la pantalla vacía si un aviso abría Gym estando desactivado). Pendiente de tu visto bueno: el cambio en `sync/adapters/gym.ts` (zona protegida).

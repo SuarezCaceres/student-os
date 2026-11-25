@@ -8,6 +8,20 @@ import { OFF_STATUS, type SyncStatus } from './types';
  */
 export interface SyncController {
   syncNow(): Promise<void>;
+  /** Registra ya los cambios locales que aun esperan al debounce, para que cuenten como pendientes. */
+  observeNow?(): void;
+}
+
+/** Tiempo maximo que se espera a subir lo pendiente antes de cerrar sesion (spec 010, C7). */
+export const FLUSH_TIMEOUT_MS = 5000;
+
+export interface FlushResult {
+  /** `false` si esta pestana no puede sincronizar (sync apagada u otra pestana lider). */
+  attempted: boolean;
+  /** Se agoto el tiempo antes de terminar (servidor dormido, red lenta). */
+  timedOut: boolean;
+  /** Cambios locales que siguen sin subir al terminar. */
+  pending: number;
 }
 
 interface StoreState {
@@ -82,6 +96,29 @@ export const syncStore = {
     notify();
   },
   getController: (): SyncController | null => controller,
+  /**
+   * Intenta subir lo pendiente con un tiempo maximo y dice cuanto queda sin subir. Nunca lanza ni se cuelga: es lo que
+   * usa «Cerrar sesion» para no perder trabajo (spec 010). No cambia el motor: solo pide una sincronizacion y espera.
+   */
+  async flushPending(timeoutMs: number = FLUSH_TIMEOUT_MS): Promise<FlushResult> {
+    const current = controller;
+    if (!current || !state.enabled) return { attempted: false, timedOut: false, pending: state.status.pending };
+    current.observeNow?.();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const limit = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, timeoutMs);
+    });
+    try {
+      await Promise.race([current.syncNow().catch(() => undefined), limit]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    return { attempted: true, timedOut, pending: state.status.pending };
+  },
 };
 
 export type SyncStatusView = SyncStatus & {

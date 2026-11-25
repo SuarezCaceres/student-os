@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import { describeSyncStatus } from '../describeStatus';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../../services/api';
 import { createIdbStorage, createMemoryStorage } from '../storage';
@@ -329,6 +330,8 @@ describe('motor de sync: errores y lotes', () => {
     expect(a.engine.getStatus().phase).toBe('error');
     expect(a.engine.getStatus().error).toMatch(/límite/);
     expect(a.engine.getStatus().pending).toBe(2); // nada se pierde ni se descarta
+    // Spec 010 (C9): el indicador convierte ese error en un aviso claro de limite de cuenta.
+    expect(describeSyncStatus(a.engine.getStatus())).toMatchObject({ text: 'Límite de la cuenta alcanzado', tone: 'danger' });
   });
 
   it('cold start: 503 y timeouts primero, luego OK; la cola no se pierde', async () => {

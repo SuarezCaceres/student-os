@@ -54,6 +54,7 @@ import { YoutubeIcon } from '../common/YoutubeIcon';
 import type { NavTab } from '../layout/Navbar';
 import { AssignmentDetailModal } from '../university/AssignmentDetailModal';
 import { BackupModal } from './BackupModal';
+import { EmptyHint } from '../common/EmptyHint';
 import { DailyHabitsCard } from './DailyHabitsCard';
 
 export interface OverviewBentoProps {
@@ -420,8 +421,24 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
     );
   };
 
+  const isAccountEmpty =
+    state.kanbanItems.length === 0 && state.universityAssignments.length === 0 && state.calendarBlocks.length === 0;
+
   return (
     <div className="space-y-6">
+      {isAccountEmpty && (
+        <EmptyHint
+          title="Tu espacio está listo"
+          actions={[
+            { label: 'Escribir mi primera tarea', onClick: () => onOpenQuickAdd('kanban') },
+            { label: 'Registrar una entrega', onClick: () => onOpenQuickAdd('university') },
+            { label: 'Agendar un bloque', onClick: () => onOpenQuickAdd('calendar') },
+          ]}
+        >
+          Empieza por tres cosas: escribe tu primera tarea en Kanban, registra una entrega en Universidad y agenda un bloque en
+          Horario.
+        </EmptyHint>
+      )}
       {/* Workspace Operational Heading */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
         <div>

@@ -112,7 +112,12 @@ export async function signOut(): Promise<void> {
   const supabase = await getSupabase();
   if (!supabase) return;
   const { error } = await supabase.auth.signOut();
-  if (error) throw new Error(error.message);
+  if (!error) return;
+  // Sin red (o con el servidor de auth caido) el cierre global falla y supabase-js deja la sesion guardada: la app la
+  // volveria a adoptar y la persona no podria salir (spec 010, C8). El cierre local quita la sesion de este navegador
+  // antes de hacer ninguna peticion; lo unico que queda pendiente es revocar el token en el servidor, que caduca solo.
+  const local = await supabase.auth.signOut({ scope: 'local' });
+  if (local.error) throw new Error(local.error.message);
 }
 
 /** Token de acceso vigente (la libreria lo renueva sola si esta por vencer). */
