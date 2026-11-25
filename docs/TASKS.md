@@ -44,7 +44,7 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Completar `docs/google-verification-checklist.md` en Google Cloud Console (lo hace el humano)
-- [ ] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md`
+- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (borrador, espera tu aprobación)
 
 > **Orden de ejecución sugerido:** A3 (producción) y A4 (verificación, que tarda semanas) **en paralelo y cuanto antes**; después A1 y A2, que se pueden desarrollar ya con servicios simulados y se validan al final contra producción.
 
