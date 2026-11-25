@@ -87,6 +87,8 @@ export interface GymOnboardingModalProps {
   isGoogleSyncing?: boolean;
   onClearPreviousGymBlocks?: () => Promise<DeleteGoogleGymEventsResult | void> | void;
   onOpenGoogleSync?: () => void;
+  /** Opcional (spec 011): permite decir «No voy al gimnasio» sin rellenar nada. */
+  onDisableGym?: () => void;
   onComplete: (payload: GymOnboardingCompletePayload) => void;
 }
 
@@ -134,6 +136,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
   isGoogleSyncing = false,
   onClearPreviousGymBlocks,
   onOpenGoogleSync,
+  onDisableGym,
   onComplete,
 }) => {
   if (!isOpen) return null;
@@ -153,6 +156,7 @@ export const GymOnboardingModal: React.FC<GymOnboardingModalProps> = ({
       isGoogleSyncing={isGoogleSyncing}
       onClearPreviousGymBlocks={onClearPreviousGymBlocks}
       onOpenGoogleSync={onOpenGoogleSync}
+      onDisableGym={onDisableGym}
       onComplete={onComplete}
     />
   );
@@ -172,6 +176,7 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
   isGoogleSyncing = false,
   onClearPreviousGymBlocks,
   onOpenGoogleSync,
+  onDisableGym,
   onComplete,
 }) => {
   const formId = useId();
@@ -715,6 +720,15 @@ const GymOnboardingModalContent: React.FC<GymOnboardingModalProps> = ({
       maxWidth="2xl"
       footer={
         <>
+          {onDisableGym && (
+            <button
+              type="button"
+              onClick={onDisableGym}
+              className="t-btn t-btn-ghost mr-auto"
+            >
+              <span>No voy al gimnasio</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={handlePrevStep}
