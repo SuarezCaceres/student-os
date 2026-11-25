@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 import { initialData } from './data/initialData';
-import { useSyncedAppState, useSyncStatus } from './hooks/useSyncedAppState';
+import { useSyncedAppState } from './hooks/useSyncedAppState';
+import { useHasSynced } from './hooks/useHasSynced';
 import { useChores } from './hooks/useChores';
 import { isSyncConfigured } from './services/supabase';
 import { useAuthState } from './components/auth/useAuthState';
@@ -1354,8 +1355,8 @@ export const App: React.FC = () => {
 
   // Quehaceres diarios (spec 012): siembra de la lista base, estado de hoy y temporizador de medianoche. Se siembra solo tras la
   // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo.
-  const choreSyncStatus = useSyncStatus();
-  const chores = useChores(state, setState, { syncReady: !isSyncConfigured() || choreSyncStatus.lastSyncAt !== null });
+  const hasSynced = useHasSynced();
+  const chores = useChores(state, setState, { syncReady: !isSyncConfigured() || hasSynced });
 
   const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
