@@ -76,7 +76,9 @@ test.describe('6. cerrar sesion y cuentas nuevas', () => {
 
     const dialog = page.getByRole('dialog', { name: /Hay cambios sin guardar en tu cuenta/ });
     await expect(dialog).toBeVisible({ timeout: 15_000 });
-    await expect(dialog).toContainText(/1 cambio/);
+    // Con la 012 una cuenta nueva siembra su lista de quehaceres, que tambien queda pendiente sin red:
+    // no se fija el total, solo que el aviso cuenta los cambios sin subir (la tarea y la siembra).
+    await expect(dialog).toContainText(/\d+ cambios? no se pudieron? subir/);
     await evidence(page, '06-aviso-cambios-sin-guardar');
 
     // Cancelar: sigue dentro, con su tarea, y la sesion sigue abierta.
