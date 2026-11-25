@@ -1,13 +1,15 @@
 import {
+  CHORE_SETTINGS_RECORD_ID,
   CalendarRecordDataSchema,
   DAILY_HABITS_RECORD_ID,
   SyncRecordSchema,
   WORK_SHIFT_RECORD_ID,
+  choreDayRecordId,
   type SyncRecord,
 } from '@student-os/shared';
 import { describe, expect, it } from 'vitest';
 import { initialData } from '../../../data/initialData';
-import type { AppState, CalendarBlock, DailyHabits, WorkShiftConfig } from '../../../types';
+import type { AppState, CalendarBlock, Chore, ChoreDay, ChoreSettings, DailyHabits, WorkShiftConfig } from '../../../types';
 import { stableStringify } from '../../hash';
 import { calendarAdapter, isSyncableCalendarBlock } from '../calendar';
 import { createDevice, FakeServer, EMPTY_STATE } from '../../__tests__/helpers';
@@ -341,5 +343,210 @@ describe('calendarAdapter con el motor de sync (dos dispositivos)', () => {
     await b.engine.syncNow();
     await a.engine.syncNow();
     expect(a.holder.current.calendarBlocks.map((x) => x.id)).toEqual(['gcal-ev-2026-11-16', 'g']); // lo no sincronizable queda intacto
+  });
+});
+
+// --- Quehaceres diarios (spec 012) -------------------------------------------------
+
+const CHORE_A: Chore = { id: 'chore-base-1', name: 'Tender la cama', days: ['Lunes', 'Martes'], order: 0 };
+const CHORE_B: Chore = { id: 'chore-abc', name: 'Pasear al perro', days: [], order: 1 };
+const DAY_1: ChoreDay = {
+  date: '2026-11-12',
+  completed: [{ choreId: 'chore-base-1', name: 'Tender la cama' }],
+  hard: false,
+};
+const DAY_2: ChoreDay = { date: '2026-11-13', completed: [], hard: true, reason: 'cansado' };
+const SETTINGS: ChoreSettings = {
+  seeded: true,
+  levels: [
+    { min: 5, message: '¡Eres lo máximo!' },
+    { min: 10, message: '¡Sigue así!' },
+  ],
+};
+
+// El orden del arreglo no es semantico (el apply procesa por id): la UI ordena por `order`.
+const byOrder = (list: Chore[] | undefined): Chore[] => [...(list ?? [])].sort((x, y) => x.order - y.order);
+const choreRec = (c: Chore) => live(c.id, { kind: 'chore', value: c });
+const choreDayRec = (d: ChoreDay) => live(choreDayRecordId(d.date), { kind: 'choreDay', value: d });
+const settingsRec = (v: ChoreSettings) => live(CHORE_SETTINGS_RECORD_ID, { kind: 'choreSettings', value: v });
+
+const CHORES_STATE: AppState = {
+  ...BASE,
+  chores: [CHORE_A, CHORE_B],
+  choreDays: [DAY_1, DAY_2],
+  choreSettings: SETTINGS,
+};
+
+describe('calendarAdapter: quehaceres diarios', () => {
+  it('select emite los tres tipos con ids estables y cumpliendo el contrato de shared', () => {
+    const out = calendarAdapter.select(CHORES_STATE);
+    expect(out.map((r) => r.id)).toEqual([
+      'chore-base-1',
+      'chore-abc',
+      'chore-day-2026-11-12',
+      'chore-day-2026-11-13',
+      CHORE_SETTINGS_RECORD_ID,
+    ]);
+    for (const r of out) {
+      expect(CalendarRecordDataSchema.safeParse(r.data).success).toBe(true);
+      expect(SyncRecordSchema.safeParse({ ...live(r.id, r.data) }).success).toBe(true);
+    }
+  });
+
+  it('select ignora quehaceres y dias invalidos o con id reservado (no envenenan el lote)', () => {
+    const state: AppState = {
+      ...BASE,
+      chores: [
+        CHORE_A,
+        { ...CHORE_A }, // duplicado
+        { id: 'x1', name: '   ', days: [], order: 0 }, // nombre vacio
+        { id: 'x2', name: 'y'.repeat(81), days: [], order: 0 }, // nombre demasiado largo
+        { id: CHORE_SETTINGS_RECORD_ID, name: 'Colision', days: [], order: 0 },
+        { id: 'chore-day-2026-11-01', name: 'Colision', days: [], order: 0 },
+      ],
+      choreDays: [DAY_1, { ...DAY_1 }, { date: '13/11/2026', completed: [], hard: false }],
+    };
+    expect(calendarAdapter.select(state).map((r) => r.id)).toEqual(['chore-base-1', 'chore-day-2026-11-12']);
+  });
+
+  it('un estado sin quehaceres no emite nada extra', () => {
+    expect(calendarAdapter.select(BASE).map((r) => r.id)).not.toContain(CHORE_SETTINGS_RECORD_ID);
+    expect(calendarAdapter.select(BASE).some((r) => r.id.startsWith('chore'))).toBe(false);
+  });
+
+  it('no sube como bloque un bloque con id reservado de quehaceres', () => {
+    expect(isSyncableCalendarBlock(block(CHORE_SETTINGS_RECORD_ID))).toBe(false);
+    expect(isSyncableCalendarBlock(block('chore-day-2026-11-13'))).toBe(false);
+  });
+
+  it('round-trip: lo que sale de select se reconstruye identico en un estado vacio', () => {
+    const records = calendarAdapter.select(CHORES_STATE).map((r) => live(r.id, JSON.parse(JSON.stringify(r.data))));
+    const rebuilt = calendarAdapter.apply(BASE, records);
+    expect(byOrder(rebuilt.chores)).toEqual([CHORE_A, CHORE_B]);
+    expect(rebuilt.choreDays).toEqual([DAY_1, DAY_2]);
+    expect(rebuilt.choreSettings).toEqual(SETTINGS);
+  });
+
+  it('apply es idempotente y devuelve la misma referencia si no hay cambios', () => {
+    const records = [choreRec(CHORE_A), choreDayRec(DAY_1), settingsRec(SETTINGS)];
+    const once = calendarAdapter.apply(BASE, records);
+    const twice = calendarAdapter.apply(once, records);
+    expect(twice).toBe(once);
+    expect(calendarAdapter.apply(CHORES_STATE, [choreRec(CHORE_A), choreDayRec(DAY_2)])).toBe(CHORES_STATE);
+  });
+
+  it('apply es inmutable y no depende del orden de llegada', () => {
+    const records = [settingsRec(SETTINGS), choreDayRec(DAY_2), choreRec(CHORE_B), choreRec(CHORE_A), choreDayRec(DAY_1)];
+    const state = deepFreeze({ ...BASE });
+    const frozenRecords = deepFreeze(structuredClone(records));
+    const forward = calendarAdapter.apply(state, frozenRecords);
+    const backward = calendarAdapter.apply(state, [...frozenRecords].reverse());
+    expect(stableStringify(forward.chores)).toBe(stableStringify(backward.chores));
+    expect(stableStringify(forward.choreDays)).toBe(stableStringify(backward.choreDays));
+    expect(state.chores).toBeUndefined();
+  });
+
+  it('actualiza en sitio un quehacer renombrado, un dia y los ajustes sin duplicar', () => {
+    const renamed: Chore = { ...CHORE_A, name: 'Tender mi cama' };
+    const edited: ChoreDay = { ...DAY_1, completed: [] };
+    const levels: ChoreSettings = { seeded: true, levels: [{ min: 3, message: 'Vas bien' }] };
+    const next = calendarAdapter.apply(CHORES_STATE, [choreRec(renamed), choreDayRec(edited), settingsRec(levels)]);
+    expect(next.chores).toEqual([renamed, CHORE_B]);
+    expect(next.choreDays).toEqual([edited, DAY_2]);
+    expect(next.choreSettings).toEqual(levels);
+  });
+
+  it('tombstones: borran el quehacer, el dia y los ajustes; los desconocidos y repetidos no hacen nada', () => {
+    const next = calendarAdapter.apply(CHORES_STATE, [
+      tombstone(CHORE_A.id),
+      tombstone(choreDayRecordId(DAY_1.date)),
+      tombstone(CHORE_SETTINGS_RECORD_ID),
+      tombstone('chore-nope'),
+      tombstone('chore-day-1999-01-01'),
+    ]);
+    expect(next.chores).toEqual([CHORE_B]);
+    expect(next.choreDays).toEqual([DAY_2]);
+    expect(next.choreSettings).toBeUndefined();
+    expect(calendarAdapter.apply(next, [tombstone(CHORE_A.id), tombstone(choreDayRecordId(DAY_1.date))])).toBe(next);
+  });
+
+  it('un tombstone de quehacer no toca bloques, y uno de bloque no toca quehaceres', () => {
+    const state: AppState = { ...CHORES_STATE, calendarBlocks: [block('b1')] };
+    const next = calendarAdapter.apply(state, [tombstone('b1')]);
+    expect(next.calendarBlocks).toEqual([]);
+    expect(next.chores).toEqual([CHORE_A, CHORE_B]);
+  });
+
+  it('datos remotos invalidos o de una version futura no rompen ni cambian el estado', () => {
+    const bad: SyncRecord[] = [
+      live('c1', { kind: 'chore', value: { id: 'c1', name: '', days: [], order: 0 } }),
+      live('c2', { kind: 'chore', value: { ...CHORE_A, id: 'c2', days: ['Funday'] } }),
+      live('otro-id', { kind: 'chore', value: CHORE_A }), // id del registro != id del quehacer
+      live(CHORE_SETTINGS_RECORD_ID, { kind: 'chore', value: { ...CHORE_A, id: CHORE_SETTINGS_RECORD_ID } }),
+      live('chore-day-2026-11-01', { kind: 'choreDay', value: { ...DAY_1, date: '2026-11-02' } }), // id != fecha
+      live('chore-day-2026-11-03', { kind: 'choreDay', value: { date: '2026-11-03', completed: 'no', hard: false } }),
+      live('chore-day-2026-11-04', { kind: 'choreDay', value: { date: '2026-11-04', completed: [], hard: false, reason: 'aburrido' } }),
+      live('no-es-singleton', { kind: 'choreSettings', value: SETTINGS }),
+      live(CHORE_SETTINGS_RECORD_ID, { kind: 'choreSettings', value: { seeded: true, levels: [{ min: 0, message: 'x' }] } }),
+      live('x', { kind: 'choreFuturo', value: {} }),
+    ];
+    const state: AppState = { ...CHORES_STATE };
+    let next: AppState = state;
+    expect(() => {
+      next = calendarAdapter.apply(state, bad);
+    }).not.toThrow();
+    expect(next).toBe(state);
+  });
+
+  it('un registro invalido en un lote no impide aplicar los validos', () => {
+    const next = calendarAdapter.apply(BASE, [
+      live('chore-day-2026-11-03', { kind: 'choreDay', value: 5 }),
+      choreRec(CHORE_A),
+    ]);
+    expect(next.chores).toEqual([CHORE_A]);
+    expect(next.choreDays).toBeUndefined();
+  });
+
+  it('la lista base con ids deterministas se fusiona entre dos dispositivos en vez de duplicarse', () => {
+    const base = [1, 2, 3].map((n): Chore => ({ id: `chore-base-${n}`, name: `Base ${n}`, days: [], order: n }));
+    const deviceA = calendarAdapter.apply(BASE, base.map(choreRec));
+    const deviceB = calendarAdapter.apply({ ...BASE, chores: structuredClone(base) }, base.map(choreRec));
+    expect(deviceA.chores).toHaveLength(3);
+    expect(deviceB.chores).toHaveLength(3);
+  });
+});
+
+describe('calendarAdapter con el motor de sync: quehaceres entre dos dispositivos (C14)', () => {
+  it('quehaceres, historial (con dia dificil) y ajustes viajan de A a B y convergen sin eco', async () => {
+    const server = new FakeServer();
+    const clock = { t: Date.parse('2026-11-13T10:00:00Z') };
+    const now = () => clock.t;
+    const start: AppState = { ...EMPTY_STATE, calendarBlocks: [] };
+    const a = createDevice({ server, now, initial: start, adapters: [calendarAdapter] });
+    const b = createDevice({ server, now, initial: start, adapters: [calendarAdapter] });
+    await a.start();
+    await b.start();
+
+    clock.t += 1000;
+    a.edit((s) => ({ ...s, chores: [CHORE_A, CHORE_B], choreDays: [DAY_1, DAY_2], choreSettings: SETTINGS }));
+    await a.engine.syncNow();
+    await b.engine.syncNow();
+
+    expect(byOrder(b.holder.current.chores)).toEqual([CHORE_A, CHORE_B]);
+    expect(b.holder.current.choreDays).toEqual([DAY_1, DAY_2]);
+    expect(b.holder.current.choreSettings).toEqual(SETTINGS);
+
+    const pushes = server.pushCount;
+    await a.engine.syncNow();
+    await b.engine.syncNow();
+    expect(server.pushCount).toBe(pushes);
+
+    // Borrar un quehacer en B llega a A como tombstone, pero el historial (nombre copiado) se conserva.
+    clock.t += 1000;
+    b.edit((s) => ({ ...s, chores: [CHORE_B] }));
+    await b.engine.syncNow();
+    await a.engine.syncNow();
+    expect(a.holder.current.chores).toEqual([CHORE_B]);
+    expect(a.holder.current.choreDays).toEqual([DAY_1, DAY_2]);
   });
 });
