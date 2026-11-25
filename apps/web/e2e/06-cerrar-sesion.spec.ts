@@ -126,9 +126,16 @@ test.describe('6. cerrar sesion y cuentas nuevas', () => {
     expect(sa.kanbanItems).toEqual([]);
     expect(sa.universityAssignments).toEqual([]);
 
-    // En el servidor solo existe el perfil de la cuenta, una sola vez.
-    const records = (await syncRecordsOf(session.userId)).filter((r) => r.deletedAt === null);
-    expect(records.map((r) => r.collection)).toEqual(['profile']);
+    // En el servidor solo existe el perfil de la cuenta, una sola vez, y la lista base de quehaceres (spec 012: se siembra
+    // en la coleccion `calendar` y se sube un poco despues) sin duplicar aunque los dos dispositivos entren a la vez:
+    // sus ids son fijos. 5 quehaceres base + los ajustes (niveles de motivacion) = 6 registros.
+    const liveRecords = async () => (await syncRecordsOf(session.userId)).filter((r) => r.deletedAt === null);
+    await expect.poll(async () => (await liveRecords()).filter((r) => r.collection === 'calendar').length, { timeout: 20_000 }).toBe(6);
+    const records = await liveRecords();
+    expect(records.filter((r) => r.collection === 'profile')).toHaveLength(1);
+    expect([...new Set(records.map((r) => r.collection))].sort()).toEqual(['calendar', 'profile']);
+    const calendarIds = records.filter((r) => r.collection === 'calendar').map((r) => r.id);
+    expect(new Set(calendarIds).size).toBe(calendarIds.length);
     expect((await rowsOf(session.userId)).profiles).toBe(1);
     expect(a.tap.statuses().filter((s) => s >= 400 && s !== 409)).toEqual([]);
     expect(b.tap.statuses().filter((s) => s >= 400 && s !== 409)).toEqual([]);

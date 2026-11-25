@@ -4,18 +4,18 @@
 > Su objetivo es que la siguiente sesión, que no recuerda nada, sepa dónde retomar.
 
 <!-- Formato:
-## 2026-11-24 · Claude Code · feat/012-quehaceres-diarios
-- **Hecho:** 012 implementada por pasos con sub-agentes: contrato (`chores.ts` en shared, kinds `chore`/`choreDay`/`choreSettings` dentro de la colección `calendar`, sin migración), adaptador de sync, lógica pura (`utils/chores.ts`), hook `useChores`, `ChoresCard`, `ChoresEditor`, `ChoresChart` y E2E `07-quehaceres`. Una revisión independiente encontró 2 bloqueantes (foco robado por el editor y documentos sin cerrar) y 4 recomendados (re-render de App por el store de sync, esqueleto sin fin sin red, datos dañados, gráfica en ceros); se corrigieron con una prueba que reproduce cada fallo.
-- **Verificación:** hook de cada commit (lint, tipos, unitarias, integración del API) con `E2E_PORT_OFFSET`; 450 pruebas de la web; E2E `03`, `04`, `05-calendario`, `05-gym-opcional` y `07-quehaceres` pasan (con puertos desplazados temporalmente). **No corrí `./scripts/check.sh` completo ni las E2E `01` y `02`** (puertos fijos ocupados por otras sesiones hasta fusionar el PR #12). El diseño se vio en capturas solo en tema oscuro.
-- **Pendiente:** fusionar #12 y repetir la verificación completa; decisiones del humano (día sin registro, vista de historial, siembra sin red); C11 solo a nivel de datos; fusionar **después de la 009** (la 012 va apilada sobre ella).
-- **Problemas:** dos pruebas del sub-agente se reescribieron porque afirmaban lo contrario del C13 (gráfica en ceros). Al editar, las entradas inválidas se descartan del estado (los datos de una versión futura que no cumplan el esquema actual se perderían).
-
 ## AAAA-MM-DD · agente (Claude Code / Antigravity) · rama
 - **Hecho:** qué se completó (con referencia a commits o PR)
 - **Verificación:** resultado de ./scripts/check.sh
 - **Pendiente:** qué queda y el siguiente paso concreto
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
+
+## 2026-11-24 · Claude Code · feat/012-quehaceres-diarios
+- **Hecho:** 012 implementada por pasos con sub-agentes: contrato (`chores.ts` en shared, kinds `chore`/`choreDay`/`choreSettings` dentro de la colección `calendar`, sin migración), adaptador de sync, lógica pura (`utils/chores.ts`), hook `useChores`, `ChoresCard`, `ChoresEditor`, `ChoresChart` y E2E `07-quehaceres`. Una revisión independiente encontró 2 bloqueantes (foco robado por el editor y documentos sin cerrar) y 4 recomendados (re-render de App por el store de sync, esqueleto sin fin sin red, datos dañados, gráfica en ceros); se corrigieron con una prueba que reproduce cada fallo.
+- **Verificación:** hook de cada commit (lint, tipos, unitarias, integración del API) con `E2E_PORT_OFFSET`; 450 pruebas de la web; E2E `03`, `04`, `05-calendario`, `05-gym-opcional` y `07-quehaceres` pasan (con puertos desplazados temporalmente). **No corrí `./scripts/check.sh` completo ni las E2E `01` y `02`** (puertos fijos ocupados por otras sesiones hasta fusionar el PR #12). El diseño se vio en capturas solo en tema oscuro.
+- **Pendiente:** fusionar #12 y repetir la verificación completa; decisiones del humano (día sin registro, vista de historial, siembra sin red); C11 solo a nivel de datos; fusionar **después de la 009** (la 012 va apilada sobre ella).
+- **Problemas:** dos pruebas del sub-agente se reescribieron porque afirmaban lo contrario del C13 (gráfica en ceros). Al editar, las entradas inválidas se descartan del estado (los datos de una versión futura que no cumplan el esquema actual se perderían).
 
 ## 2026-11-24 · Claude Code · feat/010-entorno-de-trabajo-por-usuario (implementación)
 - **Hecho:** pasos 1 a 6 del plan. `emptyAppState` (cuenta nueva vacía), guías con `EmptyHint`, aviso visible de límite y de cambios rechazados, `syncStore.flushPending` (zona protegida, con tu permiso) y cierre de sesión que sube antes de salir o avisa. E2E `06-cerrar-sesion` (comprobado que falla sin la subida) y `03`/`04` adaptadas al estado vacío.
@@ -68,10 +68,21 @@
 - **Pendiente:** que apruebes la spec y respondas 3 preguntas abiertas (landing pública, desvincular y verificación de Google, y dejar obsoletos 001, 003 y el ADR 0004); después `plan.md`.
 - **Problemas:** el importador del primer inicio, el cifrado del token y el borrado de cuenta son zonas protegidas y esta spec los toca. Depende de 007 y 008.
 
+## 2026-11-24 · Claude Code · docs/spec-007-produccion
+- **Hecho:** spec 007 (producción) en borrador, partiendo de `origin/main`. Propone los criterios C6 a C8 (dos cuentas reales, sin secretos, respaldo de `GOOGLE_TOKEN_ENC_KEY`) y reparte qué hace el humano y qué prepara el agente. La spec 008 (verificación de Google) la redacta «agente 2» en su propia rama.
+- **Pendiente:** tu aprobación de la spec; después, el plan y el script de verificación de solo lectura. Mientras tanto A3 y A4 siguen siendo las acciones del humano que bloquean la 009.
+- **Problemas:** `.env.example` está bloqueado para lectura por `.claude/settings.json` (M4 de `TASKS.md`), así que las variables salen de `env.schema.ts` y `render.yaml`.
+
 ## 2026-11-24 · Claude Code · docs/prioriza-pendientes
 - **Hecho:** `docs/TASKS.md` reordenado por prioridad Alto/Medio/Bajo. Dos pendientes nuevos de prioridad Alta pedidos por el humano: **A1** login con Google para cualquier usuario y Calendar vinculado sin botón (funcionalidad 009, marcado importante) y **A2** entorno de trabajo por usuario (010). `features.json` con 009 y 010 y sus carpetas de spec. Verificado que el PR #7 está en `main` y que Vercel sirve la web en https://student-os-mocha-iota.vercel.app (HTTP 200).
 - **Pendiente:** escribir las specs 009 y 010 con `spec-plan-code`. Producción (A3) y verificación de Google (A4) son prerrequisitos y van en paralelo.
 - **Problemas:** la API no está desplegada, así que hoy el login y los datos por usuario no funcionan de verdad en producción; solo en local con servicios simulados. Posible riesgo al cambiar de cuenta en el mismo navegador (el importador podría ofrecer subir datos locales de otro usuario).
+
+## 2026-11-24 · Claude Code · chore/puertos-pruebas-configurables
+- **Hecho:** variable `E2E_PORT_OFFSET` (entero, por defecto 0) que desplaza todos los puertos fijos de las pruebas (integración del API y E2E) para poder correr varias sesiones a la vez. Fuente única en `apps/api/test/ports.cjs`; prueba `ports.e2e-spec.ts`; documentado en `docs/stack/backend.md` y `frontend.md`.
+- **Verificación:** con `E2E_PORT_OFFSET=500`: `./scripts/check.sh --rapido` pasa, 14 E2E pasan y el hook de pre-commit pasa. Con offset 0 solo se comprobó que la lista de puertos es la original (prueba unitaria): los puertos 54329-54337 estaban ocupados por otras sesiones.
+- **Pendiente:** nada. Cada sesión debe usar un offset distinto (separados al menos 20).
+- **Problemas:** en Windows hay rangos de puertos reservados (`netsh int ipv4 show excludedportrange protocol=tcp`); un offset de 2000 cayó en uno y Postgres embebido falló sin mensaje.
 
 ## 2026-11-23 · Claude Code · chore/adopt-agent-harness (Fase 7, cierre)
 - **Hecho:** ADR 0002, plan de adopción archivado en `docs/references/historial/`, `check.sh` completo (5 de 5, 169 s) y revisión con la skill `revisor`. Correcciones de la revisión: permisos de ejecución (`100755`) en scripts y hooks, `.gitattributes` con LF para scripts, `.claude/skills/` ignorado como directorio y rutas corregidas.

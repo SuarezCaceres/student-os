@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   API,
+  PORTS,
   PageTap,
   WEB,
   apiFetch,
@@ -163,7 +164,7 @@ test.describe('2. login con sesion en la nube', () => {
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
     await expect(page.getByRole('button', { name: /Continuar con Google/i }).first()).toBeVisible({ timeout: 8_000 });
-    expect(API).toContain('3100');
+    expect(API).toContain(String(PORTS.api));
     await context.close();
   });
 

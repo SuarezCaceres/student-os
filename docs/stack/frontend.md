@@ -31,6 +31,8 @@ Se ejecutan desde la raíz del repo.
 | E2E           | `npm run test:e2e -w @student-os/web` (levanta el stack simulado, ~2 min; la primera vez: `npx playwright install chromium`) |
 | Stack simulado a mano | `npm run e2e:stack -w @student-os/web`       |
 
+Los puertos del E2E (`54340`-`54343`, `3100`, `5293`, `5294`) se desplazan con la variable `E2E_PORT_OFFSET` (p. ej. `E2E_PORT_OFFSET=2000 npm run test:e2e -w @student-os/web`) para correr varias sesiones a la vez; detalle en `docs/stack/backend.md`. No escribas puertos a fuego en las pruebas: importa `PORTS`, `WEB`, `API`… de `e2e/support/harness.ts`.
+
 ## Estructura de carpetas en `apps/web/`
 ```
 src/

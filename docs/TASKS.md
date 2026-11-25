@@ -72,12 +72,12 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 - [ ] Variables de producción en Vercel (`VITE_*`) y Render (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `WEB_ORIGINS`, `GOOGLE_*`)
 - [ ] Desplegar la API en Render y verificar `/health`
 - [ ] Ping programado contra la pausa de Supabase a los 7 días
-- [ ] Escribir la spec en `docs/specs/007-produccion-student-os-prod/spec.md`
+- [x] Spec escrita en `docs/specs/007-produccion-student-os-prod/spec.md` (borrador, rama `docs/spec-007-produccion`): **a la espera de tu aprobación**; propone los criterios C6–C8 y deja 6 preguntas abiertas. El agente no toca producción: prepara la receta y la verificación
 
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Completar `docs/google-verification-checklist.md` en Google Cloud Console (lo hace el humano)
-- [ ] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md`
+- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (borrador, espera tu aprobación)
 
 > **Orden de ejecución sugerido:** A3 (producción) y A4 (verificación, que tarda semanas) **en paralelo y cuanto antes**; después A1 y A2, que se pueden desarrollar ya con servicios simulados y se validan al final contra producción.
 

@@ -1,4 +1,4 @@
-// Google FALSO para el E2E (puerto 54342): OAuth (con pagina de consentimiento que redirige sola), token, revoke,
+// Google FALSO para el E2E (puerto base 54342): OAuth (con pagina de consentimiento que redirige sola), token, revoke,
 // userinfo y Calendar API v3. Mismo patron que apps/api/test/helpers/google-fake.ts, pero en puerto fijo y con
 // `GET /o/oauth2/v2/auth` real para que el NAVEGADOR complete el flujo redirect -> callback.
 // Verifica de verdad: client_id/secret, redirect_uri, PKCE S256, codigo de un solo uso, refresh tokens revocables.

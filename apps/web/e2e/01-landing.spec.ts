@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { PageTap, WEB, WEB_NOCLOUD, evidence, gotoApp, newContext, relevantConsoleErrors, sessionFor, userKey } from './support/harness';
+import { PORTS, PageTap, WEB, WEB_NOCLOUD, evidence, gotoApp, newContext, relevantConsoleErrors, sessionFor, userKey } from './support/harness';
 
 /**
  * Escenario 1 - Sin sesion solo existe la landing y el unico acceso es «Continuar con Google» (spec 009, C1 y C2).
@@ -70,7 +70,7 @@ test.describe('1. landing publica: unico acceso con Google', () => {
       const isFonts = /^fonts\.(googleapis|gstatic)\.com$/.test(hostname);
       if (
         !isFonts &&
-        (['3100', '54341', '54342'].includes(port) ||
+        ([PORTS.api, PORTS.supabase, PORTS.google].map(String).includes(port) ||
           /supabase\.co|googleapis\.com|accounts\.google\.com/.test(hostname) ||
           /supabase_supabase-js|@supabase\/supabase-js/.test(url))
       ) {
