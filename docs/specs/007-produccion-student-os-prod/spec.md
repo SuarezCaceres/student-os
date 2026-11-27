@@ -19,7 +19,7 @@ Existe un entorno de producción completo y probado de punta a punta: un proyect
   - Proveedor de Google en Supabase Auth, con el **mismo client id y secret** que usa la API (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) y las URLs de redirección y orígenes autorizados correctos.
   - Variables de producción: Vercel (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_API_URL`) y Render (`DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `WEB_ORIGINS`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY`; `NODE_ENV`, `NODE_VERSION` y `SUPABASE_JWT_AUDIENCE` ya vienen en `render.yaml`).
   - API desplegada en Render con `autoDeploy: false` (el humano aprueba cada despliegue) y `GET /health` en verde.
-  - Un ping programado que evite que Supabase pause el proyecto a los 7 días sin actividad.
+  - Un ping programado que evite que Supabase pause el proyecto a los 7 días sin actividad. Se ejecuta con **GitHub Actions** programado (decisión del humano, 2026-11-25).
   - Una verificación de punta a punta con una cuenta de prueba real.
   - Quitar `VITE_GOOGLE_CLIENT_ID` de Vercel cuando la 009 retire el transporte de Google Identity Services.
 - **No incluye:**
@@ -40,7 +40,7 @@ Los criterios **C1 a C5** son los de `docs/features.json` (no se reescriben). Ca
 - **C4:** Un ping programado evita la pausa de Supabase a los 7 días. *Se comprueba:* el ping se ejecuta en su horario y deja constancia (registro o actividad visible) al menos una vez tras activarlo.
 - **C5:** Un usuario de prueba puede iniciar sesión y sincronizar contra producción de punta a punta. *Se comprueba:* con una cuenta de Google real (de las permitidas como usuario de prueba), entra a la app, su Calendar queda vinculado sin pulsar nada, crea un dato en un dispositivo y lo ve en otro.
 
-### Criterios adicionales propuestos (no están en `features.json`; requieren tu aprobación para añadirlos)
+### Criterios adicionales (aprobados por el humano el 2026-11-25 y añadidos a `features.json` con `pasa: false`)
 - **C6:** Dadas **dos cuentas reales distintas**, cuando cada una crea datos, entonces cada una ve solo lo suyo y no hay filas de una en la otra (es el criterio C1 de la funcionalidad 010).
 - **C7:** Dado el repositorio y los logs de la API en producción, cuando se revisan, entonces no contienen ningún secreto (`GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY`, claves de Supabase, contraseñas de base de datos) ni tokens de Google.
 - **C8:** Dado que `GOOGLE_TOKEN_ENC_KEY` cifra los tokens guardados, cuando se genera la clave de producción, entonces queda respaldada en un lugar seguro del humano **antes** de la primera vinculación, porque rotarla deja ilegibles los tokens ya guardados.
@@ -61,10 +61,14 @@ Los criterios **C1 a C5** son los de `docs/features.json` (no se reescriben). Ca
 - **Migraciones a mano:** se aplican en orden (`20261113000000_wave2_sync`, luego `20261113010000_wave3_google`) y después `rls-baseline.sql`; no se re-ejecutan sobre una base que ya las tiene.
 - **Sin verificación de Google (008):** solo los usuarios de prueba autorizados pueden entrar, y verán la advertencia de «app no verificada».
 
+## Decisiones tomadas (2026-11-25)
+- **Datos de partida:** `student-os-prod` **empieza vacía**; no se migran datos del Supabase de desarrollo (coherente con la 010: cada cuenta nueva parte limpia).
+- **Dominio:** la web de producción usa un **dominio propio** (Google exige un dominio verificado para la verificación de la app, spec 008). Afecta a `WEB_ORIGINS`, a las redirecciones de Supabase y a la pantalla de consentimiento.
+- **Ping contra la pausa de Supabase:** **GitHub Actions** programado (cada ~3 días). Aviso: GitHub desactiva las tareas programadas de un repositorio público tras 60 días sin actividad en el repo; habrá que reactivarlas desde la pestaña Actions si ocurre.
+- **Cuentas de prueba:** el humano tiene dos o más cuentas de Google, suficientes para el criterio C6 (aislamiento entre cuentas).
+- **Criterios C6 a C8:** aprobados y añadidos a `docs/features.json`.
+
 ## Preguntas abiertas
-- ¿Existe ya un proyecto Supabase de desarrollo con datos que quieras **migrar** a `student-os-prod`, o producción empieza **vacía**? (La 010 define que una cuenta nueva parte vacía.)
+- ¿Cuál es el **dominio propio** concreto (y quién gestiona su DNS)? Hace falta para `WEB_ORIGINS`, las redirecciones de Supabase y la spec 008.
 - ¿Qué **región** usan Supabase y Render? Conviene que coincidan para minimizar latencia.
-- ¿La web de producción usa el dominio `*.vercel.app` o un **dominio propio**? Afecta a `WEB_ORIGINS`, a las redirecciones de Supabase y a la verificación de Google (008 exige un dominio verificado).
-- ¿Qué usarás para el **ping programado** (cron externo gratuito, GitHub Actions u otro)? El agente puede dejar preparada la receta, pero el planificador lo elige el humano.
-- ¿Qué **cuentas de Google** serán las de prueba (mínimo dos, para el C6)?
-- ¿Aceptas añadir los criterios C6 a C8 a `docs/features.json`?
+- Aprobación final de esta spec para pasar a su plan.
