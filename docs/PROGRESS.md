@@ -23,6 +23,12 @@
 - **Pendiente:** bloques H1 (dominio, Search Console), H2 (consola) y B (legales y landing), que dependen del humano, la 007 y la 009. Antes de H2, con una cuenta real: invitaciones con `calendar.events.owned` y scopes de identidad que añade Supabase.
 - **Problemas:** en la 009 los avisos de `App.tsx` dicen «reconecta en Google Sync» aunque ya no hay botón «Conectar» (afecta al paso 7 del vídeo). Al cambiar de rama hay que recompilar `packages/shared` (`npm run build -w @student-os/shared`): si no, falla `GYM_PREFERENCE_RECORD_ID`.
 
+## 2026-11-25 · Claude Code · feat/012-historial
+- **Hecho:** vista mínima de historial en la tarjeta de quehaceres (`ChoresHistory`, plegada tras «Ver historial», solo lectura, 14 días y «Ver más»), con el nombre copiado en cada registro y etiqueta amable para los días difíciles. Cierra el criterio C11 de la spec 012 (`features.json`). PR apilado sobre la 009; no se fusiona antes de producción.
+- **Verificación:** vitest web, `tsc -b`, lint y E2E 07 (9 pruebas, con `E2E_PORT_OFFSET=1300`); cada commit pasó `./scripts/check.sh --rapido` en el hook.
+- **Pendiente:** nada propio; el PR espera a la 009.
+- **Problemas:** un registro sin nada completado ni día difícil no se lista en el historial (decisión de diseño).
+
 ## 2026-11-25 · Claude Code · docs/tareas-fusion-hecha
 - **Hecho:** el humano fusionó #12, #8, #13 y #14 a `main` en el orden recomendado, sin conflictos. Se verificó `main` (`ecd9ad5`) con `./scripts/check.sh` completo y puertos por defecto: todo en verde, incluidas las 14 E2E. Se añade a `TASKS.md` la nota A0 con el estado real (la que se escribió el día anterior llegó a la rama de #14 después de fusionarse y solo está en la rama de la 009).
 - **Pendiente:** #9 (la 009 con la 010, la 011 y la 012 dentro) sigue en borrador **hasta que producción (007) esté lista**; decisiones abiertas del humano (012, specs 007 y 008); limpieza de ramas ya fusionadas con su confirmación. La rama de la 009 deberá incorporar `main` antes de fusionarse y **tendrá un conflicto previsible en `docs/TASKS.md` (la nota A0, versión antigua frente a esta)**: quedarse con esta versión.

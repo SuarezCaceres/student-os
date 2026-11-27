@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  apiFetch,
   bootDevice,
   pullByFocusUntil,
   relevantConsoleErrors,
@@ -139,6 +140,73 @@ test.describe('7. quehaceres diarios', () => {
       expect(await completedOnServer(other.userId)).toEqual([]);
     } finally {
       await c.context.close();
+    }
+  });
+
+  test('7i. el historial muestra los días pasados con el nombre con el que se completaron y el día difícil (C11)', async ({ browser }) => {
+    // Se siembran por el API dos días pasados ANTES de arrancar el dispositivo: uno con un quehacer que ya no está en la
+    // lista base (nombre antiguo) y otro difícil con motivo. Fechas locales de hace 2 y 3 días.
+    const hist = await sessionFor(userKey('s7-hist'));
+    const isoDaysAgo = (days: number) => {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const at = new Date().toISOString();
+    const record = (date: string, value: object) => ({
+      id: `chore-day-${date}`,
+      collection: 'calendar',
+      data: { kind: 'choreDay', value: { date, ...value } },
+      updatedAt: at,
+      deletedAt: null,
+      rev: 0,
+    });
+    const twoAgo = isoDaysAgo(2);
+    const threeAgo = isoDaysAgo(3);
+    const pushed = await apiFetch('/sync/push', hist.accessToken, {
+      method: 'POST',
+      body: JSON.stringify({
+        changes: [
+          record(twoAgo, {
+            hard: false,
+            completed: [
+              { choreId: 'chore-base-0', name: 'Hacer la cama de antes' },
+              { choreId: 'chore-borrado', name: 'Regar las plantas' },
+            ],
+          }),
+          record(threeAgo, { hard: true, reason: 'cansado', completed: [] }),
+        ],
+      }),
+    });
+    expect(pushed.status, pushed.text).toBeLessThan(300);
+
+    const d = await bootDevice(browser, hist, { kind: 'desktop' });
+    try {
+      await expect(card(d.page)).toBeVisible({ timeout: 30_000 });
+      const toggle = card(d.page).getByRole('button', { name: /historial/i });
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await expect(d.page.getByTestId('chores-history')).toHaveCount(0);
+
+      await toggle.click();
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const history = d.page.getByTestId('chores-history');
+      const entries = history.locator('li[data-date]');
+      await expect(entries).toHaveCount(2);
+      // Más reciente primero.
+      await expect(entries.nth(0)).toHaveAttribute('data-date', twoAgo);
+      await expect(entries.nth(1)).toHaveAttribute('data-date', threeAgo);
+      // Nombres copiados: ni «Hacer la cama de antes» ni «Regar las plantas» existen en la lista actual.
+      await expect(entries.nth(0)).toContainText('2 quehaceres');
+      await expect(entries.nth(0)).toContainText('Hacer la cama de antes');
+      await expect(entries.nth(0)).toContainText('Regar las plantas');
+      await expect(entries.nth(1)).toContainText('Día difícil · cansado');
+      await expect(history).not.toContainText(/incumpl|fall|fracas/i);
+      // Solo lectura y hoy sigue editable arriba, con su lista normal.
+      await expect(history.getByRole('checkbox')).toHaveCount(0);
+      await expect(card(d.page).getByRole('list', { name: 'Quehaceres de hoy' }).getByRole('checkbox')).toHaveCount(5);
+      expect(relevantConsoleErrors(d.tap)).toEqual([]);
+    } finally {
+      await d.context.close();
     }
   });
 });

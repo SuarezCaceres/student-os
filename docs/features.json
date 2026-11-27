@@ -183,7 +183,7 @@
         { "id": "C8", "descripcion": "'Hoy no puedo' marca el dia como dificil, con mensaje amable y sin contarlo como fallo", "pasa": true },
         { "id": "C9", "descripcion": "Deshacer el dia dificil conserva los quehaceres ya completados", "pasa": true },
         { "id": "C10", "descripcion": "Al cambiar de dia, el dia anterior queda guardado en el historial y hoy empieza sin marcas", "pasa": true },
-        { "id": "C11", "descripcion": "Renombrar o eliminar un quehacer no cambia los nombres de los dias pasados", "pasa": false },
+        { "id": "C11", "descripcion": "Renombrar o eliminar un quehacer no cambia los nombres de los dias pasados", "pasa": true },
         { "id": "C12", "descripcion": "La grafica muestra el promedio por dia de la semana de las ultimas 8 semanas, resalta el mejor dia y excluye los dias dificiles", "pasa": true },
         { "id": "C13", "descripcion": "Sin historial suficiente la grafica muestra un estado vacio claro", "pasa": true },
         { "id": "C14", "descripcion": "Quehaceres, historial y dias dificiles se conservan al cerrar sesion y entrar desde otro dispositivo", "pasa": true },

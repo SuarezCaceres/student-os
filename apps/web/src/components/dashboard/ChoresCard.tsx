@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useId, useState } from 'react';
-import { CalendarRange, CloudRain, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
+import { CalendarRange, CloudRain, History, Plus, SlidersHorizontal, Undo2 } from 'lucide-react';
 import type { ChoreHardReason } from '../../types';
 import type { UseChoresResult } from '../../hooks/useChores';
 import { CHORE_HARD_REASON_LABELS } from '../../utils/chores';
 import { ChoresChart } from './ChoresChart';
 import { ChoresEditor } from './ChoresEditor';
+import { ChoresHistory } from './ChoresHistory';
 
 export interface ChoresCardProps {
   /** Estado y acciones de los quehaceres (`useChores`), que `App` pasa por `OverviewBento`. */
@@ -17,10 +18,11 @@ const SYNC_WAIT_MS = 8_000;
 const HARD_REASONS = Object.keys(CHORE_HARD_REASON_LABELS) as ChoreHardReason[];
 
 export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
-  const { ready, summary, stats } = chores;
+  const { ready, summary, stats, history, today } = chores;
   const chartId = useId();
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   // Estable: ModalShell reengancha su efecto (y roba el foco) si `onClose` cambia en cada render.
   const [waitedTooLong, setWaitedTooLong] = useState(false);
   const closeEditor = useCallback(() => setIsEditorOpen(false), []);
@@ -180,21 +182,39 @@ export const ChoresCard: React.FC<ChoresCardProps> = ({ chores }) => {
             <span>Hoy no puedo</span>
           </button>
         )}
-        <button
-          type="button"
-          aria-expanded={isChartOpen}
-          aria-controls={`${chartId}-chart`}
-          onClick={() => setIsChartOpen((open) => !open)}
-          className="t-btn t-btn-ghost px-3 text-[13px] ml-auto"
-        >
-          <CalendarRange className="w-3.5 h-3.5" aria-hidden="true" />
-          <span>{isChartOpen ? 'Ocultar tu semana' : 'Ver tu semana'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
+          <button
+            type="button"
+            aria-expanded={isHistoryOpen}
+            aria-controls={`${chartId}-history`}
+            onClick={() => setIsHistoryOpen((open) => !open)}
+            className="t-btn t-btn-ghost px-3 text-[13px]"
+          >
+            <History className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{isHistoryOpen ? 'Ocultar historial' : 'Ver historial'}</span>
+          </button>
+          <button
+            type="button"
+            aria-expanded={isChartOpen}
+            aria-controls={`${chartId}-chart`}
+            onClick={() => setIsChartOpen((open) => !open)}
+            className="t-btn t-btn-ghost px-3 text-[13px]"
+          >
+            <CalendarRange className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>{isChartOpen ? 'Ocultar tu semana' : 'Ver tu semana'}</span>
+          </button>
+        </div>
       </div>
 
       {isChartOpen && (
         <div id={`${chartId}-chart`} className="mt-4 pt-4 border-t border-[var(--line)]">
           <ChoresChart stats={stats} />
+        </div>
+      )}
+
+      {isHistoryOpen && (
+        <div id={`${chartId}-history`} className="mt-4 pt-4 border-t border-[var(--line)]">
+          <ChoresHistory history={history} today={today} />
         </div>
       )}
 
