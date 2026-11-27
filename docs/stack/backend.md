@@ -56,12 +56,13 @@ Receta del plan 007 (`docs/specs/007-produccion-student-os-prod/plan.md`). **Aqu
 | Render (API) | `PORT` | La inyecta Render; no se declara |
 | Render (API) | `SUPABASE_JWT_AUDIENCE` | `authenticated` (fijada en `render.yaml`) |
 | Render (API) | `DATABASE_URL` | Pooler de Supabase, puerto 6543, con `?pgbouncer=true` · **secreto** |
-| Render (API) | `DIRECT_URL` | Conexión directa de Supabase, puerto 5432 · **secreto** |
+| Render (API) | `DIRECT_URL` | **Session pooler** de Supabase, puerto 5432 (Render no conecta por IPv6 a la conexión directa) · **secreto** |
 | Render (API) | `SUPABASE_URL` | `https://<ref>.supabase.co`, sin barra final |
 | Render (API) | `WEB_ORIGINS` | Orígenes de la web separados por comas (dominio y `www`), sin barra final ni ruta. Obligatoria con `NODE_ENV=production` |
 | Render (API) | `GOOGLE_CLIENT_ID` | Cliente OAuth **de producción** (el mismo que el proveedor Google de Supabase Auth) |
 | Render (API) | `GOOGLE_CLIENT_SECRET` | Secreto de ese cliente · **secreto** |
 | Render (API) | `GOOGLE_TOKEN_ENC_KEY` | Clave AES-256-GCM de los refresh tokens (`openssl rand -base64 32`, ≥ 32 caracteres) · **secreto**. Respáldala **antes de la primera vinculación**: rotarla deja ilegibles los tokens guardados y requiere aprobación del humano |
+| Render (API) | `GOOGLE_REDIRECT_URI` | `https://<api>.onrender.com/google/callback`. **Obligatoria**: sin ella la API se considera «no configurada» para Google y Calendar no se vincula aunque el login funcione. Debe estar también entre las URIs de redireccionamiento del cliente OAuth |
 | Vercel (web) | `VITE_SUPABASE_URL` | La misma URL de Supabase |
 | Vercel (web) | `VITE_SUPABASE_PUBLISHABLE_KEY` | Clave **pública** (publishable) de Supabase; nunca la `service_role` |
 | Vercel (web) | `VITE_API_URL` | `https://api.<dominio>` |

@@ -11,7 +11,8 @@ services:
     name: student-os-api
     runtime: node
     plan: free
-    # region: elige la MISMA region que el proyecto Supabase para minimizar latencia a la BD.
+    # Misma region que Supabase (us-east-1, N. Virginia) para minimizar latencia a la BD.
+    region: virginia
     # Monorepo: se construye desde la raiz del repo (sin rootDir).
     # Instala (incluyendo devDependencies: nest-cli/typescript/prisma hacen falta para compilar),
     # genera el cliente Prisma y compila. NO ejecuta migraciones: las aplica el Integrador a mano.
@@ -37,10 +38,12 @@ services:
         sync: false
       - key: WEB_ORIGINS # https://<tu-app>.vercel.app (lista separada por comas)
         sync: false
-      # Ola 3 (agente GOOGLE). Opcionales hasta entonces.
+      # Google: sin estas cinco la API arranca pero responde google_not_configured (Calendar no se vincula).
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
       - key: GOOGLE_TOKEN_ENC_KEY
+        sync: false
+      - key: GOOGLE_REDIRECT_URI # https://<api>.onrender.com/google/callback (tambien autorizada en Google Cloud)
         sync: false
