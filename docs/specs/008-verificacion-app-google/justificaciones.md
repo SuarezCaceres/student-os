@@ -2,7 +2,8 @@
 
 > Paso A3 del plan. Textos **en inglés** para pegar en el formulario de verificación de Google, uno por permiso.
 > Debajo de cada texto, la tabla de respaldo: cada afirmación con el código, el ADR o la prueba que la sostiene. Si el código cambia, se corrige el texto (nunca al revés) y se revisa esta tabla.
-> Scopes: los de `GOOGLE_SCOPES` (ADR 0008). Revisado contra el código de la rama de la 009 el 2026-11-25.
+> Scopes: `openid`, `email` y `calendar.events.owned` (ADR 0008, revisión del 2026-11-26; fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES`). Revisado contra el código de la rama de la 008 el 2026-11-26.
+> Ya **no** se piden `calendar.freebusy` ni `calendar.calendars.readonly`: la app no usaba `freebusy.query` ni `calendars.get` (los huecos libres salen de `events.list`), así que se quitaron sus textos.
 
 ## Qué guarda StudentOS de Google (comprobado en el código)
 | Dato | Dónde | Respaldo |
@@ -20,7 +21,7 @@ Cómo se revoca: borrar la cuenta en StudentOS revoca el token en Google y borra
 ## `calendar.events.owned`
 > StudentOS is a weekly planner for university students: classes, assignments, gym sessions, work shifts and daily habits in one schedule. Google Calendar is the core of the product, so access to the user's own calendars is requested when they sign in.
 >
-> We use this scope to (1) read the events of the user's primary calendar and show them in the StudentOS weekly view, so the student sees their real schedule and the app can detect time conflicts, and (2) create, update and delete events in the primary calendar **only when the user explicitly does so in the app**: when they schedule a gym session, publish a study block or set up their recurring work shift (including weekly recurring series and shortening a series). StudentOS never creates, changes or deletes events on its own.
+> We use this scope to (1) read the events of the user's primary calendar and show them in the StudentOS weekly view, so the student sees their real schedule, the app can detect time conflicts and it can suggest free time slots (computed from those same events), and (2) create, update and delete events in the primary calendar **only when the user explicitly does so in the app**: when they schedule a gym session, publish a study block or set up their recurring work shift (including weekly recurring series and shortening a series). StudentOS never creates, changes or deletes events on its own.
 >
 > All calls go through our server, always to the user's primary calendar. The content of calendar events is read on demand and is **not stored** in our database; we only keep the IDs of the events StudentOS itself created, so we can update or delete them later. We store one refresh token per user, encrypted with AES-256-GCM on the server; it is never sent to the browser. The user can revoke access at any time from their Google Account permissions page, and deleting their StudentOS account revokes the token in Google and deletes all their data.
 >
@@ -30,29 +31,13 @@ Cómo se revoca: borrar la cuenta en StudentOS revoca el token en Google y borra
 |---|---|
 | Lee eventos del calendario principal y los muestra | `google.controller.ts` (`GET calendar/events`, `…/instances`, `…/:eventId`); `components/calendar/WeeklyCalendar.tsx` |
 | Detecta choques de horario | `components/calendar/` (`GoogleImpactModal.tsx`, `CalendarTimelineGrid.tsx`). **Revisar en la app tras la 009** antes de enviar |
-| Escribe solo cuando el usuario lo ordena | Las escrituras salen de acciones del usuario en `App.tsx` (programar gym, publicar bloque, turno laboral). **Revisar en la app tras la 009** que ningún flujo escribe sin acción explícita (Anexo A, paso 6) |
+| Sugiere huecos libres a partir de los mismos eventos | `fetchGoogleEventsAndBusyForWeek` (`apps/web/src/services/googleCalendar.ts`) convierte la respuesta de `events.list` en intervalos ocupados; `apps/web/src/utils/calendarSlotFinder.ts`. **Revisar en la app tras la 009** qué pantallas lo muestran |
+| Escribe solo cuando el usuario lo ordena | Las escrituras salen de acciones del usuario en `App.tsx` (programar gym, publicar bloque, turno laboral). **Revisar en la app tras la 009** que ningún flujo escribe sin acción explícita (`video-guion.md`, paso 5) |
 | Series semanales y recorte con `UNTIL` | `google.controller.ts` (PATCH «también recorta series recurrentes»); `google.e2e-spec.ts` («lista, crea (con RRULE y recordatorios), lee, actualiza (UNTIL), instancias y borra») |
 | Siempre el calendario `primary` | `google.controller.ts` (rutas fijas a `calendars/primary`); `google.e2e-spec.ts` (rechaza ids con `..%2F`) |
 | No se guarda el contenido de los eventos; solo los ids de los que creó la app | Tabla «Qué guarda» de arriba |
 | Token cifrado, nunca en el navegador; revocación y borrado | Tabla «Qué guarda» y «Cómo se revoca» de arriba |
 | Es el scope más estrecho | `scopes.md`, ADR 0008 |
-
-## `calendar.freebusy`
-> Used only to query the free/busy status of the user's primary calendar (freebusy.query) so StudentOS can suggest conflict-free time slots, for example when the student picks a time for a gym session or a study block. This scope does not give access to event details. The result is used on screen and is not stored.
-
-| Afirmación | Respaldo |
-|---|---|
-| Solo `freebusy.query` sobre `primary` | `google.controller.ts` (`POST calendar/freebusy`, fuerza `items: [{ id: 'primary' }]`) |
-| Sugiere huecos libres | `apps/web/src/utils/calendarSlotFinder.ts`; `components/gym/GymOnboardingModal.tsx`. **Revisar en la app tras la 009** qué pantallas lo usan |
-| No se guarda | No hay columna ni registro de sync para disponibilidad (`google.prisma`, `packages/shared/src/calendar.ts`) |
-
-## `calendar.calendars.readonly`
-> Used only to read the title of the user's primary calendar (calendars.get on "primary"), which StudentOS shows so the user can see which calendar is connected. It does not give access to events. Nothing obtained with this scope is stored.
-
-| Afirmación | Respaldo |
-|---|---|
-| Solo `calendars.get` de `primary` para el nombre | `google.controller.ts` (`GET calendar/primary`); `fetchPrimaryCalendarMetadata` en `apps/web/src/services/googleCalendar.ts` |
-| No se guarda | No hay columna para el nombre del calendario (`google.prisma`) |
 
 ## `openid`, `email`
 > Used for Sign in with Google, the only way to sign in to StudentOS, to identify the user's account. The email is also used to check that the Google Calendar connection belongs to the same account the user signed in with. We do not use this information for advertising or share it with third parties.
@@ -70,4 +55,4 @@ Se mantiene literal en la política de privacidad (C5 d):
 ## Pendiente antes de pegar estos textos en el formulario
 - Repasar en la app desplegada con la 009 las filas marcadas «Revisar en la app tras la 009».
 - Confirmar qué scopes de identidad añade Supabase (`scopes.md`, «Otros orígenes»). Si añade `profile`, hay que justificarlo aquí.
-- Si la prueba con una cuenta real demuestra que `calendar.events.owned` no devuelve los eventos de invitaciones (`scopes.md`), hay que cambiar de scope y reescribir este texto.
+- **Comprobar con una cuenta real** que `calendar.events.owned` devuelve también los eventos de invitaciones (`scopes.md`). Es el único scope de lectura: de él dependen la vista semanal, los choques y los huecos libres. Si no los devuelve, hay que pasar a un scope más amplio (nueva decisión del humano), reescribir este texto y reverificar.

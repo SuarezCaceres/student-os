@@ -12,7 +12,7 @@
 | URL de inicio | pendiente |
 | URL de la política de privacidad | pendiente |
 | URL de los términos | pendiente |
-| Scopes declarados | `openid`, `email`, `calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly` (debe coincidir con `scopes-verificados.spec.ts`) |
+| Scopes declarados | `openid`, `email`, `calendar.events.owned` (ADR 0008, revisado el 2026-11-26; debe coincidir con `VERIFIED_GOOGLE_CALENDAR_SCOPES` y sus pruebas `scopes-verificados.spec.ts` y `googleLogin.test.ts`) |
 | URL del vídeo (No listado) | pendiente |
 | Proyecto de Google Cloud | pendiente (Q4) |
 

@@ -23,3 +23,17 @@ Se dejan de pedir `calendar.readonly` (ver y descargar **todos** los calendarios
 - Los usuarios que ya conectaron Calendar con los scopes antiguos conservan su token (sigue valiendo para todos los endpoints; no se rota la clave de cifrado). En producción no hay usuarios todavía (007 sin desplegar).
 - El servidor falso de Google de las pruebas de integración (`apps/api/test/helpers/google-fake.ts`) responde 403 si el token no tiene un scope aceptado por el endpoint, según la misma tabla oficial.
 - La política de privacidad debe listar estos scopes (paso B1 de la 008), y la consola de Google debe declarar exactamente estos.
+
+## Revisión 2026-11-26 · Solo `calendar.events.owned`
+La revisión independiente del PR #19 comprobó que la app **no usa** dos de los tres scopes de Calendar elegidos arriba:
+- `calendars.get` (`calendar.calendars.readonly`): la única función que lo llamaba (`fetchPrimaryCalendarMetadata`) se borró en la spec 009 (commit `bc94d96`). El campo `calendarName` de la meta local se leía en el modal de Calendar, pero nada lo rellenaba.
+- `freebusy.query` (`calendar.freebusy`): `fetchGoogleBusyIntervalsForWeek` solo se llamaba desde pruebas. Los huecos libres y los choques salen de `events.list` (`fetchGoogleEventsAndBusyForWeek`), que ya cubre `calendar.events.owned`.
+
+Google exige que cada scope declarado tenga un uso visible en el vídeo y una justificación; declarar scopes sin uso es motivo de rechazo. **Decisión (el humano la delegó, 2026-11-26): pedir solo `openid`, `email` y `https://www.googleapis.com/auth/calendar.events.owned`.** Se retiró el código muerto que dependía de los otros dos scopes (la función del web, los mapeos del proxy web, las rutas `GET /google/calendar/primary` y `POST /google/calendar/freebusy` del API y su soporte en los servidores falsos de Google).
+
+Además, la lista de scopes de Calendar vive ahora en un único sitio: `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `@student-os/shared` (`packages/shared/src/googleScopes.ts`). De ella derivan `GOOGLE_SCOPES` en el API (que añade `openid email`) y `GOOGLE_LOGIN_CALENDAR_SCOPES` en el web (la que de verdad pide el login). Cada lado tiene su prueba-candado con la lista escrita a mano y el aviso de reverificación (`apps/api/src/google/scopes-verificados.spec.ts` y `apps/web/src/services/googleLogin.test.ts`). Lo que dice la sección «Decisión» sobre la fuente única en `google.constants.ts` queda sustituido por esto.
+
+Consecuencias que se mantienen o cambian:
+- **Sigue pendiente**, y ahora pesa más porque `calendar.events.owned` es el único scope de lectura: comprobar con una cuenta real que `events.list` con este scope devuelve también los eventos de invitaciones. Si no, habría que pasar a `calendar.events.readonly` (lectura) además de `calendar.events.owned` (escritura), o a `calendar.events`, y reverificar.
+- **También pendiente:** qué scopes de identidad añade Supabase por su cuenta al redirigir a Google (`openid`, `email` y probablemente `profile`). La web no los pide, pero la consola debe declarar los que el usuario ve en el consentimiento.
+- Si en el futuro hace falta disponibilidad de otros calendarios o el nombre del calendario, será una funcionalidad nueva con su propio scope y una reverificación.

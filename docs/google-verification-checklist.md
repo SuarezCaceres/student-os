@@ -21,12 +21,13 @@ La verificación tarda **semanas** y suele tener varias rondas. Hay que pasar a 
 | [`rondas-google.md`](specs/008-verificacion-app-google/rondas-google.md) | Datos del envío y registro de cada correo con Google (C16, C17) |
 | ADR 0008 | Por qué se piden estos scopes y no otros |
 
-Scopes que se declaran (fuente única: `GOOGLE_SCOPES`, fijados por `apps/api/src/google/scopes-verificados.spec.ts`): `openid`, `email`, `calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`. **Cambiarlos después de aprobar obliga a reverificar.**
+Scopes que se declaran: `openid`, `email` y `calendar.events.owned` (ADR 0008, revisado el 2026-11-26), más los de identidad que añada Supabase si se confirma alguno más (H2). Los de Calendar tienen una fuente única, `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `packages/shared/src/googleScopes.ts`, de la que derivan `GOOGLE_LOGIN_CALENDAR_SCOPES` (lo que pide el login, web) y `GOOGLE_SCOPES` (API, añade `openid email`). Los fijan dos pruebas: `apps/web/src/services/googleLogin.test.ts` y `apps/api/src/google/scopes-verificados.spec.ts`. **Cambiarlos después de aprobar obliga a reverificar.**
 
 ## Bloque A · repo, sin esperar a nadie
 - [x] **A1** · Tabla endpoint → scope con la referencia oficial (C9) → `scopes.md`
 - [x] **A1** · Decisión sobre los scopes (Q9): estrechar todo → ADR 0008
-- [x] **A2** · Prueba que fija los scopes y avisa de reverificar (C8) → `scopes-verificados.spec.ts`
+- [x] **A1** · Revisión del PR #19 (2026-11-26): la app no usaba `freebusy.query` ni `calendars.get` → solo `calendar.events.owned` (ADR 0008, «Revisión 2026-11-26»)
+- [x] **A2** · Prueba que fija los scopes y avisa de reverificar (C8) → `scopes-verificados.spec.ts` (API) y `googleLogin.test.ts` (web), sobre la fuente única de `@student-os/shared`
 - [x] **A3** · Justificación en inglés de cada permiso, con respaldo (C11) → `justificaciones.md`
 - [x] **A4** · Guion del vídeo (C12) y registro de rondas (C16) → `video-guion.md`, `rondas-google.md`
 - [x] **A5** · Este checklist como única lista de tareas (C1)
@@ -35,7 +36,7 @@ Scopes que se declaran (fuente única: `GOOGLE_SCOPES`, fijados por `apps/api/sr
 - [ ] **H1** · Comprar el dominio propio (Q1) y asignarlo en Vercel. `*.vercel.app` y `*.onrender.com` no sirven como dominio autorizado.
 - [ ] **H1** · Verificar el dominio en [Search Console](https://search.google.com/search-console) con la **misma cuenta** que es propietaria o editora del proyecto de Google Cloud (C3).
 - [ ] **H1** · Comprobar sin sesión que la home, `/legal/privacidad.html` y `/legal/terminos.html` responden 200 (C3; el agente lo comprueba con `curl -I`).
-- [ ] **H2** · Comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos a los que el usuario está invitado, y qué scopes de identidad añade Supabase en la URL de consentimiento (`scopes.md`, «Pendiente»). **Antes** de declarar nada en la consola.
+- [ ] **H2** · Comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos a los que el usuario está invitado (es el único scope de lectura: si no los devuelve, hay que pasar a uno más amplio), y qué scopes de identidad añade Supabase en la URL de consentimiento (¿`profile`?) (`scopes.md`, «Pendiente»). **Antes** de declarar nada en la consola.
 - [ ] **H2** · Branding: nombre «StudentOS», logotipo de 120×120 sin marcas de Google y de menos de 1 MB (Q5), correo de asistencia y de contacto del desarrollador que se lean a diario (Q3), URLs de inicio, privacidad y términos, y dominio autorizado = el verificado (C7). Capturas en `docs/qa/evidence/`.
 - [ ] **H2** · Audience: tipo *External* (C7).
 - [ ] **H2** · Data access: declarar **exactamente** los scopes de arriba y anotar su clasificación en `scopes.md` (C7, C9). Confirmar que ninguno es «restringido» (sin evaluación CASA).

@@ -89,8 +89,9 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (aprobada el 2026-11-24)
 - [x] Plan aprobado el 2026-11-25 y **bloque A hecho** (rama `feat/008-verificacion-app-google`, apilada sobre la 009): `scopes.md`, prueba `scopes-verificados.spec.ts`, `justificaciones.md`, `video-guion.md`, `rondas-google.md` y checklist reescrito.
 - [x] Q9 decidida: **scopes estrechos** (`calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`), ADR 0008.
-- [ ] Antes de declarar los scopes en la consola (H2), con una cuenta real: comprobar que `calendar.events.owned` devuelve los eventos de invitaciones y qué scopes de identidad añade Supabase (¿`profile`?).
-- [ ] Revisar tras la 009 el paso 7 del guion: los avisos de `App.tsx` dicen «reconecta en Google Sync», pero la 009 quitó el botón «Conectar».
+- [x] **Hallazgo de la revisión del PR #19 (2026-11-26):** la app no usaba `calendar.freebusy` (`freebusy.query` solo se llamaba desde pruebas; los huecos salen de `events.list`) ni `calendar.calendars.readonly` (nada rellenaba el nombre del calendario). **Decisión (delegada por el humano, 2026-11-26): pedir solo `openid`, `email` y `calendar.events.owned`.** Código muerto retirado, fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `@student-os/shared` con prueba-candado en web y API, y docs al día (ADR 0008 «Revisión 2026-11-26», `scopes.md`, `justificaciones.md`, `video-guion.md`, 009-C4, checklist).
+- [ ] Antes de declarar los scopes en la consola (H2), con una cuenta real: comprobar que `calendar.events.owned` devuelve los eventos de invitaciones (ahora es el único scope de lectura; si no, hay que pasar a uno más amplio y decidir de nuevo) y qué scopes de identidad añade Supabase (¿`profile`?).
+- [ ] Revisar tras la 009 el paso 6 del guion (antes 7; se renumeró el 2026-11-26): los avisos de `App.tsx` dicen «reconecta en Google Sync», pero la 009 quitó el botón «Conectar».
 
 > **Orden de ejecución sugerido:** A3 (producción) y A4 (verificación, que tarda semanas) **en paralelo y cuanto antes**; después A1 y A2, que se pueden desarrollar ya con servicios simulados y se validan al final contra producción.
 
