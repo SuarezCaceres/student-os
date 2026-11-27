@@ -18,3 +18,4 @@ export * from './calendar';
 export * from './profile';
 export * from './appState';
 export * from './sync';
+export * from './googleScopes';

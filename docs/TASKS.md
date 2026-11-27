@@ -87,7 +87,13 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Completar `docs/google-verification-checklist.md` en Google Cloud Console (lo hace el humano)
-- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (borrador, espera tu aprobación)
+- [x] Escribir la spec en `docs/specs/008-verificacion-app-google/spec.md` (aprobada el 2026-11-24)
+- [x] Plan aprobado el 2026-11-25 y **bloque A hecho** (rama `feat/008-verificacion-app-google`, apilada sobre la 009): `scopes.md`, prueba `scopes-verificados.spec.ts`, `justificaciones.md`, `video-guion.md`, `rondas-google.md` y checklist reescrito.
+- [x] Respondidas (2026-11-26): Q1 dominio `studentoshub.io` (sin comprar), Q4 cliente OAuth nuevo solo de producción, Q5 logo actual en PNG (falta el de 120×120), Q6 justificar Calendar obligatorio, Q7 enviar en paralelo con producción, Q8 mantener `/google/disconnect` sin botón; Q10 aplazada. **Faltan Q2 (responsable, país, correo) y Q3 (correos de la consola).**
+- [x] Q9 decidida: **scopes estrechos** (`calendar.events.owned`, `calendar.freebusy`, `calendar.calendars.readonly`), ADR 0008.
+- [x] **Hallazgo de la revisión del PR #19 (2026-11-26):** la app no usaba `calendar.freebusy` (`freebusy.query` solo se llamaba desde pruebas; los huecos salen de `events.list`) ni `calendar.calendars.readonly` (nada rellenaba el nombre del calendario). **Decisión (delegada por el humano, 2026-11-26): pedir solo `openid`, `email` y `calendar.events.owned`.** Código muerto retirado, fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `@student-os/shared` con prueba-candado en web y API, y docs al día (ADR 0008 «Revisión 2026-11-26», `scopes.md`, `justificaciones.md`, `video-guion.md`, 009-C4, checklist).
+- [ ] Antes de declarar los scopes en la consola (H2), con una cuenta real: comprobar que `calendar.events.owned` devuelve los eventos de invitaciones (ahora es el único scope de lectura; si no, hay que pasar a uno más amplio y decidir de nuevo) y qué scopes de identidad añade Supabase (¿`profile`?).
+- [x] Avisos de «reconecta en Google Sync» corregidos en la 009 (commit `b5c65c5`, 2026-11-26): ahora piden cerrar sesión y volver a entrar con Google; paso 6 del guion actualizado (falta verlo en vivo al grabar).
 
 > **Orden de ejecución sugerido:** A3 (producción) y A4 (verificación, que tarda semanas) **en paralelo y cuanto antes**; después A1 y A2, que se pueden desarrollar ya con servicios simulados y se validan al final contra producción.
 
@@ -113,7 +119,8 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Bundle web de ~1 MB (aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).
 - [ ] `./scripts/check.sh` (E2E) reescribe los JPG versionados de `docs/qa/evidence/` y ensucia el árbol de git. Dirigir la salida a una carpeta ignorada o dejar de versionar esas imágenes.
-- [ ] Versiones de Node dispares: `engines >=20`, CI en 20, Render en 22, Vercel en 26.x. Unificarlas.
+- [ ] Versiones de Node dispares: `engines >=20`, CI en 20, Render en 22, Vercel en 26.x. Unificarlas. Síntoma ya visto (2026-11-26): en el CI (Node 20) el reporter de vitest se rompe con «Map.groupBy is not a function» (`Map.groupBy` llega en Node 21).
+- [ ] **Prueba frágil:** `apps/web/src/components/calendar/GoogleCalendarSyncModal.test.tsx` (existe en `main`) («si Google no confirma la revocacion…») falló una vez en el job Web del PR #18 (que solo cambia docs) y pasó al relanzarla (2026-11-26). La 009 elimina ese flujo de desconectar; si sobrevive, estabilizarla (espera explícita en vez de temporizador).
 - [ ] TypeScript distinto entre paquetes: web `~7.0.2`, api `^5.9`.
 - [ ] `pre-commit` tarda ~50 s (decidido mantenerlo; revisar si molesta).
 - [ ] `docs/qa/BUGS.md` está citado en el test 2c pero **no existe**: recrearlo o quitar la referencia.

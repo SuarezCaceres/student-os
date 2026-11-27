@@ -6,6 +6,7 @@ vi.mock('./api', async () => {
   return { ...actual, getApiClient: () => ({ request }) };
 });
 
+import { VERIFIED_GOOGLE_CALENDAR_SCOPES } from '@student-os/shared';
 import { ApiError } from './api';
 import {
   __resetGoogleLoginForTests,
@@ -51,12 +52,41 @@ afterEach(() => {
   __resetGoogleLoginForTests();
 });
 
-describe('permisos que se piden en el login (C4)', () => {
-  it('pide exactamente leer y crear/editar eventos de Calendar (los mismos de siempre)', () => {
-    expect(GOOGLE_LOGIN_CALENDAR_SCOPES.split(' ')).toEqual([
+/**
+ * Spec 008 · C8 (gemela de `apps/api/src/google/scopes-verificados.spec.ts`). La lista que de verdad pide el login es
+ * esta; si cambias `GOOGLE_LOGIN_CALENDAR_SCOPES` o la fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES` de
+ * `@student-os/shared`, esta prueba falla A PROPÓSITO.
+ */
+const CALENDAR_SCOPES_VERIFICADOS = ['https://www.googleapis.com/auth/calendar.events.owned'];
+
+const AVISO_REVERIFICAR =
+  'GOOGLE_LOGIN_CALENDAR_SCOPES no coincide con los scopes verificados en Google. Cambiar scopes obliga a VOLVER A VERIFICAR la app ' +
+  '(spec 008, C8): actualiza la consola, scopes.md, las justificaciones, el vídeo y la política, y pide aprobación al humano.';
+
+describe('permisos que se piden en el login (C4; spec 008, C8 y C9)', () => {
+  it('pide exactamente los permisos estrechos de Calendar verificados en Google', () => {
+    const actuales = GOOGLE_LOGIN_CALENDAR_SCOPES.split(' ');
+    if (JSON.stringify([...actuales].sort()) !== JSON.stringify([...CALENDAR_SCOPES_VERIFICADOS].sort())) {
+      throw new Error(`${AVISO_REVERIFICAR}\n  Actuales:    ${actuales.join(' ')}\n  Verificados: ${CALENDAR_SCOPES_VERIFICADOS.join(' ')}`);
+    }
+  });
+
+  it('sale de la fuente única compartida con el API', () => {
+    expect(GOOGLE_LOGIN_CALENDAR_SCOPES).toBe(VERIFIED_GOOGLE_CALENDAR_SCOPES.join(' '));
+  });
+
+  it('no pide profile ni ningún scope de Calendar amplio o sin uso', () => {
+    const actuales = GOOGLE_LOGIN_CALENDAR_SCOPES.split(' ');
+    for (const prohibido of [
+      'profile',
+      'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.readonly',
       'https://www.googleapis.com/auth/calendar.events',
-    ]);
+      'https://www.googleapis.com/auth/calendar.freebusy',
+      'https://www.googleapis.com/auth/calendar.calendars.readonly',
+    ]) {
+      expect(actuales).not.toContain(prohibido);
+    }
   });
 });
 

@@ -331,7 +331,7 @@ function generateDayCandidates(params: {
 
 /**
  * Finds scored, collision-free 2-hour training windows across candidate days
- * by merging local WeeklyCalendar blocks and optional Google Calendar freeBusy intervals.
+ * by merging local WeeklyCalendar blocks and optional Google Calendar busy intervals (derived from events.list).
  */
 export function findFreeTwoHourSlots(options: SlotFinderOptions): FreeTwoHourSlot[] {
   const {

@@ -278,9 +278,9 @@ const GoogleCalendarSyncContent: React.FC<SyncContentProps> = ({
             </span>
           )}
 
-          {meta.connected && (meta.email || meta.calendarName) && (
+          {meta.connected && meta.email && (
             <span className="text-[14px] font-medium text-[var(--ink)] truncate">
-              {meta.email || meta.calendarName}
+              {meta.email}
             </span>
           )}
 

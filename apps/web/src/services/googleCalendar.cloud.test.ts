@@ -192,16 +192,6 @@ describe('googleCalendar (transporte por la API)', () => {
       expect(facade.getStoredGoogleMeta().lastSyncedAt).toBeTruthy();
     });
 
-    it('freeBusy: POST /google/calendar/freebusy con el cuerpo parseado', async () => {
-      respond(() => ({ calendars: { primary: { busy: [{ start: '2026-11-10T15:00:00Z', end: '2026-11-10T16:00:00Z' }] } } }));
-      const busy = await facade.fetchGoogleBusyIntervalsForWeek(TOKEN(), WEEK);
-      expect(Object.values(busy).flat().length).toBeGreaterThan(0);
-      const [path, options] = request.mock.calls[0];
-      expect(path).toBe('/google/calendar/freebusy');
-      expect(options?.method).toBe('POST');
-      expect(options?.body).toMatchObject({ items: [{ id: 'primary' }] });
-    });
-
     it('upsert: crear = POST; actualizar = PATCH /events/<id>; si el evento ya no existe (404) lo recrea', async () => {
       respond((path, options) => {
         if (options?.method === 'PATCH' && path.endsWith('/borrado')) throw clientError(404, { code: 'google_not_found', message: 'no existe' });
@@ -303,7 +293,7 @@ describe('googleCalendar (transporte por la API)', () => {
       respond(() => {
         throw clientError(409, { code: 'google_not_connected', message: 'no conectado' });
       });
-      await expect(facade.fetchGoogleBusyIntervalsForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
+      await expect(facade.fetchGoogleEventsAndBusyForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
     });
 
     it('borrado de series con reauth -> status auth_missing (no "error")', async () => {

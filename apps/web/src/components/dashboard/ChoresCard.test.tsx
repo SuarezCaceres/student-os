@@ -278,3 +278,79 @@ describe('ChoresCard: sin sincronización (R2)', () => {
     expect(screen.getAllByRole('checkbox')).toHaveLength(5);
   });
 });
+
+describe('ChoresCard: historial', () => {
+  const past = (date: string, names: string[], extra: Partial<ChoreDay> = {}): ChoreDay => ({
+    date,
+    hard: false,
+    completed: names.map((name, index) => ({ choreId: `old-${index}`, name })),
+    ...extra,
+  });
+  const historyButton = () => screen.getByRole('button', { name: /historial/i });
+  const openHistory = () => fireEvent.click(historyButton());
+  const entries = () =>
+    within(screen.getByTestId('chores-history'))
+      .getAllByRole('listitem')
+      .filter((item) => item.hasAttribute('data-date'));
+
+  it('el historial está plegado por defecto y es un botón aparte de «Ver tu semana»', () => {
+    render(<Harness initial={stateWith({ choreDays: [past('2026-11-24', ['Ducharme'])] })} />);
+    expect(historyButton().textContent).toContain('Ver historial');
+    expect(historyButton().getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Ver tu semana' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByTestId('chores-history')).toBeNull();
+  });
+
+  it('al abrirlo muestra los días pasados del más reciente al más antiguo, sin hoy', () => {
+    const choreDays = [past('2026-11-20', ['Vieja']), doneDay(2), past('2026-11-24', ['Reciente'])];
+    render(<Harness initial={stateWith({ choreDays })} />);
+    openHistory();
+    expect(historyButton().getAttribute('aria-expanded')).toBe('true');
+    expect(historyButton().textContent).toContain('Ocultar historial');
+    expect(entries().map((item) => item.getAttribute('data-date'))).toEqual(['2026-11-24', '2026-11-20']);
+    // Lo de hoy ya está en la lista de arriba, no se repite aquí.
+    expect(within(screen.getByTestId('chores-history')).queryByText('Tender la cama')).toBeNull();
+  });
+
+  it('C11: tras renombrar o eliminar un quehacer, el día pasado conserva el nombre con el que se completó', () => {
+    const choreDays = [past('2026-11-24', ['Tender la cama', 'Ducharme'])];
+    const renamed: Chore[] = [{ id: 'old-0', name: 'Hacer la cama', days: [...ALL_DAYS], order: 0 }];
+    render(<Harness initial={stateWith({ choreDays, chores: renamed })} />);
+    openHistory();
+    const history = screen.getByTestId('chores-history');
+    expect(within(history).getByText('Tender la cama')).toBeTruthy(); // nombre antiguo
+    expect(within(history).getByText('Ducharme')).toBeTruthy(); // quehacer ya eliminado de la lista
+    expect(within(history).queryByText('Hacer la cama')).toBeNull();
+  });
+
+  it('un día difícil pasado muestra la etiqueta amable con el motivo', () => {
+    render(<Harness initial={stateWith({ choreDays: [past('2026-11-24', [], { hard: true, reason: 'cansado' })] })} />);
+    openHistory();
+    expect(within(screen.getByTestId('chores-history')).getByText('Día difícil · cansado')).toBeTruthy();
+  });
+
+  it('sin días pasados muestra el estado vacío', () => {
+    render(<Harness initial={stateWith({ choreDays: [doneDay(1)] })} />);
+    openHistory();
+    expect(screen.getByText('Aún no hay días anteriores. Aquí verás lo que hiciste cada día.')).toBeTruthy();
+  });
+
+  it('«Ver más» amplía el historial y plegarlo lo oculta', () => {
+    const choreDays = Array.from({ length: 20 }, (_, index) => past(`2026-11-${String(24 - index).padStart(2, '0')}`, [`N${index}`])).filter(
+      (day) => day.date >= '2026-11-01',
+    );
+    render(<Harness initial={stateWith({ choreDays })} />);
+    openHistory();
+    expect(entries()).toHaveLength(14);
+    fireEvent.click(screen.getByRole('button', { name: 'Ver más' }));
+    expect(entries()).toHaveLength(20);
+    openHistory();
+    expect(screen.queryByTestId('chores-history')).toBeNull();
+  });
+
+  it('es solo lectura: no hay casillas en el historial', () => {
+    render(<Harness initial={stateWith({ choreDays: [past('2026-11-24', ['Ducharme'])] })} />);
+    openHistory();
+    expect(within(screen.getByTestId('chores-history')).queryByRole('checkbox')).toBeNull();
+  });
+});
