@@ -20,19 +20,17 @@ Navegador ──JWT Supabase──▶ API NestJS ──access token (memoria)─
 | `GET /google/callback` | **Publica** (`@Public()`) | Valida el `state`, canjea el codigo, cifra y guarda el refresh token, y responde **302** a la web con `?google=connected` o `?google=error[&reason=...]`. 30/min por IP. |
 | `GET /google/status` | JWT | `{ configured, connected, needsReauth, email, connectedAt, scopes }`. Sin secretos. |
 | `POST /google/disconnect` | JWT | Revoca en Google y borra el secreto: `{ disconnected, revoked }`. Idempotente. |
-| `GET /google/calendar/primary` | JWT | Metadatos del calendario principal. |
 | `GET /google/calendar/events` | JWT | Lista (`timeMin,timeMax,singleEvents,orderBy,timeZone,maxResults,pageToken,showDeleted`). |
 | `GET /google/calendar/events/:id` y `/:id/instances` | JWT | Un evento / instancias de una serie. |
 | `POST /google/calendar/events` | JWT | Crea (incluye `recurrence` RRULE, `reminders`, `extendedProperties.private`). |
 | `PATCH /google/calendar/events/:id` | JWT | Actualiza; tambien recorta series (`recurrence` con `;UNTIL=...`). |
 | `DELETE /google/calendar/events/:id` | JWT | 204. |
-| `POST /google/calendar/freebusy` | JWT | Solo el calendario `primary` (el cuerpo no puede elegir otro). |
 
-Siempre el calendario `primary` del usuario del JWT (`userId` nunca viene del body/query). Respuestas con `Cache-Control: no-store`.
+Solo rutas de eventos (desde el 2026-11-26 no hay `calendar/primary` ni `calendar/freebusy`: exigian scopes que la app ya no pide, ADR 0008). Siempre el calendario `primary` del usuario del JWT (`userId` nunca viene del body/query). Respuestas con `Cache-Control: no-store`.
 
 ### Decisiones
 
-- **PKCE + `access_type=offline` + `prompt=consent`** (siempre se entrega refresh token). Scopes: `openid email calendar.readonly calendar.events` (los de calendario que la app ya usaba; se quito `profile`, el servidor no necesita nombre ni foto). Si el usuario desmarca `calendar.events` en el consentimiento granular, se revoca lo concedido y se vuelve con `reason=missing_scopes`.
+- **PKCE + `access_type=offline` + `prompt=consent`** (siempre se entrega refresh token). Scopes: `openid email calendar.events.owned` (el mas estrecho que acepta Google para lo que hace el proxy, ADR 0008 revisado el 2026-11-26; los de Calendar salen de `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `@student-os/shared`; se quito `profile`, el servidor no necesita nombre ni foto). Si el usuario desmarca `calendar.events.owned` en el consentimiento granular, se revoca lo concedido y se vuelve con `reason=missing_scopes`.
 - **`state` = `base64url(json{u,n,e}).HMAC-SHA256`**: ligado al usuario (`u`), a un nonce de un solo uso (`n`) y a una expiracion de 10 min (`e`). La clave HMAC se deriva con HKDF de `GOOGLE_TOKEN_ENC_KEY` con otro `info` que la de cifrado. El **verifier PKCE** se guarda en `google_oauth_states` (cifrado, TTL 10 min, fila borrada al usarse: un solo uso, tambien contra carreras con `deleteMany`). El callback cruza `state.u` con `fila.userId`.
 - **Sin open redirect**: el `returnTo` se valida contra `WEB_ORIGINS` (origen exacto, sin credenciales, sin `\`, sin caracteres de control; solo se conserva `origen + ruta`) al crear el flujo Y otra vez al redirigir. Si el `state` es invalido se redirige al primer origen de `WEB_ORIGINS`.
 - **Cifrado AES-256-GCM** (`token-cipher.ts`): IV aleatorio de 12 bytes por registro, version de clave en el blob (`v1.<iv>.<tag>.<ct>`) y columna `keyVersion`, **AAD = `userId`** (un blob copiado a otra fila no descifra). Clave = HKDF-SHA256 del secreto (>= 32 bytes). Rotacion: `GOOGLE_TOKEN_ENC_KEY_VERSION` (+ `GOOGLE_TOKEN_ENC_KEY_PREVIOUS[_VERSION]`); un blob con clave anterior se re-cifra solo al usarse.
@@ -77,7 +75,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/google/callback
 ## Que debe configurar el USUARIO en Google Cloud
 
 1. Proyecto con **Google Calendar API habilitada**.
-2. **Pantalla de consentimiento**: scopes `openid`, `email`, `.../auth/calendar.readonly` y `.../auth/calendar.events`; agregar usuarios de prueba mientras este en *Testing*.
+2. **Pantalla de consentimiento**: scopes `openid`, `email` y `.../auth/calendar.events.owned` (ADR 0008, revisado el 2026-11-26); agregar usuarios de prueba mientras este en *Testing*.
 3. Credenciales -> ID de cliente OAuth tipo **Aplicacion web** (puede ser el mismo que usa GIS, o uno nuevo). En **URI de redireccionamiento autorizados** agregar EXACTAMENTE el callback de la API (sin barra final, mismo esquema/host/puerto que `GOOGLE_REDIRECT_URI`):
    - Produccion: `https://<tu-api>.onrender.com/google/callback`
    - Local: `http://localhost:3000/google/callback`
@@ -86,7 +84,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/google/callback
 ## Limites que hay que conocer (honestidad)
 
 - **Modo *Testing*: el refresh token caduca a los 7 dias** (y hay un maximo de 100 usuarios de prueba). El servidor lo detecta como `invalid_grant`, marca `needsReauth` y la UI muestra "Requiere reconexión" con una explicacion en espanol. Para que la persistencia sea real hay que pasar la pantalla de consentimiento a **In production**.
-- **En produccion sin verificar**: maximo **100 usuarios** y aviso de "app no verificada". `calendar.events`/`calendar.readonly` son scopes *sensibles*: para pasar de 100 usuarios hay que enviar la app a **verificacion de Google** (politica de privacidad, dominio verificado, video de demostracion; el agente PUBLIC aporta las paginas legales). Puede tardar semanas.
+- **En produccion sin verificar**: maximo **100 usuarios** y aviso de "app no verificada". Los scopes de Calendar son *sensibles* (confirmar la clasificacion de cada uno en la consola, spec 008 C9): para pasar de 100 usuarios hay que enviar la app a **verificacion de Google** (politica de privacidad, dominio verificado, video de demostracion; el agente PUBLIC aporta las paginas legales). Puede tardar semanas.
 - Google tambien invalida refresh tokens sin uso durante 6 meses, o si el usuario cambia su contrasena de Google / quita el acceso (se ve igual que `invalid_grant`), y guarda como maximo 100 refresh tokens por usuario y cliente.
 - El access token vive en memoria del proceso: tras un reinicio/dormida de Render se vuelve a renovar con el refresh token (1 llamada extra, transparente).
 
@@ -101,7 +99,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/google/callback
 - `disconnectGoogleCalendar()` (que `App` llama al **cerrar sesion**) en modo nube **solo olvida el estado local**: NO revoca la conexion persistente (si no, cada logout obligaria a reconectar). La desconexion real es la nueva `disconnectGoogleCalendarCloud()`, que usa el modal.
 - Archivo nuevo `services/googleCloud.ts` (transporte nube, estado de sesion, captura de la redireccion). Esta dentro del dominio GOOGLE pero no figuraba en la lista de alcance; si prefieres, se puede fusionar dentro de `googleCalendar.ts`.
 - Exports nuevos: `GOOGLE_CLOUD_ACCESS_TOKEN`, `isGoogleCloudToken`, `isGoogleCloudMode`, `resolveGoogleCloudMode`, `refreshGoogleCloudConnection`, `beginGoogleCloudConnect`, `disconnectGoogleCalendarCloud`, `consumeGoogleRedirectResult` y los tipos `GoogleCloudConnectionState`, `GoogleCloudStatus`, `GoogleRedirectResult`.
-- `GoogleCalendarSyncModal.tsx`: estados Conectado / Sin conectar / Requiere reconexión / Revisando conexión, "Conectar" (redireccion, sin popup), "Reconectar", "Desconectar" con confirmacion (revoca de verdad y avisa si Google no confirmo), mensajes del resultado de volver de Google, aviso si el servidor no esta configurado. Objetivos tactiles `.t-btn` (>= 44 px), texto >= 13 px, sin violeta. En modo GIS el modal se comporta como antes.
+- `GoogleCalendarSyncModal.tsx`: estados Conectado / Sin conectar / Requiere reconexión / Revisando conexión. Desde la 009 **no tiene** botones "Conectar", "Reconectar" ni "Desconectar": Calendar se vincula al iniciar sesion con Google, y si el acceso caduca o se revoca el modal (y los avisos de `App.tsx`, ver `services/googleReauthMessages.ts`) piden cerrar sesion y volver a entrar con Google. Acciones: sincronizar disponibilidad, publicar bloques y descargar .ics. Objetivos tactiles `.t-btn` (>= 44 px), texto >= 13 px, sin violeta. En modo GIS el modal se comporta como antes.
 - `GoogleChangeBanner.tsx`, `GoogleImpactModal.tsx` y `googleCalendarDiff.ts` **no necesitaron cambios** (no tocan tokens).
 
 ## Lo que debe cablear el Integrador

@@ -1,3 +1,4 @@
+import { VERIFIED_GOOGLE_CALENDAR_SCOPES } from '@student-os/shared';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -11,9 +12,12 @@ import { useSyncExternalStore } from 'react';
  * Nada de este modulo registra ni muestra el token.
  */
 
-/** Permisos de Calendar que se piden en el mismo consentimiento del login (los mismos que usa la app desde siempre). */
-export const GOOGLE_LOGIN_CALENDAR_SCOPES =
-  'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events';
+/**
+ * Permisos de Calendar que se piden en el mismo consentimiento del login. Salen de la fuente unica
+ * `VERIFIED_GOOGLE_CALENDAR_SCOPES` de `@student-os/shared`, la misma de la que deriva `GOOGLE_SCOPES` en el API (los mas
+ * estrechos que acepta Google, spec 008 C9): cambiarlos obliga a reverificar la app (`googleLogin.test.ts`).
+ */
+export const GOOGLE_LOGIN_CALENDAR_SCOPES = VERIFIED_GOOGLE_CALENDAR_SCOPES.join(' ');
 
 const PROVIDER_FIELDS = ['provider_token', 'provider_refresh_token'] as const;
 

@@ -82,12 +82,22 @@ test.describe('2. login con sesion en la nube', () => {
 
     // C4: el MISMO consentimiento del login pide los permisos de Calendar y el refresh token (offline + consent).
     const asked = new URL(req.url()).searchParams;
-    expect((asked.get('scopes') ?? '').split(/[\s,+]+/)).toEqual(
-      expect.arrayContaining([
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/calendar.events',
-      ]),
-    );
+    const askedScopes = (asked.get('scopes') ?? '').split(/[\s,+]+/).filter(Boolean);
+    expect(askedScopes).toEqual(expect.arrayContaining(['https://www.googleapis.com/auth/calendar.events.owned']));
+    // Solo el scope estrecho verificado (spec 008 C9, ADR 0008 revisado el 2026-11-26): ni amplios ni los que no se usan.
+    // `profile` tampoco lo pide la app. Ojo: este parametro es lo que la WEB envia a Supabase; el Supabase real anade
+    // por su cuenta los scopes de identidad al redirigir a Google (pendiente de comprobar cuales con una cuenta real,
+    // ver scopes.md). El Supabase falso no anade `profile`, asi que aqui sirve para fijar lo que pide la app.
+    for (const forbidden of [
+      'profile',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar.freebusy',
+      'https://www.googleapis.com/auth/calendar.calendars.readonly',
+    ]) {
+      expect(askedScopes, `la web no debe pedir ${forbidden}`).not.toContain(forbidden);
+    }
     expect(asked.get('access_type')).toBe('offline');
     expect(asked.get('prompt') ?? '').toContain('consent');
 
@@ -125,7 +135,8 @@ test.describe('2. login con sesion en la nube', () => {
     const key = userKey('s2e');
     await control('/supabase/config', {
       loginUserKey: key,
-      grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
+      // El usuario desmarca el unico permiso de Calendar que se pide: Google solo concede la identidad.
+      grantedScopes: ['openid', 'email'],
     });
     try {
       const s = await sessionFor(key);

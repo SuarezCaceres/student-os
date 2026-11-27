@@ -88,7 +88,7 @@
       "id": "008",
       "nombre": "verificacion-de-la-app-en-google",
       "spec": "docs/specs/008-verificacion-app-google/spec.md",
-      "estado": "plan",
+      "estado": "en_curso",
       "criterios": [
         { "id": "C1", "descripcion": "Todos los puntos de docs/google-verification-checklist.md estan completados", "pasa": false },
         { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false },
@@ -118,7 +118,7 @@
         { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": true },
         { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": true },
         { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": true },
-        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email, calendar.readonly y calendar.events", "pasa": true },
+        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email y calendar.events.owned (actualizado el 2026-11-26, revision del ADR 0008 por decision delegada por el humano; el 2026-11-25 eran calendar.events.owned, calendar.freebusy y calendar.calendars.readonly, spec 008 Q9)", "pasa": true },
         { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": true },
         { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": true },
         { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": true },

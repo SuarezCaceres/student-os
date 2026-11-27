@@ -84,12 +84,6 @@ export const eventBodySchema = z.object({
   transparency: z.enum(['opaque', 'transparent']).optional(),
 });
 
-export const freeBusyBodySchema = z.object({
-  timeMin: rfc3339,
-  timeMax: rfc3339,
-  timeZone: z.string().max(64).optional(),
-});
-
 export const connectBodySchema = z.object({
   returnTo: z.string().max(2048).optional(),
 });

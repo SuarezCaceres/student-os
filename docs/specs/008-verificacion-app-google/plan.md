@@ -1,6 +1,6 @@
 # Plan · 008 · Verificación de la app StudentOS en Google
 
-> Estado: borrador (espera la aprobación del humano; no se implementa nada antes)
+> Estado: **aprobado** por el humano el 2026-11-25. Se empieza por el bloque A.
 > Se escribe después de aprobar la spec (aprobada el 2026-11-24). Dice **cómo**.
 
 ## Enfoque
