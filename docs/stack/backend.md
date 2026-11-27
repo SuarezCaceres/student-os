@@ -45,6 +45,47 @@ E2E_PORT_OFFSET=2000 ./scripts/check.sh --rapido     # también vale para npm ru
 - Puertos base: integración `54329` (sync), `54334` (google), `54335` (public); E2E `54340` (Postgres), `54341` (Supabase falso), `54342` (Google falso), `54343` (control), `3100` (API), `5293` y `5294` (Vite con y sin nube).
 - Fuente única: `apps/api/test/ports.cjs` (la leen los helpers `*-pg.ts`, los `*-pg-server.mjs`, `e2e-harness/config.mjs` y, a través de este, `apps/web/e2e/support/harness.ts`). Para añadir un puerto nuevo, añádelo solo ahí. Prueba: `apps/api/test/ports.e2e-spec.ts`.
 
+## Producción (`student-os-prod`): variables y orden de despliegue
+Receta del plan 007 (`docs/specs/007-produccion-student-os-prod/plan.md`). **Aquí solo van los nombres**: los valores viven en los paneles de cada servicio y en el gestor de contraseñas del humano, nunca en el repositorio, en commits, en logs ni en chats.
+
+### Variables por servicio
+| Servicio | Variable | Qué es |
+|----------|----------|--------|
+| Render (API) | `NODE_ENV` | `production` (fijada en `render.yaml`) |
+| Render (API) | `NODE_VERSION` | `22` (fijada en `render.yaml`) |
+| Render (API) | `PORT` | La inyecta Render; no se declara |
+| Render (API) | `SUPABASE_JWT_AUDIENCE` | `authenticated` (fijada en `render.yaml`) |
+| Render (API) | `DATABASE_URL` | Pooler de Supabase, puerto 6543, con `?pgbouncer=true` · **secreto** |
+| Render (API) | `DIRECT_URL` | Conexión directa de Supabase, puerto 5432 · **secreto** |
+| Render (API) | `SUPABASE_URL` | `https://<ref>.supabase.co`, sin barra final |
+| Render (API) | `WEB_ORIGINS` | Orígenes de la web separados por comas (dominio y `www`), sin barra final ni ruta. Obligatoria con `NODE_ENV=production` |
+| Render (API) | `GOOGLE_CLIENT_ID` | Cliente OAuth **de producción** (el mismo que el proveedor Google de Supabase Auth) |
+| Render (API) | `GOOGLE_CLIENT_SECRET` | Secreto de ese cliente · **secreto** |
+| Render (API) | `GOOGLE_TOKEN_ENC_KEY` | Clave AES-256-GCM de los refresh tokens (`openssl rand -base64 32`, ≥ 32 caracteres) · **secreto**. Respáldala **antes de la primera vinculación**: rotarla deja ilegibles los tokens guardados y requiere aprobación del humano |
+| Vercel (web) | `VITE_SUPABASE_URL` | La misma URL de Supabase |
+| Vercel (web) | `VITE_SUPABASE_PUBLISHABLE_KEY` | Clave **pública** (publishable) de Supabase; nunca la `service_role` |
+| Vercel (web) | `VITE_API_URL` | `https://api.<dominio>` |
+| Vercel (web) | ~~`VITE_GOOGLE_CLIENT_ID`~~ | La web ya no la usa desde la 009: quítala si existe |
+| GitHub (repo) | `PROD_API_URL` | **Variable** de repositorio (no secreto): `https://api.<dominio>`. Activa el ping de `.github/workflows/ping-supabase.yml` |
+
+Las variables de producción de Vercel no deben aplicarse a las previsualizaciones de ramas.
+
+### Orden de despliegue
+De la base de datos hacia fuera; cada capa se comprueba antes de pasar a la siguiente. Los pasos 1 a 7 los hace el humano con sus credenciales.
+
+1. **Decisiones previas:** dominio y quién gestiona su DNS; región (recomendada: Supabase `us-east-1` y Render Virginia, la misma zona). La región no se cambia después.
+2. **Supabase:** crear `student-os-prod`; anotar `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL` y la clave pública; aplicar **una sola vez y en este orden** `20261113000000_wave2_sync`, `20261113010000_wave3_google` y después `prisma/rls-baseline.sql`. Comprobar que todas las tablas tienen RLS activa.
+3. **Google Cloud:** cliente OAuth de producción con la redirección `https://<ref>.supabase.co/auth/v1/callback` y el dominio como origen.
+4. **Supabase Auth:** proveedor Google con el mismo client id y secret; `Site URL` = dominio; redirecciones permitidas: dominio y `www`.
+5. **Render (API):** servicio desde `render.yaml` (`autoDeploy: false`), variables de la tabla, despliegue manual, comprobar `GET /health` y `GET /health/ready`; dominio `api.<dominio>`.
+6. **Vercel (web):** `Root Directory = apps/web`, variables de la tabla, dominio y registros DNS.
+7. **Ping:** crear `PROD_API_URL` en GitHub y lanzar a mano el workflow «Ping Supabase (producción)»; debe terminar en verde.
+8. **Verificación:** `node scripts/verificar-produccion.mjs --api https://api.<dominio> --web https://<dominio>` (o con `API_URL` y `WEB_URL`). Es de solo lectura y no necesita credenciales: comprueba `/health` y `/health/ready` (200), `/profile` sin token (401), que CORS no autoriza un origen ajeno y que la web responde 200; sale con un código distinto de 0 si algo falla. Después, la prueba manual con las cuentas reales.
+
+### Salud
+- `GET /health`: proceso vivo (tiempo activo y versión). No toca la base; lo usa el health check de Render.
+- `GET /health/ready`: además ejecuta `SELECT 1` por Prisma (máx. 5 s). 200 `{ status: 'ok', db: 'ok' }` o 503 `{ status: 'error', db: 'error' }`, sin detalles del error. Lo llama el ping cada 3 días para que Supabase (plan gratuito) no pause el proyecto tras 7 días sin actividad.
+
 ## Estructura de carpetas en `apps/api/`
 ```
 src/

@@ -28,9 +28,13 @@ describe('API (e2e)', () => {
       imports: [AppModule],
       controllers: [ProtectedTestController],
     })
-      // Sin base de datos viva: Prisma se sustituye por un doble.
+      // Sin base de datos viva: Prisma se sustituye por un doble cuya consulta falla como una base caida.
       .overrideProvider(PrismaService)
-      .useValue({ $connect: jest.fn(), $disconnect: jest.fn() })
+      .useValue({
+        $connect: jest.fn(),
+        $disconnect: jest.fn(),
+        $queryRaw: jest.fn(() => Promise.reject(new Error('postgresql://u:SUPER-SECRETO@db.example.com caida'))),
+      })
       .compile();
 
     const nestApp = moduleRef.createNestApplication({ logger: false });
@@ -73,6 +77,21 @@ describe('API (e2e)', () => {
       expect(res.headers['x-content-type-options']).toBe('nosniff');
       expect(res.headers['strict-transport-security']).toBeDefined();
       expect(res.headers['x-powered-by']).toBeUndefined();
+    });
+  });
+
+  describe('GET /health/ready', () => {
+    it('es publico y responde 503 sin detalles si la base no responde', async () => {
+      const res = await request(app.getHttpServer()).get('/health/ready').expect(503);
+      expect(res.body).toEqual({ status: 'error', db: 'error' });
+      expect(JSON.stringify(res.body)).not.toContain('SUPER-SECRETO');
+    });
+
+    it('no le afecta el limite de peticiones (lo llama un ping programado)', async () => {
+      const responses = await Promise.all(
+        Array.from({ length: 130 }, () => request(app.getHttpServer()).get('/health/ready')),
+      );
+      expect(responses.every((r) => r.status === 503)).toBe(true);
     });
   });
 
