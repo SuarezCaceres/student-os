@@ -527,6 +527,16 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(error?.message).not.toContain('secreto interno');
     });
 
+    it('un 403 de permisos pide volver a entrar con Google, no reconectar (spec 009: ya no hay boton Conectar)', async () => {
+      h.fake.failNextCalendar(403, { error: { code: 403, errors: [{ reason: 'insufficientPermissions' }] } });
+      const error = await listEvents(h, USER_A).then(
+        () => null,
+        (e: unknown) => e as GoogleHttpException,
+      );
+      expect(error?.message).toContain('Cierra sesion y vuelve a entrar con Google');
+      expect(error?.message).not.toMatch(/Reconecta/i);
+    });
+
     it('un fallo de red hacia Google se informa como google_upstream_error (424)', async () => {
       const dead = await createGoogleHarness();
       try {

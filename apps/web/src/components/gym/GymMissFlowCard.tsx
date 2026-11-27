@@ -566,7 +566,7 @@ export const GymMissFlowCard: React.FC<GymMissFlowCardProps> = ({
                       helperText={
                         isGoogleConnected
                           ? 'Se agregará esta alarma popup directa en Google Calendar.'
-                          : 'Se guardará en tu bloque y se aplicará al conectar Google Calendar.'
+                          : 'Se guardará en tu bloque y se aplicará cuando Google Calendar esté conectado.'
                       }
                     />
                   </div>

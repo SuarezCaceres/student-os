@@ -81,6 +81,7 @@ import {
   type DeleteGoogleGymEventsResult,
   type GoogleCalendarEvent,
 } from './services/googleCalendar';
+import { GOOGLE_REAUTH_MESSAGES } from './services/googleReauthMessages';
 import {
   buildGymCalendarBlockPayload,
   findFreeTwoHourSlots,
@@ -862,7 +863,7 @@ export const App: React.FC = () => {
       } else if (payload.selectedSlot && generatedBlockId && hasGoogleLink) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró. El entrenamiento reprogramado se guardó solo localmente hasta que reconectes Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.gymRescheduleSavedLocally,
           showSyncButton: true,
         });
       }
@@ -1037,7 +1038,7 @@ export const App: React.FC = () => {
     if (!activeToken) {
       if (hasGoogleLink || extraLinkedIds.length > 0 || hadGoogleGymInCache) {
         const msg =
-          'Tu sesión de Google Calendar expiró o no está activa. Reconecta en Google Sync para borrar también las sesiones anteriores en Google Calendar.';
+          GOOGLE_REAUTH_MESSAGES.gymPreviousSessionsNotDeleted;
         setGoogleActionBanner({ tone: 'warn', text: msg, showSyncButton: true });
         return {
           status: 'auth_missing',
@@ -1239,7 +1240,7 @@ export const App: React.FC = () => {
           });
           setGoogleActionBanner({
             tone: 'warn',
-            text: 'Tu sesión de Google Calendar expiró al guardar el horario. Reconecta en Google Sync para guardar y limpiar tus sesiones en Google Calendar.',
+            text: GOOGLE_REAUTH_MESSAGES.gymScheduleNotSaved,
             showSyncButton: true,
           });
           return;
@@ -1433,7 +1434,7 @@ export const App: React.FC = () => {
       } else if (newBlock.syncWithGoogle && hasGoogleLink && !activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró; este bloque se guardó solo localmente hasta reconectar Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.blockSavedLocally,
           showSyncButton: true,
         });
       }
@@ -1490,7 +1491,7 @@ export const App: React.FC = () => {
       if (!activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Se eliminó el bloque local, pero tu sesión de Google expiró y el evento sigue en Google Calendar hasta que reconectes Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.blockDeletedLocallyOnly,
           showSyncButton: true,
         });
         return;
@@ -1532,7 +1533,7 @@ export const App: React.FC = () => {
       if (!activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró. Reconecta en Google Sync para eliminar este evento de Google Calendar.',
+          text: GOOGLE_REAUTH_MESSAGES.googleEventNotDeleted,
           showSyncButton: true,
         });
         return;
@@ -1908,7 +1909,7 @@ export const App: React.FC = () => {
             if (hasGoogleLink) {
               setGoogleActionBanner({
                 tone: 'warn',
-                text: 'Tu sesión de Google Calendar expiró. El turno laboral quedó guardado localmente; reconecta en Google Sync para publicar su serie recurrente.',
+                text: GOOGLE_REAUTH_MESSAGES.workShiftSavedLocally,
                 showSyncButton: true,
               });
             }
@@ -2081,7 +2082,7 @@ export const App: React.FC = () => {
           if (!activeToken) {
             setGoogleActionBanner({
               tone: 'warn',
-              text: 'Tu sesión de Google Calendar expiró. Reconecta en Google Sync para reubicar este entrenamiento en Google Calendar.',
+              text: GOOGLE_REAUTH_MESSAGES.gymSolutionNotMoved,
               showSyncButton: true,
             });
             return;
