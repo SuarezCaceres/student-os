@@ -1,6 +1,6 @@
 # Spec · 008 · Verificación de la app StudentOS en Google
 
-> Estado: **aprobada** por el humano el 2026-11-24 (las preguntas abiertas Q1–Q10 siguen pendientes de respuesta)
+> Estado: **aprobada** por el humano el 2026-11-24 (preguntas abiertas: respondidas Q1 y Q4–Q9; Q10 aplazada; faltan Q2 y Q3)
 > Dice **qué** y **por qué**, no **cómo**. El cómo va en `plan.md`, después de aprobar esta spec.
 > Prioridad: Alto (`docs/TASKS.md` → 2). **Bloquea** que el login sea «para todos» (spec 009, C12) y tarda **semanas**, así que conviene empezar cuanto antes lo que no depende de nada.
 > Depende de: 007 (dominio y producción desplegada). Se coordina con: 009 (el flujo que Google verá).
@@ -144,13 +144,20 @@ Hallazgo para C9: el checklist daba por posible retirar `calendar.readonly` si `
 ## Preguntas abiertas
 El humano debe contestarlas; no se han rellenado con datos inventados.
 - **Q1 · Dominio:** ¿cuál es el dominio propio y está ya comprado? (el checklist solo da `studentos.app` como ejemplo). ¿Quién es el propietario de la cuenta de Search Console y de Google Cloud?
+  - **Respuesta (2026-11-26):** `studentoshub.io` (libre según el registro de Vercel el 2026-11-26; 14,99 USD el primer año y 46 USD al renovar). Lo compra el humano en el bloque H. Siguen abiertos el propietario de Search Console y de Google Cloud (debe ser la misma cuenta).
 - **Q2 · Datos legales:** nombre del responsable, país o jurisdicción y correo de contacto que irán publicados en las páginas legales (C4). No se prefija ninguno del repo ni de la cuenta personal.
 - **Q3 · Correos de la consola:** ¿correo de asistencia y correo de contacto del desarrollador? ¿Son el mismo que el de Q2 y se leen a diario?
 - **Q4 · Proyecto de Google Cloud:** ¿se usa el mismo proyecto y cliente OAuth de desarrollo para producción, o se crea uno separado con sus URIs? (recomendable separar; no es una decisión que esta spec pueda inventar).
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** cliente OAuth **nuevo y solo de producción**, con sus propias URIs.
 - **Q5 · Logotipo:** ¿`apps/web/public/logo.png` (JPEG 1024×1024) es el logotipo definitivo? Hay que preparar la versión de 120×120 px sin marcas de Google y comprobar el peso.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** el logotipo actual, **convertido a PNG real** (cuadrado, hasta 1 MB). Falta preparar la versión de 120×120 px.
 - **Q6 · Calendar obligatorio:** ¿se acepta el plan B (hacerlo opcional, reabriendo 009-C9) si Google cuestiona que el login lo exija? Es un riesgo conocido, no una certeza.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **no** hacerlo opcional de antemano; si Google lo cuestiona, justificarlo y decidir entonces.
 - **Q7 · Cuándo enviar:** ¿se espera a que 009 esté en producción para grabar el vídeo y enviar (recomendado) o se envía antes con el flujo actual y se regraba después?
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **antes, en paralelo** con producción. Riesgo aceptado: Google revisa la web pública, las páginas legales y el vídeo, así que enviar sin la 009 desplegada puede añadir rondas.
 - **Q8 · Revocación y `POST /google/disconnect`:** como la 009 elimina el botón, ¿se deja el endpoint sin uso en la API, se retira o se mantiene para el borrado de cuenta? Hay que responder a Google con exactitud cómo revoca el usuario.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **mantener el endpoint sin botón** en la web. Al usuario se le indica revocar en `myaccount.google.com/permissions` (paso 6 del guion).
 - **Q9 · Retirada de scopes:** si C9 demuestra que algún scope sobra o hay uno más estrecho, ¿se autoriza modificar 009-C4 y el ADR 0005 («Scopes mínimos»)?
   - **Respuesta (2026-11-25):** sí, **estrechar todo**: `calendar.events.owned`, `calendar.freebusy` y `calendar.calendars.readonly` en lugar de `calendar.readonly` y `calendar.events`. Registrado en el ADR 0008. El Anexo B queda sustituido por `scopes.md`.
 - **Q10 · Texto legal:** reescribir la política y los términos es una decisión con efecto jurídico; ¿quién los revisa antes de publicarse (el humano, un tercero)?
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **se deja para después**; el bloque B espera a esta respuesta y a Q2.
