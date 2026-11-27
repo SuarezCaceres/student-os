@@ -2,7 +2,7 @@
 
 > Paso A3 del plan. Textos **en inglés** para pegar en el formulario de verificación de Google, uno por permiso.
 > Debajo de cada texto, la tabla de respaldo: cada afirmación con el código, el ADR o la prueba que la sostiene. Si el código cambia, se corrige el texto (nunca al revés) y se revisa esta tabla.
-> Scopes: `openid`, `email` y `calendar.events.owned` (ADR 0008, revisión del 2026-11-26; fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES`). Revisado contra el código de la rama de la 008 el 2026-11-26.
+> Scopes: `openid`, `email`, `profile` (lo añade Supabase) y `calendar.events.owned` (ADR 0008, revisión del 2026-11-26; fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES`). Revisado contra el código de la rama de la 008 el 2026-11-26.
 > Ya **no** se piden `calendar.freebusy` ni `calendar.calendars.readonly`: la app no usaba `freebusy.query` ni `calendars.get` (los huecos libres salen de `events.list`), así que se quitaron sus textos.
 
 ## Qué guarda StudentOS de Google (comprobado en el código)
@@ -39,12 +39,13 @@ Cómo se revoca: borrar la cuenta en StudentOS revoca el token en Google y borra
 | Token cifrado, nunca en el navegador; revocación y borrado | Tabla «Qué guarda» y «Cómo se revoca» de arriba |
 | Es el scope más estrecho | `scopes.md`, ADR 0008 |
 
-## `openid`, `email`
-> Used for Sign in with Google, the only way to sign in to StudentOS, to identify the user's account. The email is also used to check that the Google Calendar connection belongs to the same account the user signed in with. We do not use this information for advertising or share it with third parties.
+## `openid`, `email`, `profile`
+> Used for Sign in with Google, the only way to sign in to StudentOS, to identify the user's account. The basic profile (name and profile picture) is shown in the app header so the user can see which account is signed in, and the name is used as the initial display name of a new StudentOS profile, which the user can change. The email is also used to check that the Google Calendar connection belongs to the same account the user signed in with. We do not use this information for advertising or share it with third parties.
 
 | Afirmación | Respaldo |
 |---|---|
 | Único método de entrada | ADR 0007 |
+| `profile`: nombre y foto en la cabecera; nombre inicial del perfil nuevo | `apps/web/src/components/auth/useAuthState.ts` (`full_name`/`avatar_url` de `user_metadata`), `apps/web/src/utils/newAccountState.ts` (`getAccountDisplayName`). Lo añade Supabase al login (comprobado en producción el 2026-11-26, `scopes.md`) |
 | Se comprueba que la cuenta de Calendar es la de la sesión | `google.e2e-spec.ts` («un token de otra cuenta de Google responde 409 google_account_mismatch y no guarda nada») |
 | Sin publicidad ni cesión a terceros | Política de privacidad (`apps/web/public/legal/privacidad.html`); se revisa en el paso B1 |
 
@@ -54,5 +55,5 @@ Se mantiene literal en la política de privacidad (C5 d):
 
 ## Pendiente antes de pegar estos textos en el formulario
 - Repasar en la app desplegada con la 009 las filas marcadas «Revisar en la app tras la 009».
-- Confirmar qué scopes de identidad añade Supabase (`scopes.md`, «Otros orígenes»). Si añade `profile`, hay que justificarlo aquí.
+- [x] Supabase añade `profile` (comprobado el 2026-11-26): justificado arriba junto con `openid` y `email` (decisión del humano, 2026-11-27).
 - **Comprobar con una cuenta real** que `calendar.events.owned` devuelve también los eventos de invitaciones (`scopes.md`). Es el único scope de lectura: de él dependen la vista semanal, los choques y los huecos libres. Si no los devuelve, hay que pasar a un scope más amplio (nueva decisión del humano), reescribir este texto y reverificar.

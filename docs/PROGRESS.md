@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-27 · Claude Code (sesión «pendientes») · docs/008-declara-profile
+- **Hecho:** se declara el scope `profile` para la verificación en Google. En producción, Supabase lo añade al login (`google_connections.scopes` = `calendar.events.owned userinfo.email userinfo.profile openid`, comprobado el 2026-11-26) y la app sí lo usa: nombre y foto en la cabecera (`useAuthState.ts`) y nombre inicial del perfil nuevo (`newAccountState.ts`). Decisión del humano: declararlo, no sustituir el login de Supabase. Actualizados `scopes.md`, `justificaciones.md` (texto en inglés de `openid`/`email`/`profile`), el checklist (H2, B1) y `TASKS.md` (A4). Antes, en esta sesión: revisión de #19 (scopes reducidos a `calendar.events.owned`), avisos de reconexión de la 009 y respuestas a Q1, Q4–Q8 y Q10 de la 008 (dominio `studentoshub.io`).
+- **Verificación:** solo documentación; el hook de pre-commit (`check.sh --rapido`) pasa.
+- **Pendiente:** comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos de invitaciones; Q2 y Q3 del humano; bloque B (páginas legales con `profile`) y bloque H en la consola.
+- **Problemas:** ninguno.
+
 ## 2026-11-27 · Claude Code · fix/render-google-redirect (producción desplegada)
 - **Hecho:** producción de la 007 en marcha. Supabase `student-os-prod` (us-east-1; se pausó `bidercorp-demo` por el límite de 2 proyectos gratuitos, decisión del humano) con las 2 migraciones y `rls-baseline.sql` aplicadas por el conector; API en Render (`https://student-os-api.onrender.com`, Virginia, rama `main`); web en Vercel con `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_API_URL`; #9 fusionado en `main` (con 010, 011, 012, 008 y la parte de código de la 007 dentro). Login real verificado: perfil creado, Calendar vinculado sin botón, 7 registros sincronizados. Ping a Supabase activo (`PROD_API_URL` en GitHub; primera ejecución en verde).
 - **Corrección:** la API necesitaba `GOOGLE_REDIRECT_URI` (la lee `GoogleConfig`, no `env.schema`) y no estaba en `render.yaml`; sin ella respondía `google_not_configured`. Ahora está en `render.yaml` y en `docs/stack/backend.md`, con una prueba que falla si la API lee una variable que `render.yaml` no declara.
