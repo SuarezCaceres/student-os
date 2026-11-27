@@ -11,6 +11,15 @@
 
 ### 🔴 Alto
 
+#### A0 · Fusionar los PRs pendientes a `main` · lo hace el humano (parte 1 hecha el 2026-11-25)
+El `AGENTS.md` prohíbe que el agente haga merge a `main`: estos pasos son de la persona.
+- [x] **Hecho el 2026-11-25:** #12, #8, #13 y #14 fusionados a `main` con merge commit, sin conflictos (`main` en `ecd9ad5`). Verificación completa de `./scripts/check.sh` sobre `main` con los puertos por defecto: lint, tipos, 368 + 288 + 35 unitarias, 152 de integración y 14 E2E, todo en verde (confirma que `E2E_PORT_OFFSET` con valor 0 no cambia nada).
+- [ ] **No fusionar #9** (la 009, que ya lleva dentro el gym opcional, los datos por usuario y los quehaceres diarios) hasta que producción (A3) esté lista: sigue en borrador a propósito. Antes de fusionarlo, pasarlo a «Ready for review», incorporar `main` en su rama y confirmar que sus checks están en verde.
+- [ ] Borrar las ramas remotas ya fusionadas (`chore/adopt-agent-harness`, `feat/agent-1-university-kanban`, `feat/agent-2-gym-calendar-dashboard`, `feat/student-os-core-hub`, `feat/ui-taste-foundation`, `integration/backend`, y ahora también `chore/puertos-pruebas-configurables`, `docs/prioriza-pendientes`, `docs/spec-007-produccion`, `docs/spec-008-verificacion-google`) y las obsoletas (`feat/011-gym-opcional`, `feat/overview-summary`) **solo con confirmación del humano**. Hacer `git pull` en los worktrees locales desfasados (`student-os-008`, `student-os-011` y el directorio principal).
+- [ ] Limpiar lo que dejaron los agentes: un Postgres de pruebas huérfano (procesos 33604 y 36648, puerto 55395; ya no aparecen ocupando puertos) y la carpeta `C:\Users\Sergio Suarez\Projects\student-os-int-009`.
+- [x] **Decisiones tomadas el 2026-11-25:** 012: un día sin registro **cuenta como 0** en el promedio (se mantiene), se **añade una vista de historial** (hecha en el PR #17, apilado sobre la 009) y sin red **no se siembra** la lista base. 007: `student-os-prod` **empieza vacía**, **dominio propio**, ping con **GitHub Actions**, el humano tiene **dos o más cuentas de Google**, y se aprueban los criterios C6–C8 (PR #18).
+- [ ] Decisiones del humano que siguen abiertas: **dominio propio concreto** y su DNS, **región** de Supabase y Render, **aprobar la spec 007** para pasar a su plan; las Q1–Q10 de la spec 008 (varias dependen del dominio y de los datos legales); y confirmar que sembrar los quehaceres cuente como «cambios sin subir» al cerrar sesión (aserciones 6b y 6d de la E2E `06-cerrar-sesion`).
+
 #### A1 · ⭐ IMPORTANTE · Login con Google para cualquier usuario y Calendar vinculado automáticamente (funcionalidad 009)
 Objetivo del humano: que **cualquier persona** entre con su cuenta de Google y que su Google Calendar quede **ya vinculado, sin pulsar ningún botón «Conectar»**.
 - **Hoy:** el login usa Supabase Auth con Google (`apps/web/src/services/supabase.ts`). Vincular Calendar es **otro flujo aparte** que exige pulsar «Conectar» en `GoogleCalendarSyncModal` (`POST /google/connect`, PKCE, refresh token cifrado en el servidor). Además la web en producción **no tiene API desplegada**, así que el login con la nube no funciona de verdad todavía.
