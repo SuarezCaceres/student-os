@@ -82,6 +82,7 @@ Prerrequisito de A1 y A2. Acciones del humano, necesitan credenciales.
 - [ ] Desplegar la API en Render y verificar `/health`
 - [ ] Ping programado contra la pausa de Supabase a los 7 días
 - [x] Spec escrita en `docs/specs/007-produccion-student-os-prod/spec.md` (borrador, rama `docs/spec-007-produccion`): **a la espera de tu aprobación**; propone los criterios C6–C8 y deja 6 preguntas abiertas. El agente no toca producción: prepara la receta y la verificación
+- [x] Fase A del plan (pasos del agente, rama `feat/007-produccion`, PR en borrador sobre la 009): `GET /health/ready` (`SELECT 1`, 200/503), `scripts/verificar-produccion.mjs` de solo lectura, workflow `ping-supabase.yml` (inactivo sin la variable `PROD_API_URL`) y variables y orden de despliegue en `docs/stack/backend.md`. Faltan las fases B a H del humano
 
 #### A4 · Verificación de la app en Google (funcionalidad 008)
 Prerrequisito de A1: sin ella el login no es «para todos».
@@ -97,6 +98,7 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] **M6 · Reabrir sin red tras perder IndexedDB:** el motor descarta `localStorage` cuando el documento de sync de la cuenta no está arrancado en el navegador (regla de la spec 009). Si el navegador borró IndexedDB, o está en memoria (modo privado restrictivo), una recarga **sin red** muestra el estado de una cuenta nueva en vez de la última caché hasta recuperar la conexión. Valorar conservar la caché cuando `localStorage` guarda el id de la cuenta que está entrando.
 - [ ] **M3 · E2E en el CI:** el CI no ejecuta la E2E (solo build, lint y tests unitarios de los tres paquetes). Valorar un job de E2E.
 - [ ] **M4 · `.claude/settings.json`** deniega `Read(./.env.*)` y eso bloquea también leer `.env.example`, que el harness pide mantener al día. Decidir: listar solo los `.env` con secretos (`.env`, `.env.local`, `.env.production`…) o aceptar la limitación.
+- [ ] **M7 · Arranque inestable de Postgres embebido:** el 2026-11-26 (`feat/007-produccion`, `E2E_PORT_OFFSET=1900`) `public.e2e-spec.ts` falló una vez en `npm test` con `P1001: Can't reach database server at 127.0.0.1:56235` en `prisma db push`, justo después de que el hijo anunciara «ready», y pasó en las tres repeticiones siguientes sin cambios. Investigar si `public-pg-server.mjs` anuncia que está listo antes de aceptar conexiones.
 - [ ] **M5 · Revisar lo deducido:** las convenciones «(observado)» de `docs/rules/backend.md` y `frontend.md`, el glosario de `PROJECT.md` y los ADRs 0004 a 0006 salen del código y de las notas de los agentes, no de una decisión tuya.
 
 ### 🟢 Bajo

@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-26 · Claude Code · feat/007-produccion
+- **Hecho:** fase A del plan 007 (aprobado), un commit por paso, sobre `feat/009-login-google-calendar-automatico`: A2 `GET /health/ready` (público, sin límite, `SELECT 1` con tope de 5 s; 200 `{ status: 'ok', db: 'ok' }` o 503 sin detalles del error en la respuesta ni en el log; `/health` sin cambios), A1 `scripts/verificar-produccion.mjs` (solo lectura, sin dependencias ni credenciales; prueba contra servidores falsos y contra la API real con Postgres embebido), A3 `.github/workflows/ping-supabase.yml` (cada 3 días y a mano; en verde sin hacer nada si falta `PROD_API_URL`; `permissions: {}`) y A4 variables y orden de despliegue en `docs/stack/backend.md`.
+- **Verificación:** hook de cada commit con `E2E_PORT_OFFSET=1900` y `./scripts/check.sh` completo al cerrar (ver el PR).
+- **Pendiente:** fases B a H del humano (Supabase, Google Cloud, Supabase Auth, Render, Vercel y DNS, variable `PROD_API_URL`) y después la verificación de punta a punta con el script. `docs/stack/frontend.md` y `.env.example` no se tocaron (el segundo está bloqueado para lectura, M4).
+- **Problemas:** en el primer intento del hook, la suite `public.e2e-spec.ts` falló una vez con `P1001` al arrancar su Postgres embebido (puerto 56235) y pasó en las repeticiones sin cambios: posible inestabilidad al arrancar Postgres con la máquina cargada.
+
 ## 2026-11-25 · Claude Code · docs/tareas-fusion-hecha
 - **Hecho:** el humano fusionó #12, #8, #13 y #14 a `main` en el orden recomendado, sin conflictos. Se verificó `main` (`ecd9ad5`) con `./scripts/check.sh` completo y puertos por defecto: todo en verde, incluidas las 14 E2E. Se añade a `TASKS.md` la nota A0 con el estado real (la que se escribió el día anterior llegó a la rama de #14 después de fusionarse y solo está en la rama de la 009).
 - **Pendiente:** #9 (la 009 con la 010, la 011 y la 012 dentro) sigue en borrador **hasta que producción (007) esté lista**; decisiones abiertas del humano (012, specs 007 y 008); limpieza de ramas ya fusionadas con su confirmación. La rama de la 009 deberá incorporar `main` antes de fusionarse y **tendrá un conflicto previsible en `docs/TASKS.md` (la nota A0, versión antigua frente a esta)**: quedarse con esta versión.
