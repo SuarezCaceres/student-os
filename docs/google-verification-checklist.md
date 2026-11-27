@@ -21,7 +21,7 @@ La verificación tarda **semanas** y suele tener varias rondas. Hay que pasar a 
 | [`rondas-google.md`](specs/008-verificacion-app-google/rondas-google.md) | Datos del envío y registro de cada correo con Google (C16, C17) |
 | ADR 0008 | Por qué se piden estos scopes y no otros |
 
-Scopes que se declaran: `openid`, `email` y `calendar.events.owned` (ADR 0008, revisado el 2026-11-26), más los de identidad que añada Supabase si se confirma alguno más (H2). Los de Calendar tienen una fuente única, `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `packages/shared/src/googleScopes.ts`, de la que derivan `GOOGLE_LOGIN_CALENDAR_SCOPES` (lo que pide el login, web) y `GOOGLE_SCOPES` (API, añade `openid email`). Los fijan dos pruebas: `apps/web/src/services/googleLogin.test.ts` y `apps/api/src/google/scopes-verificados.spec.ts`. **Cambiarlos después de aprobar obliga a reverificar.**
+Scopes que se declaran: `openid`, `email` y `calendar.events.owned` (ADR 0008, revisado el 2026-11-26), más `profile`, que añade Supabase al login (comprobado en producción el 2026-11-26; el humano decidió declararlo el 2026-11-27). `profile` no está en la fuente única porque no lo pide nuestro código. Los de Calendar tienen una fuente única, `VERIFIED_GOOGLE_CALENDAR_SCOPES` en `packages/shared/src/googleScopes.ts`, de la que derivan `GOOGLE_LOGIN_CALENDAR_SCOPES` (lo que pide el login, web) y `GOOGLE_SCOPES` (API, añade `openid email`). Los fijan dos pruebas: `apps/web/src/services/googleLogin.test.ts` y `apps/api/src/google/scopes-verificados.spec.ts`. **Cambiarlos después de aprobar obliga a reverificar.**
 
 ## Bloque A · repo, sin esperar a nadie
 - [x] **A1** · Tabla endpoint → scope con la referencia oficial (C9) → `scopes.md`
@@ -36,7 +36,7 @@ Scopes que se declaran: `openid`, `email` y `calendar.events.owned` (ADR 0008, r
 - [ ] **H1** · Comprar el dominio propio (Q1) y asignarlo en Vercel. `*.vercel.app` y `*.onrender.com` no sirven como dominio autorizado.
 - [ ] **H1** · Verificar el dominio en [Search Console](https://search.google.com/search-console) con la **misma cuenta** que es propietaria o editora del proyecto de Google Cloud (C3).
 - [ ] **H1** · Comprobar sin sesión que la home, `/legal/privacidad.html` y `/legal/terminos.html` responden 200 (C3; el agente lo comprueba con `curl -I`).
-- [ ] **H2** · Comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos a los que el usuario está invitado (es el único scope de lectura: si no los devuelve, hay que pasar a uno más amplio), y qué scopes de identidad añade Supabase en la URL de consentimiento (¿`profile`?) (`scopes.md`, «Pendiente»). **Antes** de declarar nada en la consola.
+- [ ] **H2** · Comprobar con una cuenta real que `calendar.events.owned` devuelve los eventos a los que el usuario está invitado (es el único scope de lectura: si no los devuelve, hay que pasar a uno más amplio), (`scopes.md`, «Pendiente»). Lo de Supabase ya está comprobado: añade `profile` y se declara. **Antes** de declarar nada en la consola.
 - [ ] **H2** · Branding: nombre «StudentOS», logotipo de 120×120 sin marcas de Google y de menos de 1 MB (Q5), correo de asistencia y de contacto del desarrollador que se lean a diario (Q3), URLs de inicio, privacidad y términos, y dominio autorizado = el verificado (C7). Capturas en `docs/qa/evidence/`.
 - [ ] **H2** · Audience: tipo *External* (C7).
 - [ ] **H2** · Data access: declarar **exactamente** los scopes de arriba y anotar su clasificación en `scopes.md` (C7, C9). Confirmar que ninguno es «restringido» (sin evaluación CASA).
@@ -44,7 +44,7 @@ Scopes que se declaran: `openid`, `email` y `calendar.events.owned` (ADR 0008, r
 - [ ] **H3** · Publicar a **In production** sin verificar y entrar con una cuenta ajena. Comprobar que la conexión sigue viva pasados más de 7 días (C14).
 
 ## Bloque B · repo, cuando haya datos y la 009 esté lista
-- [ ] **B1** · Páginas legales (Q2, Q10): rellenar `[NOMBRE DEL RESPONSABLE]`, `[CORREO DE CONTACTO]` y `[PAÍS O JURISDICCIÓN]`; listar exactamente los scopes de arriba sin `profile`; Calendar como parte del acceso, sin «desconectar desde la app»; cómo retirar el acceso; conservar la declaración de uso limitado y el enlace a la política de Google. Prueba `legalPages.test.ts` (C4, C5). **Se despliega a la vez que la 009.**
+- [ ] **B1** · Páginas legales (Q2, Q10): rellenar `[NOMBRE DEL RESPONSABLE]`, `[CORREO DE CONTACTO]` y `[PAÍS O JURISDICCIÓN]`; listar exactamente los scopes de arriba, **incluido `profile`** (nombre y foto de Google); Calendar como parte del acceso, sin «desconectar desde la app»; cómo retirar el acceso; conservar la declaración de uso limitado y el enlace a la política de Google. Prueba `legalPages.test.ts` (C4, C5). **Se despliega a la vez que la 009.**
 - [ ] **B2** · Landing: texto que explica StudentOS y para qué usa los datos de Google, con el mismo nombre que la consola; E2E de los enlaces legales (C6).
 
 ## Bloque H2 · humano, con la 009 en producción

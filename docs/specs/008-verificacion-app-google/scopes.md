@@ -28,6 +28,7 @@ El proxy (`apps/api/src/google/google.controller.ts`) solo habla con los eventos
 | Scope | Endpoints que lo **necesitan** (ningún otro scope pedido los cubre) |
 |---|---|
 | `openid`, `email` | `userinfo` (saber qué cuenta de Google se conectó) |
+| `profile` (lo añade Supabase, ver «Otros orígenes») | Nombre y foto de la cuenta: cabecera de la app (`apps/web/src/components/auth/useAuthState.ts`) y nombre inicial del perfil de una cuenta nueva (`apps/web/src/utils/newAccountState.ts`) |
 | `calendar.events.owned` | `events.list` (también para calcular los huecos libres y los choques de la semana), `events.get`, `events.instances`, `events.insert`, `events.patch`, `events.delete` |
 
 Cada scope declarado tiene al menos un endpoint que lo necesita, y cada endpoint está cubierto por un scope pedido. Las pruebas de integración lo comprueban: el servidor falso de Google (`apps/api/test/helpers/google-fake.ts`, `acceptedCalendarScopes`) responde 403 como Google si el token no tiene un scope aceptado por el endpoint, y la prueba del ciclo completo de eventos (`apps/api/test/google.e2e-spec.ts`) recorre todas las rutas del proxy.
@@ -38,11 +39,11 @@ Los scopes anteriores eran más amplios: `calendar.readonly` deja ver y descarga
 
 ## Pendiente antes de declararlos en la consola (paso H2)
 - **Comprobar con una cuenta real** que `events.list` con `calendar.events.owned` sobre `primary` devuelve también los eventos a los que el usuario está **invitado** (los creó otra persona). Ahora es el único scope de lectura, así que de él dependen los huecos libres y la detección de choques. Si no los devuelve, habría que pasar a un scope más amplio (`calendar.events.readonly` para leer, además de `calendar.events.owned`, o `calendar.events`) con nueva decisión del humano y nueva verificación. El servidor falso no puede comprobarlo.
-- **Comprobar qué scopes de identidad añade Supabase** (¿`profile`?): ver «Otros orígenes».
+- [x] **Scopes de identidad que añade Supabase:** comprobado el 2026-11-26 con una cuenta real en producción. `google_connections.scopes` guardó `calendar.events.owned userinfo.email userinfo.profile openid`: Supabase **sí añade `profile`**. Decisión del humano (2026-11-27): **declararlo** (no sustituir el login de Supabase por un OAuth propio).
 - **Clasificación** (sensible o no) de cada scope: la página de autenticación de Google no la indica. Se confirma en la consola (*Data access*) y se anota abajo.
 
 ## Otros orígenes de scopes en el repo
-- **Login (009):** `apps/web/src/services/supabase.ts` pasa a Supabase Auth los scopes de Calendar de `GOOGLE_LOGIN_CALENDAR_SCOPES` (`apps/web/src/services/googleLogin.ts`, derivado de la fuente única). La E2E `02-login.spec.ts` comprueba que la web pide `calendar.events.owned` y no pide `profile` ni scopes amplios o sin uso. Supabase añade por su cuenta los scopes de identidad de su proveedor Google. **Hay que comprobar en la URL real de consentimiento** (paso H2, con la 007 desplegada) qué scopes de identidad añade: si incluye `profile`, hay que declararlo en la consola, justificarlo y mencionarlo en la política, o quitarlo, y decidir si `GOOGLE_SCOPES` también lo lleva.
+- **Login (009):** `apps/web/src/services/supabase.ts` pasa a Supabase Auth los scopes de Calendar de `GOOGLE_LOGIN_CALENDAR_SCOPES` (`apps/web/src/services/googleLogin.ts`, derivado de la fuente única). La E2E `02-login.spec.ts` comprueba que la web pide `calendar.events.owned` y no pide `profile` ni scopes amplios o sin uso. Supabase añade por su cuenta los scopes de identidad de su proveedor Google. Comprobado en producción (2026-11-26): añade `openid`, `userinfo.email` y `userinfo.profile`. **`profile` se declara** en la consola, se justifica en `justificaciones.md` y se menciona en la política (bloque B). La web no lo pide (la E2E sigue comprobándolo: lo pide Supabase, no nuestro código) y `GOOGLE_SCOPES` del API **no** lo lleva, porque el API no usa el nombre ni la foto.
 - El transporte GIS del navegador (`googleCalendar.ts`) ya no pide scopes propios en la 009: solo habla con el proxy del API.
 
 ## Clasificación en la consola (lo rellena el humano en H2)
@@ -51,4 +52,4 @@ Los scopes anteriores eran más amplios: `calendar.readonly` deja ver y descarga
 | `openid` | pendiente | pendiente |
 | `email` | pendiente | pendiente |
 | `calendar.events.owned` | pendiente | pendiente |
-| `profile` (solo si Supabase lo añade) | pendiente | pendiente |
+| `profile` (lo añade Supabase; se declara) | pendiente | pendiente |
