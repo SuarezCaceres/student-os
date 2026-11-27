@@ -2,7 +2,8 @@ import { GOOGLE_SCOPES, REQUIRED_EVENTS_SCOPE } from './google.constants';
 
 /**
  * Spec 008 · C8. Lista de scopes declarados (o por declarar) en la pantalla de consentimiento de Google y enviados a
- * verificación. Si cambias `GOOGLE_SCOPES`, esta prueba falla A PROPÓSITO.
+ * verificación. Si cambias `GOOGLE_SCOPES` (o la fuente única `VERIFIED_GOOGLE_CALENDAR_SCOPES` de `@student-os/shared`),
+ * esta prueba falla A PROPÓSITO. El web tiene su gemela en `apps/web/src/services/googleLogin.test.ts`.
  *
  * Cambiar scopes después de la verificación obliga a VOLVER A VERIFICAR la app en Google (semanas de revisión):
  * antes de tocar esta lista, actualiza la consola (Data access), `docs/specs/008-verificacion-app-google/scopes.md`,
@@ -13,8 +14,6 @@ const SCOPES_VERIFICADOS = [
   'openid',
   'email',
   'https://www.googleapis.com/auth/calendar.events.owned',
-  'https://www.googleapis.com/auth/calendar.freebusy',
-  'https://www.googleapis.com/auth/calendar.calendars.readonly',
 ] as const;
 
 const AVISO =
@@ -34,9 +33,16 @@ describe('Scopes verificados en Google (spec 008, C8)', () => {
     expect(new Set(GOOGLE_SCOPES).size).toBe(GOOGLE_SCOPES.length);
   });
 
-  it('no se pide profile ni ningún scope amplio de Calendar', () => {
+  it('no se pide profile ni ningún scope de Calendar amplio o sin uso', () => {
     expect(GOOGLE_SCOPES).not.toContain('profile');
-    for (const amplio of ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/calendar.events']) {
+    for (const amplio of [
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
+      // Revisión del ADR 0008 (2026-11-26): la app no usa freebusy.query ni calendars.get.
+      'https://www.googleapis.com/auth/calendar.freebusy',
+      'https://www.googleapis.com/auth/calendar.calendars.readonly',
+    ]) {
       expect(GOOGLE_SCOPES).not.toContain(amplio);
     }
   });

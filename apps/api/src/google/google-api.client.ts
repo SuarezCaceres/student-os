@@ -149,7 +149,7 @@ export class GoogleApiClient {
     }
   }
 
-  /** Llamada a Calendar API v3. `path` es relativo a `/calendar/v3/` (p. ej. `calendars/primary/events` o `freeBusy`). */
+  /** Llamada a Calendar API v3. `path` es relativo a `/calendar/v3/` (p. ej. `calendars/primary/events`). */
   async calendar(accessToken: string, call: CalendarCall): Promise<CalendarResult> {
     const query = call.query && Object.keys(call.query).length > 0 ? `?${new URLSearchParams(call.query).toString()}` : '';
     const url = `${this.config.apiBase}/calendar/v3/${call.path}${query}`;

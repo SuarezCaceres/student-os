@@ -9,6 +9,9 @@ import * as facade from './googleCalendar';
  *
  * Spec 009 (aprobado por el dueno): se retiro el transporte de Google Identity Services (token de 1 hora en el
  * navegador) y con el la conexion manual. Lo retirado esta en RETIRED_EXPORTS y ya no puede volver a aparecer.
+ *
+ * Revision del ADR 0008 (2026-11-26, decision del humano): la app solo pide `calendar.events.owned`, asi que se retiro
+ * `fetchGoogleBusyIntervalsForWeek` (usaba `freebusy.query`, que exige otro scope y nadie la llamaba).
  */
 const FROZEN_FUNCTIONS: Record<string, number> = {
   getStoredGoogleMeta: 0,
@@ -18,7 +21,6 @@ const FROZEN_FUNCTIONS: Record<string, number> = {
   trySilentGoogleReconnect: 0,
   disconnectGoogleCalendar: 0,
   fetchGoogleEventsAndBusyForWeek: 2,
-  fetchGoogleBusyIntervalsForWeek: 2,
   buildWeeklyRecurrenceRule: 2,
   formatPrevSundayUntilUtc: 1,
   upsertGoogleGymEvent: 2,
@@ -39,6 +41,8 @@ const RETIRED_EXPORTS = [
   'disconnectGoogleCalendarCloud',
   'consumeGoogleRedirectResult',
   'GOOGLE_CLIENT_ID_STORAGE_KEY',
+  // ADR 0008, revision 2026-11-26: sin el scope `calendar.freebusy` no puede existir.
+  'fetchGoogleBusyIntervalsForWeek',
 ];
 
 const FROZEN_CONSTANTS: Record<string, string> = {
@@ -52,7 +56,7 @@ describe('googleCalendar: firmas exportadas congeladas (patron fachada)', () => 
     expect((value as (...args: unknown[]) => unknown).length).toBe(length);
   });
 
-  it.each(RETIRED_EXPORTS)('%s fue retirada (spec 009) y no debe volver', (name) => {
+  it.each(RETIRED_EXPORTS)('%s fue retirada (spec 009 / ADR 0008) y no debe volver', (name) => {
     expect((facade as Record<string, unknown>)[name]).toBeUndefined();
   });
 

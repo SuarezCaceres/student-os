@@ -58,8 +58,6 @@ describe('GoogleService (con servidor falso de Google)', () => {
         'openid',
         'email',
         'https://www.googleapis.com/auth/calendar.events.owned',
-        'https://www.googleapis.com/auth/calendar.freebusy',
-        'https://www.googleapis.com/auth/calendar.calendars.readonly',
       ]);
       // El verifier NO viaja en la URL: se guarda cifrado en servidor.
       expect(url).not.toMatch(/code_verifier/);
@@ -177,7 +175,8 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
     it('consentimiento granular sin permiso de eventos: error y se revoca lo concedido', async () => {
       const redirect = await connectUser(h, USER_A, {
-        grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly'],
+        // El usuario desmarca el unico permiso de Calendar: Google solo concede la identidad.
+        grantedScopes: ['openid', 'email'],
       });
       expect(new URL(redirect).searchParams.get('reason')).toBe('missing_scopes');
       expect(await h.repo.getConnection(USER_A)).toBeNull();
@@ -223,7 +222,8 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
   describe('vinculacion al terminar el login (link-login, spec 009)', () => {
     const EMAIL = 'ana@gmail.example';
-    const NO_EVENTS_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly'];
+    // El usuario desmarca el unico permiso de Calendar que se pide: Google solo concede la identidad.
+    const NO_EVENTS_SCOPES = ['openid', 'email'];
 
     it('C5: valida el token con Google, lo guarda CIFRADO y deja Calendar conectado sin pasos manuales', async () => {
       const token = h.fake.issueRefreshToken(EMAIL);

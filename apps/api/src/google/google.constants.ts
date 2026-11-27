@@ -1,4 +1,5 @@
 /** Tokens de inyeccion y constantes del modulo GOOGLE (sync persistente de Google Calendar). */
+import { VERIFIED_GOOGLE_CALENDAR_SCOPES, type VerifiedGoogleCalendarScope } from '@student-os/shared';
 
 export const GOOGLE_REPOSITORY = Symbol('GOOGLE_REPOSITORY');
 /** Reloj inyectable (ms desde epoch). Solo las pruebas lo sustituyen. */
@@ -7,22 +8,16 @@ export const GOOGLE_CLOCK = Symbol('GOOGLE_CLOCK');
 export const GOOGLE_FETCH = Symbol('GOOGLE_FETCH');
 
 /**
- * Scopes minimos (spec 008, C9; tabla en `docs/specs/008-verificacion-app-google/scopes.md`), cada uno el mas estrecho
- * que acepta la referencia oficial para lo que hace el proxy: `calendar.events.owned` (leer y escribir eventos del
- * calendario `primary`, que es del usuario), `calendar.freebusy` (`freebusy.query`) y `calendar.calendars.readonly`
- * (`calendars.get`, nombre del calendario). Mas `openid email` para saber QUE cuenta de Google se conecto. No se pide
- * `profile`: el servidor no necesita nombre ni foto. Cambiarlos obliga a reverificar la app (`scopes-verificados.spec.ts`).
+ * Scopes minimos (spec 008, C9; tabla en `docs/specs/008-verificacion-app-google/scopes.md`). Los de Calendar salen de
+ * la fuente unica `VERIFIED_GOOGLE_CALENDAR_SCOPES` (`@student-os/shared`), que el login del web tambien usa: solo
+ * `calendar.events.owned` (leer y escribir eventos del calendario `primary`, que es del usuario; revision del ADR 0008,
+ * 2026-11-26). Mas `openid email` para saber QUE cuenta de Google se conecto. No se pide `profile`: el servidor no
+ * necesita nombre ni foto. Cambiarlos obliga a reverificar la app (`scopes-verificados.spec.ts`).
  */
-export const GOOGLE_SCOPES = [
-  'openid',
-  'email',
-  'https://www.googleapis.com/auth/calendar.events.owned',
-  'https://www.googleapis.com/auth/calendar.freebusy',
-  'https://www.googleapis.com/auth/calendar.calendars.readonly',
-] as const;
+export const GOOGLE_SCOPES = ['openid', 'email', ...VERIFIED_GOOGLE_CALENDAR_SCOPES] as const;
 
 /** Scope sin el cual el sync no puede escribir eventos (el usuario puede desmarcarlo en el consentimiento granular). */
-export const REQUIRED_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events.owned';
+export const REQUIRED_EVENTS_SCOPE: VerifiedGoogleCalendarScope = 'https://www.googleapis.com/auth/calendar.events.owned';
 
 /** Endpoints reales por defecto. Solo las pruebas los sobrescriben (GOOGLE_OAUTH_BASE, GOOGLE_API_BASE, GOOGLE_AUTH_URL). */
 export const DEFAULT_GOOGLE_OAUTH_BASE = 'https://oauth2.googleapis.com';

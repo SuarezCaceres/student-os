@@ -102,8 +102,6 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
       ['POST', '/google/calendar/events'],
       ['PATCH', '/google/calendar/events/abc'],
       ['DELETE', '/google/calendar/events/abc'],
-      ['GET', '/google/calendar/primary'],
-      ['POST', '/google/calendar/freebusy'],
     ])('%s %s exige JWT (401 sin token)', async (method, path) => {
       const res = await http()[method.toLowerCase() as 'get' | 'post' | 'patch' | 'delete'](path);
       expect(res.status).toBe(401);
@@ -277,19 +275,6 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
         .expect(200);
       expect(instancesAfter.body.items.length).toBeLessThan(instancesBefore.body.items.length);
 
-      const busy = await http()
-        .post('/google/calendar/freebusy')
-        .set(asA())
-        .send({ timeMin: '2026-11-09T00:00:00Z', timeMax: '2026-11-10T00:00:00Z', timeZone: 'America/Bogota', items: [{ id: 'otro@calendario.com' }] })
-        .expect(200);
-      expect(busy.body.calendars.primary.busy).toHaveLength(1);
-      // Aunque el navegador pida otro calendario, el proxy solo consulta `primary`.
-      const fbCall = fake.calls.filter((c) => c.path === '/calendar/v3/freeBusy').at(-1);
-      expect((fbCall?.body as { items?: Array<{ id: string }> } | undefined)?.items).toEqual([{ id: 'primary' }]);
-
-      const primary = await http().get('/google/calendar/primary').set(asA()).expect(200);
-      expect(primary.body.id).toBe('ana@gmail.example');
-
       await http().delete(`/google/calendar/events/${eventId}`).set(asA()).expect(204);
       const again = await http().delete(`/google/calendar/events/${eventId}`).set(asA());
       expect(again.status).toBe(410);
@@ -337,7 +322,18 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
         .set(asA())
         .send({ reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: -5 }] } })
         .expect(400);
-      await http().post('/google/calendar/freebusy').set(asA()).send({}).expect(400);
+    });
+
+    it('ADR 0008 (revision 2026-11-26): no hay rutas de free/busy ni de metadatos del calendario (solo eventos)', async () => {
+      const before = fake.calls.length;
+      await http().get('/google/calendar/primary').set(asA()).expect(404);
+      await http()
+        .post('/google/calendar/freebusy')
+        .set(asA())
+        .send({ timeMin: '2026-11-09T00:00:00Z', timeMax: '2026-11-10T00:00:00Z' })
+        .expect(404);
+      // Ni siquiera se contacta a Google: esas llamadas exigirian scopes que la app no pide.
+      expect(fake.calls).toHaveLength(before);
     });
 
     it('Google caido (500) -> 424 google_upstream_error sin filtrar detalles', async () => {
@@ -481,7 +477,8 @@ describe('Google Calendar persistente (e2e HTTP)', () => {
     it('C9: sin el permiso de eventos responde 409 google_missing_scopes y no guarda nada', async () => {
       const userE = '55555555-5555-4555-8555-555555555555';
       const tokenE = await jwks.sign({ sub: userE, email: 'eva@example.com' });
-      const noEvents = fake.issueRefreshToken('eva@example.com', ['openid', 'email', 'https://www.googleapis.com/auth/calendar.freebusy', 'https://www.googleapis.com/auth/calendar.calendars.readonly']);
+      // El usuario desmarca el unico permiso de Calendar que se pide: Google solo concede la identidad.
+      const noEvents = fake.issueRefreshToken('eva@example.com', ['openid', 'email']);
       const res = await http()
         .post('/google/link-login')
         .set({ Authorization: `Bearer ${tokenE}` })

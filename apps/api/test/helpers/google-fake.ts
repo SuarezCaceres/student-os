@@ -71,11 +71,9 @@ const EVENTS_WRITE = ['calendar', 'calendar.events', 'calendar.app.created', 'ca
  */
 export function acceptedCalendarScopes(method: string, rest: string): string[] | null {
   let names: string[] | null = null;
-  if (rest === 'calendars/primary' && method === 'GET') {
-    names = ['calendar.readonly', 'calendar', 'calendar.app.created', 'calendar.calendars', 'calendar.calendars.readonly'];
-  } else if (rest === 'freeBusy' && method === 'POST') {
-    names = ['calendar.readonly', 'calendar', 'calendar.events.freebusy', 'calendar.freebusy'];
-  } else if (/^calendars\/primary\/events(\/[^/]+(\/instances)?)?$/.test(rest)) {
+  // Solo las rutas de eventos que usa el proxy: `calendars.get` y `freebusy.query` se retiraron (ADR 0008, revision
+  // 2026-11-26) porque exigen scopes que la app ya no pide.
+  if (/^calendars\/primary\/events(\/[^/]+(\/instances)?)?$/.test(rest)) {
     names = method === 'GET' ? EVENTS_READ : EVENTS_WRITE;
   }
   return names ? names.map((name) => AUTH + name) : null;
@@ -288,17 +286,6 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
       }
       const store = events(account);
 
-      if (rest === 'calendars/primary' && req.method === 'GET') {
-        return send(res, 200, { id: account, summary: account });
-      }
-      if (rest === 'freeBusy' && req.method === 'POST') {
-        const payload = (body ?? {}) as { timeMin: string; timeMax: string; items?: Array<{ id: string }> };
-        const busy = [...store.values()]
-          .filter((event) => event.start?.dateTime && event.end?.dateTime)
-          .filter((event) => Date.parse(event.start!.dateTime!) < Date.parse(payload.timeMax) && Date.parse(event.end!.dateTime!) > Date.parse(payload.timeMin))
-          .map((event) => ({ start: event.start!.dateTime, end: event.end!.dateTime }));
-        return send(res, 200, { calendars: { primary: { busy } }, requestedItems: payload.items });
-      }
       if (rest === 'calendars/primary/events' && req.method === 'GET') {
         const timeMin = query.timeMin ? Date.parse(query.timeMin) : 0;
         const timeMax = query.timeMax ? Date.parse(query.timeMax) : Number.MAX_SAFE_INTEGER;
@@ -415,8 +402,6 @@ export async function startFakeGoogle(): Promise<FakeGoogle> {
           'openid',
           'email',
           'https://www.googleapis.com/auth/calendar.events.owned',
-          'https://www.googleapis.com/auth/calendar.freebusy',
-          'https://www.googleapis.com/auth/calendar.calendars.readonly',
         ]
       ).join(' ');
       const token = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;

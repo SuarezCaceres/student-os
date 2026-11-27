@@ -159,13 +159,11 @@ interface ProxyTarget {
   query: Record<string, string>;
 }
 
-/** Traduce una ruta de Calendar API v3 (`calendars/primary/events/..`, `freeBusy`) a la ruta del proxy `/google/calendar/*`. */
+/** Traduce una ruta de Calendar API v3 (`calendars/primary/events/..`) a la ruta del proxy `/google/calendar/events*`. */
 export function toProxyTarget(relativePath: string): ProxyTarget {
   const url = new URL(relativePath, 'https://calendar.invalid/');
   const path = url.pathname.replace(/^\/+/, '');
   const query = Object.fromEntries(url.searchParams.entries());
-  if (path === 'freeBusy') return { path: '/google/calendar/freebusy', query };
-  if (path === 'calendars/primary') return { path: '/google/calendar/primary', query };
   const match = /^calendars\/primary\/events(\/.*)?$/.exec(path);
   if (match) return { path: `/google/calendar/events${match[1] ?? ''}`, query };
   throw new Error(`Ruta de Google Calendar no soportada por la nube: ${path}`);
