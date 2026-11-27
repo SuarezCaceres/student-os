@@ -115,7 +115,8 @@ Prerrequisito de A1: sin ella el login no es «para todos».
 - [ ] Bundle web de ~1 MB (aviso de Vite sobre chunks > 500 kB): evaluar `import()` dinámico.
 - [ ] 4 avisos de oxlint en `apps/web` (`LearningView.tsx` ×3, `App.tsx:205`).
 - [ ] `./scripts/check.sh` (E2E) reescribe los JPG versionados de `docs/qa/evidence/` y ensucia el árbol de git. Dirigir la salida a una carpeta ignorada o dejar de versionar esas imágenes.
-- [ ] Versiones de Node dispares: `engines >=20`, CI en 20, Render en 22, Vercel en 26.x. Unificarlas.
+- [ ] Versiones de Node dispares: `engines >=20`, CI en 20, Render en 22, Vercel en 26.x. Unificarlas. Síntoma ya visto (2026-11-26): en el CI (Node 20) el reporter de vitest se rompe con «Map.groupBy is not a function» (`Map.groupBy` llega en Node 21).
+- [ ] **Prueba frágil:** `apps/web/src/components/calendar/GoogleCalendarSyncModal.test.tsx` (existe en `main`) («si Google no confirma la revocacion…») falló una vez en el job Web del PR #18 (que solo cambia docs) y pasó al relanzarla (2026-11-26). La 009 elimina ese flujo de desconectar; si sobrevive, estabilizarla (espera explícita en vez de temporizador).
 - [ ] TypeScript distinto entre paquetes: web `~7.0.2`, api `^5.9`.
 - [ ] `pre-commit` tarda ~50 s (decidido mantenerlo; revisar si molesta).
 - [ ] `docs/qa/BUGS.md` está citado en el test 2c pero **no existe**: recrearlo o quitar la referencia.
