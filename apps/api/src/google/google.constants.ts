@@ -1,4 +1,5 @@
 /** Tokens de inyeccion y constantes del modulo GOOGLE (sync persistente de Google Calendar). */
+import { VERIFIED_GOOGLE_CALENDAR_SCOPES, type VerifiedGoogleCalendarScope } from '@student-os/shared';
 
 export const GOOGLE_REPOSITORY = Symbol('GOOGLE_REPOSITORY');
 /** Reloj inyectable (ms desde epoch). Solo las pruebas lo sustituyen. */
@@ -7,18 +8,16 @@ export const GOOGLE_CLOCK = Symbol('GOOGLE_CLOCK');
 export const GOOGLE_FETCH = Symbol('GOOGLE_FETCH');
 
 /**
- * Scopes minimos: los de calendario que la app ya usa (leer disponibilidad/eventos y escribir eventos) mas `openid email`
- * para saber QUE cuenta de Google se conecto. No se pide `profile`: el servidor no necesita nombre ni foto.
+ * Scopes minimos (spec 008, C9; tabla en `docs/specs/008-verificacion-app-google/scopes.md`). Los de Calendar salen de
+ * la fuente unica `VERIFIED_GOOGLE_CALENDAR_SCOPES` (`@student-os/shared`), que el login del web tambien usa: solo
+ * `calendar.events.owned` (leer y escribir eventos del calendario `primary`, que es del usuario; revision del ADR 0008,
+ * 2026-11-26). Mas `openid email` para saber QUE cuenta de Google se conecto. No se pide `profile`: el servidor no
+ * necesita nombre ni foto. Cambiarlos obliga a reverificar la app (`scopes-verificados.spec.ts`).
  */
-export const GOOGLE_SCOPES = [
-  'openid',
-  'email',
-  'https://www.googleapis.com/auth/calendar.readonly',
-  'https://www.googleapis.com/auth/calendar.events',
-] as const;
+export const GOOGLE_SCOPES = ['openid', 'email', ...VERIFIED_GOOGLE_CALENDAR_SCOPES] as const;
 
 /** Scope sin el cual el sync no puede escribir eventos (el usuario puede desmarcarlo en el consentimiento granular). */
-export const REQUIRED_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+export const REQUIRED_EVENTS_SCOPE: VerifiedGoogleCalendarScope = 'https://www.googleapis.com/auth/calendar.events.owned';
 
 /** Endpoints reales por defecto. Solo las pruebas los sobrescriben (GOOGLE_OAUTH_BASE, GOOGLE_API_BASE, GOOGLE_AUTH_URL). */
 export const DEFAULT_GOOGLE_OAUTH_BASE = 'https://oauth2.googleapis.com';
@@ -45,6 +44,10 @@ export const GOOGLE_ERROR_CODES = {
   rateLimited: 'google_rate_limited',
   upstream: 'google_upstream_error',
   invalidReturnTo: 'google_invalid_return_to',
+  /** El usuario desmarco el permiso de eventos de Calendar en el consentimiento de Google (login). */
+  missingScopes: 'google_missing_scopes',
+  /** El refresh token entregado pertenece a otra cuenta de Google distinta de la del usuario autenticado. */
+  accountMismatch: 'google_account_mismatch',
 } as const;
 
 export type GoogleErrorCode = (typeof GOOGLE_ERROR_CODES)[keyof typeof GOOGLE_ERROR_CODES];

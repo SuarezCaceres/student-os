@@ -147,7 +147,7 @@ export async function startFakeGoogle({ port, host = '::' }) {
         if (challenge !== entry.challenge) return send(res, 400, { error: 'invalid_grant' });
         if (form.redirect_uri !== entry.redirectUri) return send(res, 400, { error: 'redirect_uri_mismatch' });
         const refreshToken = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;
-        refreshTokens.set(refreshToken, { account: entry.account, revoked: false });
+        refreshTokens.set(refreshToken, { account: entry.account, revoked: false, scope: entry.scope });
         const access = mintAccessToken(entry.account, refreshToken);
         return send(res, 200, {
           access_token: access.token,
@@ -162,7 +162,7 @@ export async function startFakeGoogle({ port, host = '::' }) {
         const entry = refreshTokens.get(form.refresh_token);
         if (!entry || entry.revoked) return send(res, 400, { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' });
         const access = mintAccessToken(entry.account, form.refresh_token);
-        return send(res, 200, { access_token: access.token, expires_in: access.expiresIn, token_type: 'Bearer' });
+        return send(res, 200, { access_token: access.token, expires_in: access.expiresIn, scope: entry.scope, token_type: 'Bearer' });
       }
       return send(res, 400, { error: 'unsupported_grant_type' });
     }
@@ -187,9 +187,12 @@ export async function startFakeGoogle({ port, host = '::' }) {
       const forced = failures.shift();
       if (forced) return send(res, forced.status, forced.body ?? { error: { code: forced.status, message: 'fallo simulado' } });
       const rest = path.slice('/calendar/v3/'.length);
+      // A diferencia de `test/helpers/google-fake.ts` (integracion del API), este falso NO responde 403 cuando el token no
+      // tiene el scope que exige cada metodo: acepta cualquier token valido. La cobertura de scopes por ruta del proxy la
+      // demuestran las pruebas de integracion; aqui solo importa el flujo del navegador. Por eso un token sin
+      // `calendar.events.owned` solo se rechaza en `/google/link-login` (lo comprueba el API al leer los scopes concedidos).
+      // Solo hay rutas de eventos: free/busy y `calendars.get` se retiraron (ADR 0008, revision 2026-11-26).
       const store = events(account);
-      if (rest === 'calendars/primary' && req.method === 'GET') return send(res, 200, { id: account, summary: account });
-      if (rest === 'freeBusy' && req.method === 'POST') return send(res, 200, { calendars: { primary: { busy: [] } } });
       if (rest === 'calendars/primary/events' && req.method === 'GET') {
         const timeMin = query.timeMin ? Date.parse(query.timeMin) : 0;
         const timeMax = query.timeMax ? Date.parse(query.timeMax) : Number.MAX_SAFE_INTEGER;
@@ -251,6 +254,17 @@ export async function startFakeGoogle({ port, host = '::' }) {
     opts,
     revokeAllRefreshTokens() {
       for (const entry of refreshTokens.values()) entry.revoked = true;
+    },
+    /**
+     * Emite un refresh token como el que Google entrega a Supabase en el login (spec 009), sin pasar por el flujo del API.
+     * Por defecto concede los permisos de la app (identidad + `calendar.events.owned`); `grantedScopes` simula que el usuario
+     * desmarco el de Calendar.
+     */
+    issueRefreshToken(email, grantedScopes) {
+      const scope = (grantedScopes ?? ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events.owned']).join(' ');
+      const token = `fake-rt-${++counter}-${b64u(randomBytes(8))}`;
+      refreshTokens.set(token, { account: email, revoked: false, scope });
+      return token;
     },
     refreshTokensOf: (email) => [...refreshTokens.entries()].filter(([, e]) => e.account === email).map(([t]) => t),
     revokedStateOf: (email) => [...refreshTokens.values()].filter((e) => e.account === email).map((e) => e.revoked),

@@ -1,15 +1,27 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { OFF_STATUS, type DecisionChoice, type SyncStatus } from './types';
+import { OFF_STATUS, type SyncStatus } from './types';
 
 /**
  * Store externo (fuera de React) con el estado de la sync. Lo escribe el hook `useSyncedAppState`
- * (que vive en App) y lo leen `SyncStatusBadge`, el modal del importador y `useSyncStatus()`.
+ * (que vive en App) y lo leen `SyncStatusBadge` y `useSyncStatus()`.
  * Asi no hace falta un provider para que el indicador funcione.
  */
 export interface SyncController {
   syncNow(): Promise<void>;
-  resolveDecision(choice: DecisionChoice): Promise<void>;
-  resume(): void;
+  /** Registra ya los cambios locales que aun esperan al debounce, para que cuenten como pendientes. */
+  observeNow?(): void;
+}
+
+/** Tiempo maximo que se espera a subir lo pendiente antes de cerrar sesion (spec 010, C7). */
+export const FLUSH_TIMEOUT_MS = 5000;
+
+export interface FlushResult {
+  /** `false` si esta pestana no puede sincronizar (sync apagada u otra pestana lider). */
+  attempted: boolean;
+  /** Se agoto el tiempo antes de terminar (servidor dormido, red lenta). */
+  timedOut: boolean;
+  /** Cambios locales que siguen sin subir al terminar. */
+  pending: number;
 }
 
 interface StoreState {
@@ -38,7 +50,7 @@ function getChannel(): BroadcastChannel | null {
       if (!isFollower) return;
       const status = event.data as SyncStatus | undefined;
       if (!status || typeof status.phase !== 'string') return;
-      state = { enabled: true, status: { ...status, decision: null, follower: true } };
+      state = { enabled: true, status: { ...status, follower: true } };
       notify();
     };
   } catch {
@@ -61,7 +73,7 @@ export const syncStore = {
     state = { enabled: true, status };
     notify();
     try {
-      getChannel()?.postMessage({ ...status, decision: null });
+      getChannel()?.postMessage(status);
     } catch {
       // ignore
     }
@@ -84,14 +96,35 @@ export const syncStore = {
     notify();
   },
   getController: (): SyncController | null => controller,
+  /**
+   * Intenta subir lo pendiente con un tiempo maximo y dice cuanto queda sin subir. Nunca lanza ni se cuelga: es lo que
+   * usa «Cerrar sesion» para no perder trabajo (spec 010). No cambia el motor: solo pide una sincronizacion y espera.
+   */
+  async flushPending(timeoutMs: number = FLUSH_TIMEOUT_MS): Promise<FlushResult> {
+    const current = controller;
+    if (!current || !state.enabled) return { attempted: false, timedOut: false, pending: state.status.pending };
+    current.observeNow?.();
+    let timedOut = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const limit = new Promise<void>((resolve) => {
+      timer = setTimeout(() => {
+        timedOut = true;
+        resolve();
+      }, timeoutMs);
+    });
+    try {
+      await Promise.race([current.syncNow().catch(() => undefined), limit]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+    return { attempted: true, timedOut, pending: state.status.pending };
+  },
 };
 
 export type SyncStatusView = SyncStatus & {
   /** false si no hay sync (sin variables de entorno o sin sesion). */
   enabled: boolean;
   syncNow: () => void;
-  resolveDecision: (choice: DecisionChoice) => void;
-  resume: () => void;
 };
 
 /** Estado de la sincronizacion para la UI. Con sync apagada devuelve `enabled: false`. */
@@ -102,8 +135,6 @@ export function useSyncStatus(): SyncStatusView {
       ...snapshot.status,
       enabled: snapshot.enabled,
       syncNow: () => void syncStore.getController()?.syncNow(),
-      resolveDecision: (choice: DecisionChoice) => void syncStore.getController()?.resolveDecision(choice),
-      resume: () => syncStore.getController()?.resume(),
     }),
     [snapshot],
   );

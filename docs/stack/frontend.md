@@ -8,7 +8,7 @@
 | Framework          | React                                                           | ^19.3            |
 | Bundler            | Vite (+ `@vitejs/plugin-react`)                                 | ^8.3             |
 | Estilos / UI       | Tailwind CSS v4 (`@tailwindcss/vite`), `clsx`, `tailwind-merge`, `lucide-react`, `canvas-confetti` | ^4.3 |
-| Estado             | Estado de la app en un único `AppState` (`useLocalStorage` en modo local, `useSyncedAppState` en modo nube) + `syncStore` | — |
+| Estado             | Estado de la app en un único `AppState` (`useSyncedAppState`: caché en `localStorage` + sync) + `syncStore` | — |
 | Persistencia local | `localStorage` + IndexedDB (`idb-keyval`)                        | ^6.3             |
 | Cliente HTTP / BD  | `src/services/api.ts` (API propia) y `@supabase/supabase-js` (auth) | ^2.119       |
 | Validación         | `zod` + tipos de `@student-os/shared`                           | ^4.6             |
@@ -38,7 +38,7 @@ Los puertos del E2E (`54340`-`54343`, `3100`, `5293`, `5294`) se desplazan con l
 src/
   components/     UI por módulo: account, auth, calendar, common, dashboard, gym, kanban,
                   landing, layout, learning, legal, quick-add, sync, university
-  hooks/          useLocalStorage, useSyncedAppState
+  hooks/          useSyncedAppState
   services/       api.ts, supabase.ts, googleCalendar.ts, googleCloud.ts
   sync/           motor de sincronización: engine, syncStore, cola en IndexedDB, backup,
                   leader, hash; adapters/ (kanban, university, learning, gym, calendar, profile)

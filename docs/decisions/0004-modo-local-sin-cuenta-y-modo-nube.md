@@ -1,7 +1,7 @@
 # ADR 0004 · Modo local sin cuenta y modo nube con sesión
 
 - **Fecha:** 2026-11-23 (decisión de la Ola 0/2 del backend; registrada al adoptar el harness)
-- **Estado:** aceptada
+- **Estado:** reemplazada por ADR 0007 (2026-11-24: se retiran el modo local y el importador)
 
 ## Contexto
 StudentOS nació como una app 100 % local (`localStorage`, clave `student_os_state_v1`) para una sola persona. El objetivo actual es un producto público con sincronización entre dispositivos. Fuentes: `PRODUCT.md`, `PLAN_BACKEND.md`.

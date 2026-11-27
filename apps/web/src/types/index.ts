@@ -1,3 +1,5 @@
+import type { Chore, ChoreDay, ChoreSettings } from '@student-os/shared';
+
 export type DayOfWeek = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo';
 
 export type Category = 'universidad' | 'trabajo' | 'gym' | 'personal';
@@ -125,6 +127,16 @@ export interface DailyHabits {
   lastUpdatedDate?: string;
 }
 
+// Quehaceres diarios (spec 012). Los tipos viven en el contrato compartido para que web y API no diverjan.
+export type {
+  Chore,
+  ChoreCompletion,
+  ChoreDay,
+  ChoreHardReason,
+  ChoreLevel,
+  ChoreSettings,
+} from '@student-os/shared';
+
 export type ResourceType = 'youtube' | 'tiktok' | 'instagram' | 'articulo' | 'documentacion' | 'libro' | 'texto';
 
 export type ResourceCategory =
@@ -238,6 +250,12 @@ export interface AppState {
   weightHistory?: WeightHistoryEntry[];
   gymAttendanceLogs?: GymAttendanceLog[];
   dismissedGymScheduleAlerts?: string[];
+  /** `true` = el usuario no va al gimnasio y el modulo esta oculto (spec 011). Ausente o `false` = gym activo. */
+  gymDisabled?: boolean;
+  /** Quehaceres diarios (spec 012): lista del usuario, historial por dia y ajustes de motivacion. */
+  chores?: Chore[];
+  choreDays?: ChoreDay[];
+  choreSettings?: ChoreSettings;
   weeklyReflections?: { [week: number]: WeeklyReflection };
   kanbanItems: KanbanItem[];
   gymRoutines: GymRoutine[];

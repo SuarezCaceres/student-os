@@ -10,7 +10,7 @@ import { useSyncedAppState } from './useSyncedAppState';
 
 const h = vi.hoisted(() => ({
   api: null as unknown,
-  session: { status: 'signedIn' as 'signedIn' | 'signedOut', session: null, user: { id: 'user-1' } as { id: string } | null },
+  session: { status: 'signedIn' as 'signedIn' | 'signedOut', session: null, user: { id: 'user-1' } as { id: string; user_metadata?: Record<string, unknown> } | null },
 }));
 
 vi.mock('../sync/adapters', () => ({ syncAdapters: [] as unknown[] }));
@@ -23,7 +23,6 @@ vi.mock('../services/api', async (orig) => ({
   ...(await orig<typeof import('../services/api')>()),
   getApiClient: () => h.api,
 }));
-vi.mock('../sync/backup', () => ({ downloadBackup: vi.fn() }));
 
 const KEY = 'student_os_state_v1';
 const EMPTY = { ...initialData, kanbanItems: [] };
@@ -59,6 +58,24 @@ describe('useSyncedAppState con sesion y configuracion completa', () => {
     act(() => hook.result.current[1]((s) => ({ ...s, kanbanItems: [...s.kanbanItems, task('local-1')] })));
     await waitFor(() => expect(server.live().map((r) => r.id).sort()).toEqual(['cloud-1', 'local-1']), { timeout: 5000 });
     await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Sincronizado'), { timeout: 3000 });
+  });
+
+  it('cuenta nueva (nube vacia): parte sin bloques de ejemplo y con el nombre de Google, y lo sube para sus otros dispositivos', async () => {
+    h.session.user = { id: 'user-1', user_metadata: { full_name: 'Ana García' } };
+    const seeded = {
+      ...EMPTY,
+      studentName: 'Mateo',
+      calendarBlocks: [{ id: 'cb-1', title: 'Ejemplo', day: 'Lunes', startTime: '08:00', endTime: '09:00', category: 'clase' }, ...EMPTY.calendarBlocks],
+    } as unknown as typeof EMPTY;
+    // Restos de otra persona en este navegador: nunca deben verse.
+    window.localStorage.setItem(KEY, JSON.stringify({ ...seeded, studentName: 'Otra persona', kanbanItems: [task('ajena')] }));
+    const hook = renderHook(() => useSyncedAppState(seeded));
+
+    await waitFor(() => expect(hook.result.current[0].studentName).toBe('Ana'), { timeout: 3000 });
+    expect(hook.result.current[0].calendarBlocks.some((b) => b.id === 'cb-1')).toBe(false);
+    expect(hook.result.current[0].kanbanItems).toEqual([]);
+    expect(JSON.parse(window.localStorage.getItem(KEY)!).studentName).toBe('Ana');
+    expect(server.live()).toEqual([]);
   });
 
   it('al cerrar sesion limpia la cola de sync pero conserva los datos locales', async () => {

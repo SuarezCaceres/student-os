@@ -93,7 +93,7 @@ export const DiagnosticComparisonVisual: React.FC<DiagnosticComparisonVisualProp
         {/* Footer */}
         <div className="px-4 py-2 border-t border-[var(--line)] bg-[var(--surface-2)] flex items-center justify-between text-xs font-mono text-[var(--muted)]">
           <span>Tiempo ahorrado: ~45 min por semana</span>
-          <span className="text-[var(--ok)] font-medium">100% Privado y Offline</span>
+          <span className="text-[var(--ok)] font-medium">Privado y bajo tu control</span>
         </div>
       </div>
     </div>

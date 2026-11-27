@@ -1,11 +1,11 @@
 {
-  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho. Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad (ver docs/TASKS.md): Alto = 009 (login para todos + Calendar automatico, marcado importante), 010 (entorno por usuario), 007 (produccion) y 008 (verificacion de Google); Medio y Bajo = bugs y deuda.",
+  "_instrucciones": "Lista de funcionalidades del proyecto. El agente solo puede cambiar 'estado' y 'pasa'. Nunca borra ni reescribe criterios: si un criterio parece incorrecto, lo dice y pregunta. Estados: pendiente | spec | plan | en_curso | revision | hecho | obsoleta (funcionalidad retirada o reemplazada por decision del humano; se conserva como historial). Las funcionalidades ya existentes (001-006) se registraron en la adopcion del harness el 2026-11-23 con 'pasa: true' solo donde una prueba que pasa lo respalda (se cita en la descripcion). Prioridad (ver docs/TASKS.md): Alto = 009 (login para todos + Calendar automatico, marcado importante), 010 (entorno por usuario), 007 (produccion) y 008 (verificacion de Google); Medio y Bajo = bugs y deuda.",
   "features": [
     {
       "id": "001",
       "nombre": "modo-local-sin-cuenta",
       "spec": null,
-      "estado": "hecho",
+      "estado": "obsoleta",
       "criterios": [
         { "id": "C1", "descripcion": "Sin cuenta ni nube, la app arranca y funciona sin errores de consola ni llamadas de red a la nube (E2E apps/web/e2e/01-nocloud.spec.ts)", "pasa": true }
       ]
@@ -19,7 +19,7 @@
         { "id": "C1", "descripcion": "Con una sesion de Supabase, la app entra en modo nube, aparece el indicador de sync y el servidor crea el perfil (E2E 02-login 2a)", "pasa": true },
         { "id": "C2", "descripcion": "El flujo 'Continuar con Google' (PKCE) vuelve con codigo y deja la sesion iniciada (E2E 02-login 2b, con Supabase simulado)", "pasa": true },
         { "id": "C3", "descripcion": "Al cerrar sesion, la sesion de supabase-js se borra del navegador y una recarga no reabre la nube (E2E 02-login 2d)", "pasa": true },
-        { "id": "C4", "descripcion": "Al cerrar sesion, la app vuelve a la landing (BUG-01: hoy no vuelve; E2E 02-login 2c marcada como fallo conocido)", "pasa": false },
+        { "id": "C4", "descripcion": "Al cerrar sesion, la app vuelve a la landing (BUG-01: hoy no vuelve; E2E 02-login 2c marcada como fallo conocido)", "pasa": true },
         { "id": "C5", "descripcion": "El login funciona con Google y Supabase reales, no solo con los simulados", "pasa": false }
       ]
     },
@@ -27,7 +27,7 @@
       "id": "003",
       "nombre": "importador-del-primer-inicio",
       "spec": null,
-      "estado": "hecho",
+      "estado": "obsoleta",
       "criterios": [
         { "id": "C1", "descripcion": "Con datos locales y nube vacia, ofrece subir, descarga un respaldo previo y sube (E2E 03-importer 3a)", "pasa": true },
         { "id": "C2", "descripcion": "Con datos distintos en local y nube, pregunta 'Usar la nube / Conservar este dispositivo' y 'Usar la nube' reemplaza lo local (E2E 3b)", "pasa": true },
@@ -75,7 +75,7 @@
       "id": "007",
       "nombre": "produccion-student-os-prod",
       "spec": "docs/specs/007-produccion-student-os-prod/spec.md",
-      "estado": "plan",
+      "estado": "en_curso",
       "criterios": [
         { "id": "C1", "descripcion": "Existe el proyecto Supabase student-os-prod con las migraciones de apps/api/prisma/migrations aplicadas y rls-baseline.sql ejecutado sin errores", "pasa": false },
         { "id": "C2", "descripcion": "Vercel (VITE_*) y Render (DATABASE_URL, DIRECT_URL, SUPABASE_URL, WEB_ORIGINS, GOOGLE_*) tienen sus variables de produccion", "pasa": false },
@@ -91,7 +91,7 @@
       "id": "008",
       "nombre": "verificacion-de-la-app-en-google",
       "spec": "docs/specs/008-verificacion-app-google/spec.md",
-      "estado": "plan",
+      "estado": "en_curso",
       "criterios": [
         { "id": "C1", "descripcion": "Todos los puntos de docs/google-verification-checklist.md estan completados", "pasa": false },
         { "id": "C2", "descripcion": "Google aprueba la verificacion y el login deja de estar limitado a 100 usuarios de prueba", "pasa": false },
@@ -116,26 +116,81 @@
       "id": "009",
       "nombre": "login-google-para-todos-y-calendar-automatico",
       "spec": "docs/specs/009-login-google-para-todos-y-calendar-automatico/spec.md",
-      "estado": "pendiente",
+      "estado": "revision",
       "criterios": [
-        { "id": "C1", "descripcion": "Cualquier persona con una cuenta de Google puede iniciar sesion en produccion, sin estar en una lista de usuarios de prueba", "pasa": false },
-        { "id": "C2", "descripcion": "Tras iniciar sesion, su Google Calendar queda vinculado sin pulsar ningun boton 'Conectar'", "pasa": false },
-        { "id": "C3", "descripcion": "Si el usuario niega los permisos de Calendar, la app sigue funcionando y puede vincularlo mas tarde", "pasa": false },
-        { "id": "C4", "descripcion": "El refresh token se guarda cifrado en el servidor y el navegador nunca lo ve (se mantiene lo del criterio 005-C1)", "pasa": false },
-        { "id": "C5", "descripcion": "El flujo funciona con Google y Supabase reales de produccion, no solo con los simulados", "pasa": false }
+        { "id": "C1", "descripcion": "Un visitante sin sesion ve la landing con un unico acceso 'Continuar con Google': sin formulario de correo y contrasena, sin 'Crear cuenta' y sin 'Explorar demo'", "pasa": true },
+        { "id": "C2", "descripcion": "Sin sesion no se puede abrir la app ni ver datos; se vuelve a la landing", "pasa": true },
+        { "id": "C3", "descripcion": "Quien entra por primera vez con Google tiene su perfil creado en el servidor y entra a la app", "pasa": true },
+        { "id": "C4", "descripcion": "El consentimiento de Google pide exactamente openid, email y calendar.events.owned (actualizado el 2026-11-26, revision del ADR 0008 por decision delegada por el humano; el 2026-11-25 eran calendar.events.owned, calendar.freebusy y calendar.calendars.readonly, spec 008 Q9)", "pasa": true },
+        { "id": "C5", "descripcion": "Tras entrar con Calendar concedido, Calendar aparece conectado sin pulsar ningun boton y el servidor guarda el refresh token cifrado", "pasa": true },
+        { "id": "C6", "descripcion": "La interfaz con sesion no tiene boton 'Conectar Google Calendar' ni boton para desvincular; solo un indicador de estado", "pasa": true },
+        { "id": "C7", "descripcion": "Con Calendar conectado, los eventos de Google se ven en el calendario sin accion manual y se actualizan al volver a la ventana", "pasa": true },
+        { "id": "C8", "descripcion": "Gym, turno de trabajo y bloques marcados se publican en el Google Calendar real del usuario (comportamiento actual intacto)", "pasa": true },
+        { "id": "C9", "descripcion": "Si el usuario desmarca el permiso de Calendar en la pantalla de Google, no entra: ve un mensaje claro y un boton para reintentar, y no se guarda sesion ni datos suyos", "pasa": true },
+        { "id": "C10", "descripcion": "El almacenamiento persistente del navegador (localStorage, sessionStorage, IndexedDB y cookies) no contiene ningun access token ni refresh token de Google; el refresh token solo existe en memoria durante el enlace inicial y se elimina al enviarlo al servidor (redaccion relajada el 2026-11-24, decision D1 = opcion B)", "pasa": true },
+        { "id": "C11", "descripcion": "Al cerrar sesion se vuelve a la landing y el siguiente usuario del mismo navegador no ve ni hereda datos del anterior (incluye corregir BUG-01)", "pasa": true },
+        { "id": "C12", "descripcion": "Una cuenta de Google cualquiera, fuera de la lista de usuarios de prueba, entra en produccion sin la advertencia de app no verificada (requiere 007 y 008)", "pasa": false },
+        { "id": "C13", "descripcion": "Al borrar la cuenta se revoca el refresh token en Google y se elimina del servidor", "pasa": true },
+        { "id": "C14", "descripcion": "Los datos locales del prototipo que hubiera en el navegador no se suben a ninguna cuenta y se eliminan al iniciar sesion", "pasa": true }
       ]
     },
     {
       "id": "010",
       "nombre": "entorno-de-trabajo-por-usuario",
       "spec": "docs/specs/010-entorno-de-trabajo-por-usuario/spec.md",
-      "estado": "pendiente",
+      "estado": "revision",
       "criterios": [
-        { "id": "C1", "descripcion": "En produccion, dos cuentas reales distintas ven solo sus propios datos (tareas, entregas, gym, calendario, habitos)", "pasa": false },
-        { "id": "C2", "descripcion": "Los datos de cada usuario se conservan al cerrar sesion y al entrar desde otro dispositivo", "pasa": false },
-        { "id": "C3", "descripcion": "Al cambiar de cuenta en el mismo navegador, los datos locales de un usuario nunca se suben a la cuenta de otro", "pasa": false },
-        { "id": "C4", "descripcion": "Los datos que hoy se guardan solo en localStorage (AuthModal, BackupModal, DailyHabitsCard, GymTracker) se sincronizan por usuario o se documenta por que no", "pasa": false },
-        { "id": "C5", "descripcion": "Un usuario nuevo empieza con un estado definido (vacio o de ejemplo) y respeta los limites por cuenta", "pasa": false }
+        { "id": "C1", "descripcion": "En produccion, dos cuentas reales distintas ven solo sus propios datos (tareas, entregas, gym, calendario, habitos) desde cualquier dispositivo (manual: necesita 007 y 008)", "pasa": false },
+        { "id": "C2", "descripcion": "Quien edita y cierra sesion con conexion ve esa ultima edicion al volver a entrar, en el mismo u otro dispositivo", "pasa": true },
+        { "id": "C3", "descripcion": "Al cambiar de cuenta en el mismo navegador, los datos locales de una cuenta nunca se suben a la otra (cubierto por 009: E2E 03-primer-acceso 3b)", "pasa": true },
+        { "id": "C4", "descripcion": "Los datos que antes se guardaban solo en localStorage (modal de acceso, respaldo, habitos y gym) pasan por el estado de la cuenta y se sincronizan (cubierto por 009, paso 5e)", "pasa": true },
+        { "id": "C5", "descripcion": "Una cuenta nueva entra con Kanban, entregas, gym, aprendizaje y habitos vacios, sin datos de ejemplo, y cada modulo vacio muestra una guia de que hacer primero", "pasa": true },
+        { "id": "C6", "descripcion": "Dos dispositivos de una cuenta nueva que entran a la vez terminan con el mismo estado vacio y sin registros duplicados", "pasa": true },
+        { "id": "C7", "descripcion": "Con cambios sin sincronizar y conexion, Cerrar sesion los sube (maximo unos 5 s) antes de salir", "pasa": true },
+        { "id": "C8", "descripcion": "Con cambios sin sincronizar y sin conexion, Cerrar sesion avisa de que se perderan y deja cancelar o cerrar igualmente", "pasa": true },
+        { "id": "C9", "descripcion": "Al llegar a 5000 registros o a un registro de mas de 64 KB, el indicador de sync muestra un mensaje claro, lo ya guardado se conserva y la app sigue funcionando", "pasa": true },
+        { "id": "C10", "descripcion": "Dos cuentas en la API nunca leen ni modifican registros de la otra (pruebas de integracion existentes)", "pasa": true }
+      ]
+    },
+    {
+      "id": "011",
+      "nombre": "gym-opcional",
+      "spec": "docs/specs/011-gym-opcional/spec.md",
+      "estado": "en_curso",
+      "criterios": [
+        { "id": "C1", "descripcion": "Sin perfil de gym, el asistente de primera vez muestra un boton 'No voy al gimnasio' que funciona sin rellenar ningun campo", "pasa": true },
+        { "id": "C2", "descripcion": "Sin perfil de gym, la pestana Gym y la tarjeta de gym del resumen tambien ofrecen 'No voy al gimnasio'", "pasa": true },
+        { "id": "C3", "descripcion": "Al pulsar 'No voy al gimnasio', la pestana Gym desaparece de la navegacion y no se abre ningun asistente ni modal de gym", "pasa": true },
+        { "id": "C4", "descripcion": "Con el gym desactivado, el resumen no muestra la tarjeta de gym, el acceso rapido 'anadir gym' ni avisos de horario de gym pendiente", "pasa": true },
+        { "id": "C5", "descripcion": "Con el gym desactivado, el calendario y los habitos no muestran bloques ni contadores de gym y no se publica ningun evento de gym en Google Calendar", "pasa": true },
+        { "id": "C6", "descripcion": "Con el gym desactivado, el resumen muestra 'Gym desactivado - Reactivar' y al usarlo vuelven la pestana, la tarjeta y los bloques de gym", "pasa": true },
+        { "id": "C7", "descripcion": "Desactivar y reactivar el gym conserva intactos el perfil, las rutinas y la asistencia", "pasa": true },
+        { "id": "C8", "descripcion": "El gym desactivado se conserva al cerrar sesion, volver a entrar y entrar desde otro dispositivo", "pasa": true },
+        { "id": "C9", "descripcion": "Un usuario que desactiva el gym no afecta a otro usuario", "pasa": true },
+        { "id": "C10", "descripcion": "Los datos antiguos sin el nuevo ajuste se interpretan como gym activo", "pasa": true }
+      ]
+    },
+    {
+      "id": "012",
+      "nombre": "quehaceres-diarios",
+      "spec": "docs/specs/012-quehaceres-diarios/spec.md",
+      "estado": "spec",
+      "criterios": [
+        { "id": "C1", "descripcion": "Un usuario nuevo ve la tarjeta Quehaceres con los cinco quehaceres de la lista base (tender la cama, pasear al perro, ducharme, limpiar mi cuarto, avanzar en proyectos de IA) sin marcar", "pasa": true },
+        { "id": "C2", "descripcion": "Anadir, renombrar y eliminar quehaceres se refleja y se conserva al recargar", "pasa": true },
+        { "id": "C3", "descripcion": "Un quehacer con dias de la semana elegidos solo aparece y cuenta en esos dias", "pasa": true },
+        { "id": "C4", "descripcion": "Marcar y desmarcar un quehacer de hoy actualiza el contador, sin poder marcarlo dos veces en el dia", "pasa": true },
+        { "id": "C5", "descripcion": "Con los umbrales por defecto, 5 completados muestran 'Eres lo maximo', 10 muestran 'Sigue asi' y menos de 5 muestran el progreso", "pasa": true },
+        { "id": "C6", "descripcion": "Cambiar los umbrales o mensajes aplica los nuevos y se conserva", "pasa": true },
+        { "id": "C7", "descripcion": "Si hoy aplican menos quehaceres que la meta, completarlos todos muestra el mensaje de 'completaste todos los de hoy'", "pasa": true },
+        { "id": "C8", "descripcion": "'Hoy no puedo' marca el dia como dificil, con mensaje amable y sin contarlo como fallo", "pasa": true },
+        { "id": "C9", "descripcion": "Deshacer el dia dificil conserva los quehaceres ya completados", "pasa": true },
+        { "id": "C10", "descripcion": "Al cambiar de dia, el dia anterior queda guardado en el historial y hoy empieza sin marcas", "pasa": true },
+        { "id": "C11", "descripcion": "Renombrar o eliminar un quehacer no cambia los nombres de los dias pasados", "pasa": true },
+        { "id": "C12", "descripcion": "La grafica muestra el promedio por dia de la semana de las ultimas 8 semanas, resalta el mejor dia y excluye los dias dificiles", "pasa": true },
+        { "id": "C13", "descripcion": "Sin historial suficiente la grafica muestra un estado vacio claro", "pasa": true },
+        { "id": "C14", "descripcion": "Quehaceres, historial y dias dificiles se conservan al cerrar sesion y entrar desde otro dispositivo", "pasa": true },
+        { "id": "C15", "descripcion": "Un usuario que marca quehaceres no afecta a otro usuario", "pasa": true }
       ]
     }
   ]

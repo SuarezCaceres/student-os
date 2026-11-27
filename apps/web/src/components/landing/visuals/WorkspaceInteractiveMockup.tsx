@@ -57,7 +57,7 @@ export const WorkspaceInteractiveMockup: React.FC<WorkspaceInteractiveMockupProp
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-[var(--ok)] bg-[color-mix(in_oklab,var(--ok)_12%,transparent)] border border-[color-mix(in_oklab,var(--ok)_25%,transparent)]">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" />
-              100% Offline
+              Sincronizado
             </span>
             <span className="px-2.5 py-1 rounded-full text-xs font-medium text-[var(--action)] bg-[color-mix(in_oklab,var(--action)_14%,transparent)] border border-[color-mix(in_oklab,var(--action)_28%,transparent)]">
               En vivo

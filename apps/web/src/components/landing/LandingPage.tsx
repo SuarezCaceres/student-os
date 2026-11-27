@@ -6,50 +6,29 @@ import { FeatureShowcaseSection } from './FeatureShowcaseSection';
 import { AudienceSection } from './AudienceSection';
 import { CreatorStorySection } from './CreatorStorySection';
 import { LandingFooter } from './LandingFooter';
-import { AuthModal, type UserSession } from '../auth/AuthModal';
+import { AuthModal } from '../auth/AuthModal';
+import { CalendarLinkNotice } from '../auth/CalendarLinkNotice';
 
-interface LandingPageProps {
-  onEnterApp: () => void;
-  onAuthSuccess: (user: UserSession) => void;
-}
-
-export const LandingPage: React.FC<LandingPageProps> = ({
-  onEnterApp,
-  onAuthSuccess,
-}) => {
+/**
+ * Landing publica: es lo unico que se ve sin sesion. El unico acceso es «Continuar con Google» (spec 009): no hay registro
+ * con correo, ni demo, ni modo sin cuenta. Al volver de Google con la sesion iniciada, `App.tsx` entra a la app solo.
+ */
+export const LandingPage: React.FC = () => {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-
-  const handleOpenAuth = (mode: 'login' | 'register') => {
-    setAuthMode(mode);
-    setIsAuthOpen(true);
-  };
-
-  const handleAuthSuccess = (user: UserSession) => {
-    setIsAuthOpen(false);
-    onAuthSuccess(user);
-  };
-
-  const handleEnterDemo = () => {
-    setIsAuthOpen(false);
-    onEnterApp();
-  };
+  const openAuth = () => setIsAuthOpen(true);
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--ink)] selection:bg-[var(--action)] selection:text-white transition-colors">
       {/* Top Sticky Navbar */}
-      <LandingNavbar
-        onOpenAuth={handleOpenAuth}
-        onEnterAppDemo={handleEnterDemo}
-      />
+      <LandingNavbar onOpenAuth={openAuth} />
+
+      {/* Aviso si el login se cerro porque Calendar no quedo vinculado (spec 009, C9) */}
+      <CalendarLinkNotice />
 
       {/* Main Content with Scroll Storytelling */}
       <main>
         {/* 1. Hero Section: Split Visual with Interactive Workspace & Cadence Hub */}
-        <HeroSection
-          onOpenAuth={handleOpenAuth}
-          onEnterAppDemo={handleEnterDemo}
-        />
+        <HeroSection onOpenAuth={openAuth} />
 
         {/* 2. Problem Section: "¿Qué está saboteando tu semestre y tu tiempo?" */}
         <ProblemSection />
@@ -65,20 +44,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </main>
 
       {/* Footer */}
-      <LandingFooter
-        onOpenAuth={handleOpenAuth}
-        onEnterAppDemo={handleEnterDemo}
-      />
+      <LandingFooter onOpenAuth={openAuth} />
 
-      {/* Auth Modal (Login / Register / Guest Demo) */}
-      <AuthModal
-        key={`${authMode}-${isAuthOpen}`}
-        isOpen={isAuthOpen}
-        initialMode={authMode}
-        onClose={() => setIsAuthOpen(false)}
-        onSuccess={handleAuthSuccess}
-        onEnterDemo={handleEnterDemo}
-      />
+      {/* Login: unico acceso, con Google */}
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
     </div>
   );
 };

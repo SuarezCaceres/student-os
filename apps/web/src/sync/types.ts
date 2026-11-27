@@ -1,5 +1,4 @@
 import type { Collection, SyncRecord } from '@student-os/shared';
-import type { AppState } from '../types';
 import type { ApiStatus } from '../services/api';
 
 /** Clave de un registro dentro del motor: `<coleccion>/<id>`. */
@@ -48,7 +47,7 @@ export interface RejectedEntry {
 /** Documento persistido en IndexedDB por usuario. Una sola escritura = consistente. */
 export interface SyncDoc {
   v: 1;
-  /** El importador de primer inicio de sesion ya se resolvio. */
+  /** La primera comparacion con la nube de este usuario en este navegador ya termino. */
   bootstrapped: boolean;
   cursor: string | null;
   /** Hash del ultimo estado observado por registro (base del diff). */
@@ -66,26 +65,10 @@ export function emptyDoc(): SyncDoc {
 export type SyncPhase =
   | 'off'
   | 'starting'
-  | 'awaiting-decision'
-  | 'paused'
   | 'idle'
   | 'syncing'
   | 'offline'
   | 'error';
-
-export interface DataSummary {
-  total: number;
-  byCollection: Partial<Record<Collection, number>>;
-}
-
-export interface SyncDecision {
-  /** `upload`: hay datos locales y la nube esta vacia. `choose`: hay datos en ambos lados. */
-  kind: 'upload' | 'choose';
-  local: DataSummary;
-  cloud: DataSummary;
-}
-
-export type DecisionChoice = 'upload' | 'cloud' | 'local' | 'skip';
 
 export interface SyncStatus {
   phase: SyncPhase;
@@ -99,7 +82,6 @@ export interface SyncStatus {
   apiStatus: ApiStatus;
   lastSyncAt: number | null;
   error: string | null;
-  decision: SyncDecision | null;
   /** Esta pestana no sincroniza: lo hace otra pestana abierta de la misma cuenta. */
   follower: boolean;
 }
@@ -113,21 +95,8 @@ export const OFF_STATUS: SyncStatus = {
   apiStatus: 'idle',
   lastSyncAt: null,
   error: null,
-  decision: null,
   follower: false,
 };
-
-/** Respaldo JSON descargado antes de cualquier operacion que sobrescriba datos. */
-export interface SyncBackup {
-  app: 'StudentOS';
-  version: 1;
-  kind: 'local' | 'cloud';
-  reason: string;
-  createdAt: string;
-  userId: string;
-  state?: AppState;
-  records?: SyncRecord[];
-}
 
 export interface RemoteSnapshot {
   records: Map<RecordKey, SyncRecord>;

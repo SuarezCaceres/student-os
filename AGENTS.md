@@ -5,8 +5,8 @@
 > No crees `CLAUDE.md` ni `GEMINI.md`: si existen, algunas herramientas ignoran este archivo.
 
 ## Qué es este proyecto
-StudentOS: hub web para estudiantes universitarios (Kanban, entregas por semanas, gym, horario, hábitos y Google Calendar). Objetivo: producto público; estado: **prototipo**. Funciona sin cuenta en local y sincroniza entre dispositivos al iniciar sesión.
-**Zonas protegidas (pregunta antes de tocar):** borrado/exportación de cuenta y el importador del primer inicio.
+StudentOS: hub web para estudiantes universitarios (Kanban, entregas por semanas, gym, horario, hábitos y Google Calendar). Objetivo: producto público; estado: **prototipo**. Se entra solo con Google (que vincula Calendar) y los datos se sincronizan entre dispositivos.
+**Zonas protegidas (pregunta antes de tocar):** borrado/exportación de cuenta y el motor de sync (`apps/web/src/sync/`).
 
 Más detalle: `docs/project/PROJECT.md` · Arquitectura: `docs/project/ARCHITECTURE.md`
 
@@ -90,7 +90,7 @@ Los cambios pequeños (un bugfix o una errata) pueden saltarse la spec y el plan
 
 ## Autonomía
 - **Sin preguntar:** leer, editar, ejecutar pruebas, crear ramas, hacer commits en ramas y abrir PRs.
-- **Pregunta antes de:** añadir o quitar dependencias, crear migraciones de BD, modificar `docs/rules/`, borrar archivos que no creaste tú, tocar el borrado/exportación de cuenta o el importador del primer inicio, cambiar `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY` o el cifrado del token (rotar la clave deja ilegibles los tokens guardados) y cualquier cosa que toque producción.
+- **Pregunta antes de:** añadir o quitar dependencias, crear migraciones de BD, modificar `docs/rules/`, borrar archivos que no creaste tú, tocar el borrado/exportación de cuenta o el motor de sync, cambiar `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENC_KEY` o el cifrado del token (rotar la clave deja ilegibles los tokens guardados) y cualquier cosa que toque producción.
 - **Nunca:** push o merge a `main`, leer o commitear `.env` o secretos, borrar o desactivar pruebas para que pasen, usar `--no-verify`.
 
 ## Reglas de oro

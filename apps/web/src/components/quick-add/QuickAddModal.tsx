@@ -34,6 +34,8 @@ export interface QuickAddModalProps {
   onAddLearningResource?: (resource: LearningResource, week?: number) => void;
   initialTab?: QuickAddTab;
   isGoogleConnected?: boolean;
+  /** `false` = el usuario dijo que no va al gimnasio: no se ofrece la pestana Gym (spec 011). */
+  gymEnabled?: boolean;
 }
 
 const COMMON_COURSES = [
@@ -77,8 +79,12 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   onAddLearningResource,
   initialTab,
   isGoogleConnected = false,
+  gymEnabled = true,
 }) => {
-  const [activeTab, setActiveTab] = useState<QuickAddTab>(initialTab);
+  const tabOptions = gymEnabled ? TAB_OPTIONS : TAB_OPTIONS.filter((option) => option.id !== 'gym');
+  const [activeTab, setActiveTab] = useState<QuickAddTab>(
+    initialTab === 'gym' && !gymEnabled ? 'university' : initialTab
+  );
 
   // University Assignment Form
   const [uniTitle, setUniTitle] = useState('');
@@ -229,7 +235,7 @@ const QuickAddFormContent: React.FC<QuickAddFormContentProps> = ({
   return (
     <div className="space-y-5">
       <SegmentedControl
-        options={TAB_OPTIONS}
+        options={tabOptions}
         value={activeTab}
         onChange={setActiveTab}
         ariaLabel="Categoría para agregar"

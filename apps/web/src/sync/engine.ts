@@ -8,13 +8,9 @@ import {
   emptyDoc,
   keyOf,
   splitKey,
-  type DataSummary,
-  type DecisionChoice,
   type QueueEntry,
   type RecordKey,
   type RemoteSnapshot,
-  type SyncBackup,
-  type SyncDecision,
   type SyncDoc,
   type SyncPhase,
   type SyncStatus,
@@ -76,11 +72,11 @@ export interface SyncEngineDeps {
   setState: (next: AppState) => void;
   /** true si el estado es el de fabrica (nada que perder al reemplazarlo). */
   isPristine?: (state: AppState) => boolean;
-  /** Descarga el respaldo; si lanza, la operacion destructiva se cancela. */
-  saveBackup?: (backup: SyncBackup) => void | Promise<void>;
-  /** Marca persistente "este usuario ya importo sus datos locales alguna vez". */
-  hasImportedBefore?: () => boolean;
-  markImported?: () => void;
+  /**
+   * Estado de fabrica. Spec 009: si este navegador no tiene a este usuario ya arrancado (primer acceso, otra cuenta o
+   * datos del prototipo), el estado local NO se sube ni se pregunta: se sustituye por este y se trae el de la nube.
+   */
+  initialState?: () => AppState;
   now?: () => number;
   isOnline?: () => boolean;
   options?: Partial<SyncEngineOptions>;
@@ -95,17 +91,6 @@ interface Projected {
   hash: string;
 }
 
-interface BootContext {
-  remote: RemoteSnapshot;
-  decision: SyncDecision;
-}
-
-function summarize(items: Array<{ collection: Collection }>): DataSummary {
-  const byCollection: Partial<Record<Collection, number>> = {};
-  for (const item of items) byCollection[item.collection] = (byCollection[item.collection] ?? 0) + 1;
-  return { total: items.length, byCollection };
-}
-
 const iso = (ms: number) => new Date(ms).toISOString();
 
 export class SyncEngine {
@@ -118,15 +103,12 @@ export class SyncEngine {
   private loaded = false;
   private started = false;
   private stopped = false;
-  private paused = false;
   private failed = false;
   private bootstrapping = false;
 
   private phase: SyncPhase = 'off';
   private error: string | null = null;
   private lastSyncAt: number | null = null;
-  private decision: SyncDecision | null = null;
-  private bootCtx: BootContext | null = null;
   private apiStatus: ApiStatus = 'idle';
 
   private wantPull = false;
@@ -166,7 +148,6 @@ export class SyncEngine {
       apiStatus: this.apiStatus,
       lastSyncAt: this.lastSyncAt,
       error: this.error,
-      decision: this.decision,
       follower: false,
     };
   }
@@ -202,8 +183,14 @@ export class SyncEngine {
     this.doc = this.isValidDoc(stored) ? stored : emptyDoc();
     this.loaded = true;
 
+    // Spec 009 (C11, C14): si este navegador no tiene a este usuario ya arrancado, el estado local es de otra persona o
+    // del prototipo: NUNCA se sube a esta cuenta ni se pregunta; se descarta y se trae el de la nube.
+    if (!this.doc.bootstrapped && this.deps.initialState) {
+      this.deps.setState(this.deps.initialState());
+    }
+
     // Proteccion: si el estado local volvio a "fabrica" (localStorage borrado) pero el snapshot
-    // recuerda datos, NO lo interpretamos como "el usuario borro todo": se repite el importador.
+    // recuerda datos, NO lo interpretamos como "el usuario borro todo": se vuelve a traer la nube.
     const state = this.deps.getState();
     if (this.doc.bootstrapped && this.deps.isPristine?.(state)) {
       const current = this.project(state);
@@ -217,8 +204,7 @@ export class SyncEngine {
     }
 
     if (!this.doc.bootstrapped) {
-      // Resuelve cuando el importador termino o quedo esperando una decision (nunca bloquea la UI:
-      // el hook no espera este promise).
+      // Resuelve cuando termina la primera comparacion con la nube (nunca bloquea la UI: el hook no espera este promise).
       await this.bootstrap();
       return;
     }
@@ -228,7 +214,7 @@ export class SyncEngine {
   /** Detiene timers, red y listeners. Captura las ultimas ediciones en la cola antes de salir. */
   async stop(): Promise<void> {
     if (this.stopped) return;
-    if (this.loaded && this.doc.bootstrapped && !this.paused) this.observe();
+    if (this.loaded && this.doc.bootstrapped) this.observe();
     this.stopped = true;
     for (const timer of [this.observeTimer, this.pushTimer, this.retryTimer]) {
       if (timer) clearTimeout(timer);
@@ -277,36 +263,6 @@ export class SyncEngine {
     return this.drain();
   }
 
-  /** Reanuda tras "Ahora no" en el importador. */
-  resume(): void {
-    if (!this.paused) return;
-    this.paused = false;
-    void this.bootstrap();
-  }
-
-  async resolveDecision(choice: DecisionChoice): Promise<void> {
-    const ctx = this.bootCtx;
-    if (!ctx || this.stopped) return;
-    if (choice === 'skip') {
-      this.decision = null;
-      this.bootCtx = null;
-      this.paused = true;
-      this.error = null;
-      this.setPhase('paused');
-      return;
-    }
-    const allowed = ctx.decision.kind === 'upload' ? ['upload'] : ['cloud', 'local'];
-    if (!allowed.includes(choice)) return;
-    try {
-      this.error = null;
-      await this.completeBootstrap(ctx.remote, choice, { backup: true });
-    } catch (error) {
-      console.error('No se pudo completar la importación:', error);
-      this.error = 'No pudimos guardar el respaldo, así que no se cambió nada. Inténtalo de nuevo.';
-      this.emit();
-    }
-  }
-
   /** Engancha online/offline/foco/visibilidad. Devuelve la funcion para desengancharlos. */
   attachBrowserEvents(
     win: Pick<Window, 'addEventListener' | 'removeEventListener'> = window,
@@ -316,7 +272,7 @@ export class SyncEngine {
       this.failed = false;
       this.retryIndex = 0;
       this.emit();
-      if (!this.doc.bootstrapped && this.loaded && !this.decision && !this.paused) {
+      if (!this.doc.bootstrapped && this.loaded) {
         void this.bootstrap();
         return;
       }
@@ -388,13 +344,13 @@ export class SyncEngine {
     );
   }
 
-  /** Observa cambios solo cuando el importador ya se resolvio. */
+  /** Observa cambios solo cuando la primera comparacion con la nube ya termino. */
   private isTracking(): boolean {
-    return this.started && this.loaded && !this.stopped && this.doc.bootstrapped && !this.paused;
+    return this.started && this.loaded && !this.stopped && this.doc.bootstrapped;
   }
 
   private isActive(): boolean {
-    return this.isTracking() && !this.decision;
+    return this.isTracking();
   }
 
   private setPhase(phase: SyncPhase): void {
@@ -591,7 +547,7 @@ export class SyncEngine {
       this.retryTimer = null;
       if (this.stopped) return;
       this.failed = false;
-      if (!this.doc.bootstrapped && !this.decision && !this.paused) {
+      if (!this.doc.bootstrapped) {
         void this.bootstrap();
         return;
       }
@@ -807,7 +763,7 @@ export class SyncEngine {
     this.emit();
   }
 
-  // --- Importador de primer inicio de sesion --------------------------------------
+  // --- Primera comparacion con la nube ------------------------------------------
 
   private async pullEverything(): Promise<RemoteSnapshot> {
     const records = new Map<RecordKey, SyncRecord>();
@@ -851,102 +807,40 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * Primera comparacion con la nube. Spec 009: lo que ya habia en el navegador (de otra cuenta o del prototipo) nunca se
+   * sube ni se pregunta: se descarta en `start()`. Por eso el estado local de aqui solo puede ser el de partida de esta
+   * cuenta o ediciones suyas hechas mientras esta comparacion esperaba (p. ej. arranco sin red).
+   *  - Nube con datos: se traen y reemplazan el estado (todos los dispositivos de la cuenta coinciden).
+   *  - Nube vacia: se sube el estado de partida y las ediciones del usuario, para que el resto de sus dispositivos lo reciba.
+   * No hay decision que tomar ni dialogo.
+   */
   private async decideBootstrap(remote: RemoteSnapshot): Promise<void> {
-    const state = this.deps.getState();
-    const local = this.project(state);
-    const localHasData = local.size > 0 && !this.deps.isPristine?.(state);
     const live = [...remote.records.values()].filter((r) => r.deletedAt === null && this.tracked.has(r.collection));
-
-    if (!localHasData && live.length === 0) return this.completeBootstrap(remote, 'adopt', { backup: false });
-
-    if (localHasData && live.length === local.size) {
-      const equal = live.every((r) => local.get(keyOf(r.collection, r.id))?.hash === hashData(r.data));
-      if (equal) return this.completeBootstrap(remote, 'equal', { backup: false });
-    }
-    if (!localHasData) return this.completeBootstrap(remote, 'cloud', { backup: false });
-
-    if (live.length === 0 && this.deps.hasImportedBefore?.()) {
-      return this.completeBootstrap(remote, 'upload', { backup: false });
-    }
-
-    this.decision = {
-      kind: live.length === 0 ? 'upload' : 'choose',
-      local: summarize([...local.values()]),
-      cloud: summarize(live),
-    };
-    this.bootCtx = { remote, decision: this.decision };
-    this.error = null;
-    this.setPhase('awaiting-decision');
+    return this.completeBootstrap(remote, live.length > 0 ? 'cloud' : 'upload');
   }
 
-  private async saveBackup(kind: 'local' | 'cloud', reason: string, remote?: RemoteSnapshot): Promise<void> {
-    if (!this.deps.saveBackup) return;
-    const backup: SyncBackup = {
-      app: 'StudentOS',
-      version: 1,
-      kind,
-      reason,
-      createdAt: iso(this.now()),
-      userId: this.deps.userId,
-    };
-    if (kind === 'local') backup.state = this.deps.getState();
-    else backup.records = [...(remote?.records.values() ?? [])].filter((r) => r.deletedAt === null);
-    await this.deps.saveBackup(backup);
-  }
-
-  private async completeBootstrap(
-    remote: RemoteSnapshot,
-    choice: 'adopt' | 'equal' | 'cloud' | 'upload' | 'local',
-    opts: { backup: boolean },
-  ): Promise<void> {
-    if (opts.backup) {
-      // Si el respaldo falla, esto lanza y NO se cambia nada.
-      if (choice !== 'adopt') await this.saveBackup('local', `Respaldo antes de elegir "${choice}"`);
-      if (choice === 'local') await this.saveBackup('cloud', 'Respaldo de la nube antes de reemplazarla', remote);
-    }
+  private async completeBootstrap(remote: RemoteSnapshot, choice: 'cloud' | 'upload'): Promise<void> {
     if (this.stopped) return;
-
-    const stampRemoteVersions = () => {
-      for (const [key, record] of remote.records) {
-        this.doc.versions[key] = { u: Date.parse(record.updatedAt), rev: record.rev, d: record.deletedAt !== null };
-      }
-    };
-
-    this.decision = null;
-    this.bootCtx = null;
 
     if (choice === 'cloud') {
       // Aplica y luego marca como resuelto (para que applyRemote no encole el estado que se reemplaza).
       this.applyRemote([...remote.records.values()], { replaceAll: true, force: true });
       this.doc.bootstrapped = true;
-    } else if (choice === 'adopt' || choice === 'equal') {
-      stampRemoteVersions();
-      this.doc.snapshot = {};
-      for (const [key, item] of this.project(this.deps.getState())) this.doc.snapshot[key] = item.hash;
-      this.doc.bootstrapped = true;
     } else {
-      // 'upload' y 'local': todo lo local se encola como alta (snapshot vacio) con marca de tiempo nueva.
-      stampRemoteVersions();
+      // 'upload': todo lo local se encola como alta (snapshot vacio) con marca de tiempo nueva.
+      for (const [key, record] of remote.records) {
+        this.doc.versions[key] = { u: Date.parse(record.updatedAt), rev: record.rev, d: record.deletedAt !== null };
+      }
       this.doc.snapshot = {};
       this.doc.bootstrapped = true;
       this.lastNotifyAt = this.now();
       this.observe();
-      if (choice === 'local') {
-        const current = this.project(this.deps.getState());
-        const base = this.now();
-        for (const record of remote.records.values()) {
-          const key = keyOf(record.collection, record.id);
-          if (record.deletedAt === null && this.tracked.has(record.collection) && !current.has(key)) {
-            this.enqueue(key, record.collection, record.id, null, true, base);
-          }
-        }
-      }
     }
 
     this.doc.cursor = remote.cursor;
-    this.deps.markImported?.();
     this.schedulePersist();
-    this.beginNormalOperation(choice !== 'adopt' && choice !== 'equal');
+    this.beginNormalOperation(true);
   }
 
   private beginNormalOperation(pullFirst = true): void {

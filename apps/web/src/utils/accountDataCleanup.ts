@@ -4,7 +4,7 @@ import { getDefaultSyncStorage, SYNC_DOC_PREFIX, type SyncStorage } from '../syn
 /**
  * Limpieza de sincronizacion al cerrar sesion: borra cola de cambios, cursor, snapshot y versiones
  * del usuario (o de todos si no se indica) en IndexedDB. NO toca los datos de la app en localStorage
- * (siguen como cache local) ni la marca de "ya importo" (para no volver a preguntar en una nube vacia).
+ * (siguen como cache local de esta cuenta; el motor los descarta si entra otra).
  * La sesion de Supabase la limpia `signOut()` de `services/supabase.ts`.
  */
 export async function clearSyncDataOnSignOut(
@@ -23,7 +23,41 @@ export async function clearSyncDataOnSignOut(
   }
 }
 
-export const REAL_ACCOUNT_CLEANUP_FLAG_KEY = 'student_os_cleaned_mock_calendar_v1';
+/**
+ * Claves que dejo el prototipo (cuenta local falsa, Client ID y token de Google Identity Services, marcas del importador y
+ * de las migraciones por navegador). Spec 009 (C14): se borran sin leerlas ni subirlas. `student_os_state_v1` NO esta aqui:
+ * es la cache de la cuenta y el motor de sync la descarta por su cuenta si pertenece a otra persona.
+ */
+const LEGACY_LOCAL_KEYS = [
+  'student_os_user_session',
+  'student_os_gcal_client_id',
+  'student_os_cleaned_mock_calendar_v1',
+  'student_os_work_shift_v1',
+];
+const LEGACY_LOCAL_PREFIXES = ['student_os_sync_imported_v1:'];
+const LEGACY_SESSION_KEYS = ['student_os_gcal_token'];
+
+export function clearLegacyLocalData(
+  local: Storage | undefined = typeof window === 'undefined' ? undefined : window.localStorage,
+  session: Storage | undefined = typeof window === 'undefined' ? undefined : window.sessionStorage,
+): void {
+  try {
+    if (local) {
+      for (const key of LEGACY_LOCAL_KEYS) local.removeItem(key);
+      const prefixed: string[] = [];
+      for (let i = 0; i < local.length; i += 1) {
+        const key = local.key(i);
+        if (key && LEGACY_LOCAL_PREFIXES.some((prefix) => key.startsWith(prefix))) prefixed.push(key);
+      }
+      for (const key of prefixed) local.removeItem(key);
+    }
+    if (session) {
+      for (const key of LEGACY_SESSION_KEYS) session.removeItem(key);
+    }
+  } catch {
+    // Almacenamiento bloqueado (modo privado restringido): no hay nada que limpiar.
+  }
+}
 
 export const MOCK_CALENDAR_BLOCK_IDS: ReadonlySet<string> = new Set([
   'cb-1',

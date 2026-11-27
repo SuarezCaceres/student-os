@@ -21,8 +21,8 @@ import {
   connectBodySchema,
   eventBodySchema,
   eventIdSchema,
-  freeBusyBodySchema,
   instancesQuerySchema,
+  linkLoginBodySchema,
   listEventsQuerySchema,
   parseOrBadRequest,
 } from './google.schemas';
@@ -50,6 +50,23 @@ export class GoogleController {
     return this.google.startConnect(userId, returnTo);
   }
 
+  /**
+   * Vincula Calendar al terminar el login con Google (spec 009): la web entrega una sola vez el refresh token que Google
+   * dio en el consentimiento del login. Limite bajo: solo se usa una vez por inicio de sesion.
+   */
+  @Post('link-login')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  linkLogin(
+    @CurrentUser('id') userId: string,
+    @CurrentUser('email') email: string | undefined,
+    @Body() body: unknown,
+  ): Promise<GoogleStatus> {
+    const { refreshToken } = parseOrBadRequest(linkLoginBodySchema, body);
+    return this.google.linkFromLogin(userId, email, refreshToken);
+  }
+
   /** Vuelta de Google. Siempre responde 302 a la web con `?google=connected` o `?google=error`. */
   @Public()
   @Get('callback')
@@ -75,14 +92,8 @@ export class GoogleController {
     return this.google.disconnect(userId);
   }
 
-  // --- Proxy a Calendar API v3 (siempre el calendario `primary` del usuario) ---------------
-
-  @Get('calendar/primary')
-  @Header('Cache-Control', 'no-store')
-  @Throttle({ default: { limit: 300, ttl: 60_000 } })
-  async primaryCalendar(@CurrentUser('id') userId: string): Promise<unknown> {
-    return (await this.google.calendarRequest(userId, { method: 'GET', path: 'calendars/primary' })).body;
-  }
+  // --- Proxy a Calendar API v3 (siempre eventos del calendario `primary` del usuario) -------
+  // Solo rutas de eventos: es lo que cubre `calendar.events.owned`, el unico scope de Calendar que se pide (ADR 0008).
 
   @Get('calendar/events')
   @Header('Cache-Control', 'no-store')
@@ -170,21 +181,6 @@ export class GoogleController {
       method: 'DELETE',
       path: `calendars/primary/events/${encodeURIComponent(id)}`,
     });
-  }
-
-  @Post('calendar/freebusy')
-  @HttpCode(200)
-  @Header('Cache-Control', 'no-store')
-  @Throttle({ default: { limit: 300, ttl: 60_000 } })
-  async freeBusy(@CurrentUser('id') userId: string, @Body() body: unknown): Promise<unknown> {
-    const parsed = parseOrBadRequest(freeBusyBodySchema, body);
-    const result = await this.google.calendarRequest(userId, {
-      method: 'POST',
-      path: 'freeBusy',
-      // Solo el calendario principal: el navegador no puede consultar otros calendarios.
-      body: { ...parsed, items: [{ id: 'primary' }] },
-    });
-    return result.body;
   }
 }
 

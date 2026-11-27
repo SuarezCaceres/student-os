@@ -1,4 +1,5 @@
 import React, { useId, useState } from 'react';
+import { EmptyHint } from '../common/EmptyHint';
 import {
   MapPin,
   Plus,
@@ -312,7 +313,7 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               type="button"
               onClick={handleOpenGoogleSync}
               className="t-btn t-btn-secondary"
-              title="Conectar o gestionar cuenta Google Calendar (OAuth 2.0)"
+              title="Ver el estado de Google Calendar y sus acciones"
             >
               <Calendar className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
               <span>Google Calendar</span>
@@ -391,6 +392,10 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
           )}
         </div>
       </div>
+
+      {blocks.length === 0 && (googleEvents?.length ?? 0) === 0 && !workShift?.enabled && (
+        <EmptyHint>Tu horario está vacío. Usa «Agendar bloque»; tus eventos de Google aparecerán aquí solos.</EmptyHint>
+      )}
 
       {/* Main Content: Timeline Grid vs Day Columns */}
       {viewMode === 'grid' ? (
@@ -850,9 +855,9 @@ export const WeeklyCalendar: React.FC<WeeklyCalendarProps> = ({
               >
                 <span className="inline-flex items-center gap-2">
                   <CalendarCheck2 className="w-4 h-4 text-[var(--action)] shrink-0" aria-hidden="true" />
-                  <span>Conecta Google para recibir esta alarma en tu celular</span>
+                  <span>Tu Google Calendar no está conectado: así no recibirás esta alarma en tu celular</span>
                 </span>
-                <span className="font-semibold text-[var(--action)] shrink-0">Conectar</span>
+                <span className="font-semibold text-[var(--action)] shrink-0">Ver estado</span>
               </button>
             )}
           </div>

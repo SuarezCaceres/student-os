@@ -46,10 +46,14 @@ export const APP_STATE_TO_COLLECTION: Record<keyof AppState, Collection> = {
   weightHistory: 'gym',
   gymAttendanceLogs: 'gym',
   dismissedGymScheduleAlerts: 'gym',
+  gymDisabled: 'gym',
   // calendar
   calendarBlocks: 'calendar',
   workShift: 'calendar',
   dailyHabits: 'calendar',
+  chores: 'calendar',
+  choreDays: 'calendar',
+  choreSettings: 'calendar',
 };
 
 /** Esquema de `SyncRecord.data` por colección. */

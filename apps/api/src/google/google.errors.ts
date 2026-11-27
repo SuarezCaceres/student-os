@@ -33,6 +33,26 @@ export const notConfigured = (): GoogleHttpException =>
     'La conexion con Google Calendar no esta configurada en el servidor.',
   );
 
+/** 409 (no 401): ver `reauthRequired`. El login con Google no concedio el permiso de eventos de Calendar. */
+export const missingScopes = (): GoogleHttpException =>
+  new GoogleHttpException(
+    409,
+    GOOGLE_ERROR_CODES.missingScopes,
+    'StudentOS necesita acceso a tu Google Calendar para funcionar.',
+  );
+
+/** 409 (no 401): ver `reauthRequired`. La cuenta de Google del token no es la de la sesion. */
+export const accountMismatch = (): GoogleHttpException =>
+  new GoogleHttpException(
+    409,
+    GOOGLE_ERROR_CODES.accountMismatch,
+    'La cuenta de Google no coincide con la de tu sesion.',
+  );
+
+/** 400: el token entregado no sirve (formato invalido o rechazado por Google). */
+export const invalidProviderToken = (): GoogleHttpException =>
+  new GoogleHttpException(400, GOOGLE_ERROR_CODES.badRequest, 'No se pudo vincular Google Calendar con ese acceso.');
+
 /** 424 (no 5xx) a proposito: el cliente web reintenta los 5xx durante ~90 s, y repetir un POST a Google podria duplicar eventos. */
 export const upstreamError = (): GoogleHttpException =>
   new GoogleHttpException(

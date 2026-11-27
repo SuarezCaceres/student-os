@@ -84,14 +84,16 @@ export const eventBodySchema = z.object({
   transparency: z.enum(['opaque', 'transparent']).optional(),
 });
 
-export const freeBusyBodySchema = z.object({
-  timeMin: rfc3339,
-  timeMax: rfc3339,
-  timeZone: z.string().max(64).optional(),
-});
-
 export const connectBodySchema = z.object({
   returnTo: z.string().max(2048).optional(),
+});
+
+/**
+ * Cuerpo de `POST /google/link-login`: el refresh token que Google entrego al iniciar sesion con Supabase. Solo se
+ * valida la forma (texto opaco y acotado); su validez la comprueba Google. Nunca se registra ni se devuelve.
+ */
+export const linkLoginBodySchema = z.object({
+  refreshToken: z.string().min(10).max(2048),
 });
 
 export const callbackQuerySchema = z.object({

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   COLLECTIONS,
   COLLECTION_DATA_SCHEMA,
+  CHORE_SETTINGS_RECORD_ID,
   DAILY_HABITS_RECORD_ID,
+  GYM_PREFERENCE_RECORD_ID,
   GYM_PROFILE_RECORD_ID,
   MAX_PUSH_CHANGES,
   PROFILE_RECORD_ID,
@@ -12,6 +14,7 @@ import {
   SyncPushResponseSchema,
   SyncRecordSchema,
   WORK_SHIFT_RECORD_ID,
+  choreDayRecordId,
   dismissedAlertRecordId,
   validateRecordData,
   weeklyReflectionRecordId,
@@ -93,6 +96,23 @@ const samples: Record<Collection, SyncRecord[]> = {
         targetPomodoros: 6,
       },
     }),
+    record('calendar', 'chore-base-1', {
+      kind: 'chore',
+      value: { id: 'chore-base-1', name: 'Tender la cama', days: ['Lunes', 'Domingo'], order: 0 },
+    }),
+    record('calendar', choreDayRecordId('2026-11-13'), {
+      kind: 'choreDay',
+      value: {
+        date: '2026-11-13',
+        completed: [{ choreId: 'chore-base-1', name: 'Tender la cama' }],
+        hard: true,
+        reason: 'agobiado',
+      },
+    }),
+    record('calendar', CHORE_SETTINGS_RECORD_ID, {
+      kind: 'choreSettings',
+      value: { seeded: true, levels: [{ min: 5, message: '¡Eres lo máximo!' }] },
+    }),
   ],
 };
 
@@ -168,6 +188,39 @@ describe('SyncRecord: rechazo de datos inválidos', () => {
     if (!result.success) {
       expect(result.error.issues.some((i) => i.path[0] === 'data' && i.path[1] === 'status')).toBe(true);
     }
+  });
+
+  it('acepta la preferencia de gym (spec 011) y rechaza un valor mal formado', () => {
+    const ok = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: { disabled: true } });
+    expect(SyncRecordSchema.safeParse(ok).success).toBe(true);
+    const bad = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: { disabled: 'si' } });
+    expect(SyncRecordSchema.safeParse(bad).success).toBe(false);
+    const missing = record('gym', GYM_PREFERENCE_RECORD_ID, { kind: 'preference', value: {} });
+    expect(SyncRecordSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it('valida los registros de quehaceres (spec 012) y rechaza datos mal formados', () => {
+    const day = { date: '2026-11-13', completed: [], hard: false };
+    const chore = { id: 'c1', name: 'Pasear', days: ['Lunes'], order: 0 };
+    const settings = { seeded: true, levels: [{ min: 5, message: 'Hola' }] };
+    const ok = (kind: string, id: string, value: unknown) =>
+      SyncRecordSchema.safeParse(record('calendar', id, { kind, value })).success;
+    expect(ok('chore', 'c1', chore)).toBe(true);
+    expect(ok('choreDay', choreDayRecordId('2026-11-13'), day)).toBe(true);
+    expect(ok('choreSettings', CHORE_SETTINGS_RECORD_ID, settings)).toBe(true);
+
+    // Límite de nombre (80), nombre vacío, día de la semana, fecha y motivo inválidos.
+    expect(ok('chore', 'c1', { ...chore, name: 'x'.repeat(81) })).toBe(false);
+    expect(ok('chore', 'c1', { ...chore, name: 'x'.repeat(80) })).toBe(true);
+    expect(ok('chore', 'c1', { ...chore, name: '   ' })).toBe(false);
+    expect(ok('chore', 'c1', { ...chore, days: ['Funday'] })).toBe(false);
+    expect(ok('choreDay', 'chore-day-x', { ...day, date: '13/11/2026' })).toBe(false);
+    expect(ok('choreDay', 'chore-day-x', { ...day, reason: 'aburrido' })).toBe(false);
+    expect(ok('choreDay', 'chore-day-x', { ...day, hard: 'si' })).toBe(false);
+    expect(ok('choreSettings', CHORE_SETTINGS_RECORD_ID, { seeded: true, levels: [{ min: 0, message: 'x' }] })).toBe(
+      false,
+    );
+    expect(ok('choreSettings', CHORE_SETTINGS_RECORD_ID, { levels: [] })).toBe(false);
   });
 
   it('rechaza `kind` desconocido y falta de `kind` en gym/calendar', () => {

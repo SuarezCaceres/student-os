@@ -33,13 +33,14 @@ test.describe('2. login con sesion en la nube', () => {
     // Modo app (no landing): navbar principal y badge de sync.
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible();
-    await expect.poll(() => syncBadgeText(page), { timeout: 20_000 }).toMatch(/Falta elegir tus datos|Sincroniz/);
-    await expect(page.getByText('¿Subimos tus datos a la nube?')).toBeVisible();
+    await expect.poll(() => syncBadgeText(page), { timeout: 20_000 }).toMatch(/Sincroniz/);
+    // Ya no hay importador: no se pregunta que hacer con los datos (spec 009).
+    await expect(page.getByText('¿Subimos tus datos a la nube?')).toHaveCount(0);
     await evidence(page, '02-login-app-con-sesion');
 
     // La app hizo su primer pull autenticado y la API respondio 200 con el JWT del Supabase falso.
     await expect.poll(() => tap.pulls().length, { timeout: 15_000 }).toBeGreaterThan(0);
-    expect(tap.pulls()[0].status).toBe(200);
+    await expect.poll(() => tap.pulls()[0]?.status ?? null, { timeout: 15_000 }).toBe(200);
     expect(tap.statuses().filter((st) => st === 401)).toEqual([]);
 
     // El pull crea el perfil en el servidor (SyncService -> ProfileService.ensure).
@@ -69,9 +70,9 @@ test.describe('2. login con sesion en la nube', () => {
     const page = await context.newPage();
     const tap = new PageTap(page);
     await page.goto(WEB, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: /Iniciar sesión/i }).first().click();
-    // En modo nube el modal ofrece "Continuar con Google" de Supabase (no el de GIS/Calendar).
-    const loginButton = page.getByRole('button', { name: /Continuar con Google/i }).first();
+    await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+    // El modal ofrece un unico "Continuar con Google" (Supabase): un solo consentimiento con Calendar incluido.
+    const loginButton = page.getByRole('dialog').getByRole('button', { name: /Continuar con Google/i });
     await expect(loginButton).toBeVisible();
     await evidence(page, '02-login-modal-nube');
     const authorizeRequest = page.waitForRequest((r) => r.url().includes('/auth/v1/authorize'));
@@ -79,10 +80,48 @@ test.describe('2. login con sesion en la nube', () => {
     const req = await authorizeRequest;
     expect(new URL(req.url()).searchParams.get('code_challenge_method')?.toLowerCase()).toBe('s256');
 
+    // C4: el MISMO consentimiento del login pide los permisos de Calendar y el refresh token (offline + consent).
+    const asked = new URL(req.url()).searchParams;
+    const askedScopes = (asked.get('scopes') ?? '').split(/[\s,+]+/).filter(Boolean);
+    expect(askedScopes).toEqual(expect.arrayContaining(['https://www.googleapis.com/auth/calendar.events.owned']));
+    // Solo el scope estrecho verificado (spec 008 C9, ADR 0008 revisado el 2026-11-26): ni amplios ni los que no se usan.
+    // `profile` tampoco lo pide la app. Ojo: este parametro es lo que la WEB envia a Supabase; el Supabase real anade
+    // por su cuenta los scopes de identidad al redirigir a Google (pendiente de comprobar cuales con una cuenta real,
+    // ver scopes.md). El Supabase falso no anade `profile`, asi que aqui sirve para fijar lo que pide la app.
+    for (const forbidden of [
+      'profile',
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/calendar.readonly',
+      'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/calendar.freebusy',
+      'https://www.googleapis.com/auth/calendar.calendars.readonly',
+    ]) {
+      expect(askedScopes, `la web no debe pedir ${forbidden}`).not.toContain(forbidden);
+    }
+    expect(asked.get('access_type')).toBe('offline');
+    expect(asked.get('prompt') ?? '').toContain('consent');
+
     // Tras el redirect de vuelta y el canje PKCE, la app entra sola.
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toBeVisible({ timeout: 30_000 });
+
+    // C5: Calendar queda vinculado SIN pulsar ningun boton: el servidor guardo el refresh token cifrado.
+    await expect
+      .poll(async () => (await apiFetch('/google/status', s.accessToken)).json, { timeout: 15_000 })
+      .toMatchObject({ connected: true, needsReauth: false, email: `${key}@e2e.test` });
+    expect(
+      (await apiFetch('/google/status', s.accessToken)).text,
+      'el estado de Calendar nunca incluye tokens',
+    ).not.toMatch(/fake-rt-|refresh_token/i);
+
+    // C10: ningun almacenamiento persistente del navegador contiene el refresh token de Google.
+    const leaked = await page.evaluate(() => {
+      const dump = (st: Storage) => Object.keys(st).map((k) => `${k}=${st.getItem(k)}`).join('\n');
+      return `${dump(localStorage)}\n${dump(sessionStorage)}`;
+    });
+    expect(leaked).not.toMatch(/fake-rt-/);
+    expect(leaked).not.toContain('provider_refresh_token');
     await expect.poll(() => tap.pulls().length, { timeout: 15_000 }).toBeGreaterThan(0);
-    expect(tap.pulls()[0].status).toBe(200);
+    await expect.poll(() => tap.pulls()[0]?.status ?? null, { timeout: 15_000 }).toBe(200);
     const stored = await page.evaluate((k) => localStorage.getItem(k), s.storageKey);
     expect(stored, 'supabase-js guardo la sesion').toContain(s.userId);
     expect(page.url(), 'el ?code= se limpia de la URL').not.toContain('code=');
@@ -92,21 +131,50 @@ test.describe('2. login con sesion en la nube', () => {
     await context.close();
   });
 
-  test('2c. cerrar sesion: supabase-js borra su sesion Y la app vuelve a la landing (BUG-01: no vuelve)', async ({ browser }) => {
-    // BUG-01 (docs/qa/BUGS.md): App.tsx re-adopta la sesion de Supabase (efecto de la linea ~202) mientras `signOut()`
-    // aun esta en vuelo, asi que `handleLogout` deja al usuario DENTRO de la app. Se espera que este test falle
-    // hasta que se corrija; si algun dia pasa, Playwright avisa ("expected to fail") y hay que quitar esta marca.
-    test.fail(true, 'BUG-01: logout con sesion de nube no vuelve a la landing');
+  test('2e. C9: si el usuario desmarca el permiso de Calendar en Google, no entra: mensaje claro, sin sesion y sin datos', async ({ browser }) => {
+    const key = userKey('s2e');
+    await control('/supabase/config', {
+      loginUserKey: key,
+      // El usuario desmarca el unico permiso de Calendar que se pide: Google solo concede la identidad.
+      grantedScopes: ['openid', 'email'],
+    });
+    try {
+      const s = await sessionFor(key);
+      const context = await newContext(browser);
+      const page = await context.newPage();
+      await page.goto(WEB, { waitUntil: 'domcontentloaded' });
+      await page.getByRole('button', { name: /Continuar con Google/i }).first().click();
+      await page.getByRole('dialog').getByRole('button', { name: /Continuar con Google/i }).click();
+
+      // Vuelve de Google sin el permiso: el servidor lo rechaza y la app muestra el aviso en la landing.
+      const notice = page.getByRole('alert').filter({ hasText: 'necesita acceso a tu Google Calendar' });
+      await expect(notice).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole('tablist', { name: 'Vistas principales' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Continuar con Google' }).first()).toBeVisible();
+      await evidence(page, '02-login-sin-permiso-calendar');
+
+      // No se guardo ninguna sesion ni datos suyos, y no hay conexion de Calendar.
+      const stored = await page.evaluate((k) => localStorage.getItem(k), s.storageKey);
+      expect(stored === null || !stored.includes('access_token')).toBe(true);
+      expect((await rowsOf(s.userId)).profiles).toBe(0);
+      expect((await apiFetch('/google/status', s.accessToken)).json).toMatchObject({ connected: false });
+      await context.close();
+    } finally {
+      await control('/supabase/config', { grantedScopes: null });
+    }
+  });
+
+  test('2c. cerrar sesion: supabase-js borra su sesion Y la app vuelve a la landing (BUG-01 corregido)', async ({ browser }) => {
+    // BUG-01: `handleLogout` no esperaba a `signOut()` y App.tsx re-adoptaba la sesion de Supabase en vuelo, dejando al
+    // usuario DENTRO de la app. Ahora el cierre espera a que termine (C11).
     const s = await sessionFor(userKey('s2c'));
     const context = await newContext(browser, { session: s });
     const page = await context.newPage();
     await gotoApp(page);
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible({ timeout: 30_000 });
-    // El importador (nube vacia + datos locales) bloquea la pantalla: "Ahora no" deja la sync en pausa.
-    await page.getByRole('button', { name: 'Ahora no' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
-    await expect(page.getByRole('button', { name: /Explorar Demo en Vivo/i }).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole('button', { name: /Continuar con Google/i }).first()).toBeVisible({ timeout: 8_000 });
     expect(API).toContain(String(PORTS.api));
     await context.close();
   });
@@ -118,7 +186,6 @@ test.describe('2. login con sesion en la nube', () => {
     const tap = new PageTap(page);
     await gotoApp(page);
     await expect(page.getByRole('button', { name: 'Cerrar sesión' })).toBeVisible({ timeout: 30_000 });
-    await page.getByRole('button', { name: 'Ahora no' }).click();
     await page.getByRole('button', { name: 'Cerrar sesión' }).click();
     await expect.poll(() => page.evaluate((k) => localStorage.getItem(k), s.storageKey), { timeout: 10_000 }).toBeNull();
     // Sin sesion de nube no queda indicador de sync ni nuevas llamadas autenticadas tras recargar.

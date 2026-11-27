@@ -11,7 +11,7 @@ interface SpeechState {
 
 const LEFT_QUOTES = [
   { text: '¡Compilando en 280ms! Cero burocracia.', icon: 'code' as const },
-  { text: 'Tests en verde y 100% offline en localStorage.', icon: 'code' as const },
+  { text: 'Tests en verde y datos sincronizados en tu cuenta.', icon: 'code' as const },
   { text: 'Terminé la entrega de Sistemas... ¡toca gym!', icon: 'gym' as const },
   { text: 'Cero plantillas lentas de Notion. Esto vuela.', icon: 'code' as const },
   { text: 'Semana 8 dominada sin trasnochar.', icon: 'academic' as const },

@@ -1,7 +1,6 @@
-import type { AppState, CalendarBlock, DayOfWeek, WorkShiftConfig } from '../types';
+import type { CalendarBlock, DayOfWeek, WorkShiftConfig } from '../types';
 import { ORDERED_DAYS } from './routineGenerator';
 
-export const WORK_SHIFT_INIT_FLAG_KEY = 'student_os_work_shift_v1';
 export const WORK_SHIFT_BLOCK_ID_PREFIX = 'work-shift-';
 
 export const DEFAULT_NIGHT_WORK_SHIFT: WorkShiftConfig = {
@@ -238,35 +237,6 @@ export function applyWorkShiftConfigToBlocks(
     blocks: [...nonShiftBlocks, ...nextShiftBlocks],
     removedGoogleEventIds,
     shiftBlocks: nextShiftBlocks,
-  };
-}
-
-/**
- * Ensures authenticated real accounts receive the default 22:00-06:00 night work shift
- * (6 nights/week, resting Thursday) on first initialization, without overwriting user edits.
- */
-export function ensureDefaultWorkShiftForRealAccount(state: AppState): AppState {
-  if (state.workShift !== undefined) {
-    return state;
-  }
-
-  const hasExistingManagedShifts = state.calendarBlocks.some((block) =>
-    isManagedWorkShiftBlock(block)
-  );
-  const nextConfig: WorkShiftConfig = { ...DEFAULT_NIGHT_WORK_SHIFT };
-
-  if (hasExistingManagedShifts) {
-    return {
-      ...state,
-      workShift: nextConfig,
-    };
-  }
-
-  const { blocks } = applyWorkShiftConfigToBlocks(state.calendarBlocks, nextConfig);
-  return {
-    ...state,
-    workShift: nextConfig,
-    calendarBlocks: blocks,
   };
 }
 

@@ -90,6 +90,16 @@ describe('AppStateSchema vs initialData real', () => {
         },
       ],
       dismissedGymScheduleAlerts: ['2026-11-10'],
+      chores: [{ id: 'chore-base-1', name: 'Tender la cama', days: ['Lunes', 'Martes'], order: 0 }],
+      choreDays: [
+        {
+          date: '2026-11-13',
+          completed: [{ choreId: 'chore-base-1', name: 'Tender la cama' }],
+          hard: true,
+          reason: 'cansado',
+        },
+      ],
+      choreSettings: { seeded: true, levels: [{ min: 5, message: '¡Eres lo máximo!' }] },
     };
     expect(AppStateSchema.parse(full)).toEqual(full);
   });
@@ -125,7 +135,9 @@ describe('compatibilidad de tipos con src/types/index.ts', () => {
       'calendarBlocks',
       'universityAssignments',
     ];
-    expect([...APP_STATE_FIELDS].sort()).toEqual([...legacyKeys].sort());
+    // Campos que nacieron despues del tipo legacy (solo aditivos, opcionales).
+    const addedSinceLegacy = ['gymDisabled', 'chores', 'choreDays', 'choreSettings'];
+    expect([...APP_STATE_FIELDS].sort()).toEqual([...legacyKeys, ...addedSinceLegacy].sort());
   });
 });
 
@@ -157,9 +169,13 @@ describe('APP_STATE_TO_COLLECTION', () => {
       weightHistory: 'gym',
       gymAttendanceLogs: 'gym',
       dismissedGymScheduleAlerts: 'gym',
+      gymDisabled: 'gym',
       calendarBlocks: 'calendar',
       workShift: 'calendar',
       dailyHabits: 'calendar',
+      chores: 'calendar',
+      choreDays: 'calendar',
+      choreSettings: 'calendar',
     });
   });
 

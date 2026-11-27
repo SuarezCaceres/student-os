@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
-import { initialData } from './data/initialData';
+import { emptyAppState } from './data/emptyState';
+import { ConfirmLogoutDialog } from './components/auth/ConfirmLogoutDialog';
+import { syncStore } from './sync/syncStore';
 import { useSyncedAppState } from './hooks/useSyncedAppState';
+import { useHasSynced } from './hooks/useHasSynced';
+import { useChores } from './hooks/useChores';
+import { isSyncConfigured } from './services/supabase';
 import { useAuthState } from './components/auth/useAuthState';
 import { SyncStatusBadge } from './components/sync/SyncStatusBadge';
 import { LegalLinks } from './components/legal/LegalLinks';
@@ -35,15 +40,10 @@ import {
   GymOnboardingModal,
   type GymOnboardingCompletePayload,
 } from './components/gym/GymOnboardingModal';
-import {
-  REAL_ACCOUNT_CLEANUP_FLAG_KEY,
-  applyRealAccountCalendarCleanup,
-} from './utils/accountDataCleanup';
+import { clearLegacyLocalData } from './utils/accountDataCleanup';
 import {
   WORK_SHIFT_BLOCK_ID_PREFIX,
-  WORK_SHIFT_INIT_FLAG_KEY,
   applyWorkShiftConfigToBlocks,
-  ensureDefaultWorkShiftForRealAccount,
 } from './utils/workSchedule';
 import {
   doesGoogleEventMirrorBlock,
@@ -67,7 +67,6 @@ import {
 import {
   buildWeeklyRecurrenceRule,
   clearOrCutoffWorkShiftEventsFromMonday,
-  connectGoogleCalendar,
   deleteGoogleGymEvent,
   deleteStudentOsGymEventsFromMonday,
   disconnectGoogleCalendar,
@@ -82,6 +81,7 @@ import {
   type DeleteGoogleGymEventsResult,
   type GoogleCalendarEvent,
 } from './services/googleCalendar';
+import { GOOGLE_REAUTH_MESSAGES } from './services/googleReauthMessages';
 import {
   buildGymCalendarBlockPayload,
   findFreeTwoHourSlots,
@@ -111,7 +111,7 @@ import { LandingPage } from './components/landing/LandingPage';
 import type { UserSession } from './components/auth/AuthModal';
 
 export const App: React.FC = () => {
-  const [state, setState, resetState] = useSyncedAppState(initialData);
+  const [state, setState, resetState] = useSyncedAppState(emptyAppState);
   const [activeTab, setActiveTab] = useState<NavTab>('overview');
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddInitialTab, setQuickAddInitialTab] = useState<'university' | 'gym' | 'kanban' | 'calendar' | 'learning'>('university');
@@ -173,44 +173,24 @@ export const App: React.FC = () => {
     googleBusyByDateRef.current = googleBusyByDate;
   }, [googleBusyByDate]);
 
-  // User session & Landing vs App View Routing
-  const [currentView, setCurrentView] = useState<'landing' | 'app'>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (session) {
-        const parsed = JSON.parse(session);
-        if (parsed.isLoggedIn) return 'app';
-      }
-    } catch {
-      // Fallback to landing
-    }
-    return 'landing';
-  });
-
-  const [userSession, setUserSession] = useState<UserSession | null>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (session) return JSON.parse(session);
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  // User session & Landing vs App View Routing.
+  // La UNICA fuente de verdad de la sesion es la de Supabase (login con Google, spec 009). Un dato sobrante en el
+  // navegador (p. ej. `student_os_user_session` del prototipo) NUNCA da acceso a la app (C2).
+  const [currentView, setCurrentView] = useState<'landing' | 'app'>('landing');
+  const [userSession, setUserSession] = useState<UserSession | null>(null);
+  // `true` mientras se cierra la sesion: evita que el efecto de abajo la vuelva a adoptar (BUG-01).
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Sesion en la nube (Supabase). Sin variables de entorno de Supabase no hace nada.
   const auth = useAuthState();
   useEffect(() => {
+    if (isSigningOut) return;
     // Al volver del redirect de Google, Supabase restaura la sesion: entrar a la app.
     if (auth.userSession && !userSession) {
       setUserSession(auth.userSession);
-      try {
-        localStorage.setItem('student_os_user_session', JSON.stringify(auth.userSession));
-      } catch {
-        // ignore
-      }
       setCurrentView('app');
     }
-  }, [auth.userSession, userSession]);
+  }, [auth.userSession, userSession, isSigningOut]);
 
   // Con sesion en la nube, restaura la conexion persistente de Google Calendar guardada en el servidor
   // (p. ej. en un dispositivo nuevo). Sin nube configurada devuelve null y no hace nada.
@@ -229,40 +209,12 @@ export const App: React.FC = () => {
     };
   }, [auth.userSession]);
 
-  const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(() => {
-    try {
-      const session = localStorage.getItem('student_os_user_session');
-      if (!session) return false;
-      const parsed = JSON.parse(session);
-      return Boolean(parsed?.isLoggedIn) && !state.gymProfile;
-    } catch {
-      return false;
-    }
-  });
+  const [isFirstGymOnboardingOpen, setIsFirstGymOnboardingOpen] = useState<boolean>(false);
 
-  // One-time migration for authenticated real sessions: strip cb-1..cb-14 seed blocks & seed 22:00-06:00 work shift
+  // Spec 009 (C14): lo que dejo el prototipo en este navegador (cuenta local, token de Google, marcas) se borra sin subirlo.
   useEffect(() => {
-    if (currentView !== 'app' || !userSession?.isLoggedIn) return;
-    let cleanedDone = false;
-    let shiftDone = false;
-    try {
-      cleanedDone = localStorage.getItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY) === '1';
-      // Con sesion en la nube NO se siembra el turno por defecto: el turno real llega con el primer
-      // pull; sembrarlo aqui lo subiria y podria pisar el que el usuario ya tiene en la nube.
-      shiftDone = localStorage.getItem(WORK_SHIFT_INIT_FLAG_KEY) === '1' || Boolean(auth.userSession);
-      if (cleanedDone && shiftDone) return;
-      localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
-      localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-    } catch {
-      // Ignore storage errors
-    }
-    setState((prev) => {
-      const cleaned = cleanedDone ? prev : applyRealAccountCalendarCleanup(prev);
-      const withWorkShift = shiftDone ? cleaned : ensureDefaultWorkShiftForRealAccount(cleaned);
-      calendarBlocksRef.current = withWorkShift.calendarBlocks;
-      return withWorkShift;
-    });
-  }, [currentView, userSession, auth.userSession, setState]);
+    clearLegacyLocalData();
+  }, []);
 
   const refreshGoogleCalendarWeek = useCallback(
     async (
@@ -348,9 +300,12 @@ export const App: React.FC = () => {
     [weekDates, setState, pruneMirroredLocalGymBlocks]
   );
 
+  // Carga inicial de los eventos de Google. Depende de `isGoogleConnected`: en el primer acceso de un dispositivo la
+  // vinculacion se descubre al consultar al servidor, despues de entrar a la app; sin esta dependencia los eventos
+  // tardarian hasta el siguiente sondeo (45 s) en aparecer.
   useEffect(() => {
     if (currentView !== 'app') return;
-    if (!getStoredAccessToken() && !getStoredGoogleMeta().connected) return;
+    if (!isGoogleConnected && !getStoredAccessToken() && !getStoredGoogleMeta().connected) return;
 
     let cancelled = false;
     void (async () => {
@@ -362,7 +317,7 @@ export const App: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentView, refreshGoogleCalendarWeek]);
+  }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
   // Automatic zero-button Google Calendar background sync (focus, visibilitychange & 45s polling)
   useEffect(() => {
@@ -398,14 +353,32 @@ export const App: React.FC = () => {
     };
   }, [currentView, isGoogleConnected, refreshGoogleCalendarWeek]);
 
-  const handleLogout = () => {
-    void auth.signOut();
+  // Cierre de sesion (spec 010): antes de salir se intenta subir lo pendiente; si queda algo (sin red o servidor lento),
+  // se avisa y la persona decide. Nunca se descarta trabajo en silencio.
+  const [logoutPhase, setLogoutPhase] = useState<'idle' | 'saving' | 'confirm'>('idle');
+  const [logoutPending, setLogoutPending] = useState<{ pending: number; timedOut: boolean }>({ pending: 0, timedOut: false });
+
+  const handleLogout = async () => {
+    if (logoutPhase !== 'idle') return;
+    setLogoutPhase('saving');
+    const flush = await syncStore.flushPending();
+    if (flush.pending > 0) {
+      setLogoutPending({ pending: flush.pending, timedOut: flush.timedOut });
+      setLogoutPhase('confirm');
+      return;
+    }
+    await finishLogout();
+  };
+
+  /** Cierra la sesion sin subir nada (tras borrar la cuenta no hay nada que sincronizar). */
+  const finishLogout = async () => {
+    // Se espera a que Supabase cierre la sesion ANTES de volver a la landing: si no, el efecto de `auth.userSession`
+    // la vuelve a adoptar mientras `signOut()` sigue en vuelo y el usuario no sale de la app (BUG-01).
+    setIsSigningOut(true);
     try {
-      localStorage.removeItem('student_os_user_session');
-      localStorage.removeItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY);
-      localStorage.removeItem(WORK_SHIFT_INIT_FLAG_KEY);
+      await auth.signOut();
     } catch {
-      // ignore
+      // Sin red el cierre local igualmente se completa abajo.
     }
     if (userSession?.provider === 'google' || isGoogleConnected) {
       disconnectGoogleCalendar();
@@ -422,6 +395,8 @@ export const App: React.FC = () => {
     setIsFirstGymOnboardingOpen(false);
     setUserSession(null);
     setCurrentView('landing');
+    setIsSigningOut(false);
+    setLogoutPhase('idle');
   };
 
   // Handle Theme Toggle
@@ -440,6 +415,28 @@ export const App: React.FC = () => {
       theme: prev.theme === 'dark' ? 'light' : 'dark',
     }));
   }, [setState]);
+
+  // Gym opcional (spec 011): `gymDisabled` ausente = gym activo. Ocultar no borra nada: perfil, rutinas y asistencia se conservan.
+  const isGymEnabled = state.gymDisabled !== true;
+
+  const handleDisableGym = useCallback(() => {
+    setIsFirstGymOnboardingOpen(false);
+    setActiveTab((tab) => (tab === 'gym' ? 'overview' : tab));
+    setState((prev) => (prev.gymDisabled === true ? prev : { ...prev, gymDisabled: true }));
+  }, [setState]);
+
+  const handleEnableGym = useCallback(() => {
+    setState((prev) => (prev.gymDisabled === true ? { ...prev, gymDisabled: false } : prev));
+  }, [setState]);
+
+  // Con el gym desactivado la pestana Gym no existe: si se desactiva (aqui o desde otro dispositivo) estando en ella, o si
+  // algo intenta abrirla despues (p. ej. el aviso «Ir a Gym» de Google), se vuelve al resumen en vez de dejar la pantalla vacia.
+  useEffect(() => {
+    if (!isGymEnabled) {
+      setIsFirstGymOnboardingOpen(false);
+      if (activeTab === 'gym') setActiveTab('overview');
+    }
+  }, [isGymEnabled, activeTab]);
 
   // Quick Add Trigger Helper
   const handleOpenQuickAdd = useCallback((tab: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning' = 'university') => {
@@ -866,7 +863,7 @@ export const App: React.FC = () => {
       } else if (payload.selectedSlot && generatedBlockId && hasGoogleLink) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró. El entrenamiento reprogramado se guardó solo localmente hasta que reconectes Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.gymRescheduleSavedLocally,
           showSyncButton: true,
         });
       }
@@ -890,9 +887,8 @@ export const App: React.FC = () => {
           ? await trySilentGoogleReconnect()
           : null);
       if (!token) {
-        const conn = await connectGoogleCalendar();
-        token = conn.accessToken;
-        setIsGoogleConnected(true);
+        // Spec 009: Calendar se vincula al iniciar sesion; ya no se puede conectar desde aqui.
+        throw new Error('Google Calendar no está disponible. Cierra sesión y vuelve a entrar con Google para vincularlo.');
       }
 
       const targetDays: DayOfWeek[] = state.gymProfile?.selectedDays.length
@@ -1042,7 +1038,7 @@ export const App: React.FC = () => {
     if (!activeToken) {
       if (hasGoogleLink || extraLinkedIds.length > 0 || hadGoogleGymInCache) {
         const msg =
-          'Tu sesión de Google Calendar expiró o no está activa. Reconecta en Google Sync para borrar también las sesiones anteriores en Google Calendar.';
+          GOOGLE_REAUTH_MESSAGES.gymPreviousSessionsNotDeleted;
         setGoogleActionBanner({ tone: 'warn', text: msg, showSyncButton: true });
         return {
           status: 'auth_missing',
@@ -1244,7 +1240,7 @@ export const App: React.FC = () => {
           });
           setGoogleActionBanner({
             tone: 'warn',
-            text: 'Tu sesión de Google Calendar expiró al guardar el horario. Reconecta en Google Sync para guardar y limpiar tus sesiones en Google Calendar.',
+            text: GOOGLE_REAUTH_MESSAGES.gymScheduleNotSaved,
             showSyncButton: true,
           });
           return;
@@ -1379,6 +1375,11 @@ export const App: React.FC = () => {
     }));
   }, [setState]);
 
+  // Quehaceres diarios (spec 012): siembra de la lista base, estado de hoy y temporizador de medianoche. Se siembra solo tras la
+  // primera sincronizacion (o sin nube) para no pisar lo que la cuenta ya tiene en otro dispositivo.
+  const hasSynced = useHasSynced();
+  const chores = useChores(state, setState, { syncReady: !isSyncConfigured() || hasSynced });
+
   const handleRestoreState = useCallback((restored: AppState) => {
     setState(restored);
   }, [setState]);
@@ -1433,7 +1434,7 @@ export const App: React.FC = () => {
       } else if (newBlock.syncWithGoogle && hasGoogleLink && !activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró; este bloque se guardó solo localmente hasta reconectar Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.blockSavedLocally,
           showSyncButton: true,
         });
       }
@@ -1490,7 +1491,7 @@ export const App: React.FC = () => {
       if (!activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Se eliminó el bloque local, pero tu sesión de Google expiró y el evento sigue en Google Calendar hasta que reconectes Google Sync.',
+          text: GOOGLE_REAUTH_MESSAGES.blockDeletedLocallyOnly,
           showSyncButton: true,
         });
         return;
@@ -1532,7 +1533,7 @@ export const App: React.FC = () => {
       if (!activeToken) {
         setGoogleActionBanner({
           tone: 'warn',
-          text: 'Tu sesión de Google Calendar expiró. Reconecta en Google Sync para eliminar este evento de Google Calendar.',
+          text: GOOGLE_REAUTH_MESSAGES.googleEventNotDeleted,
           showSyncButton: true,
         });
         return;
@@ -1873,12 +1874,6 @@ export const App: React.FC = () => {
     async (nextConfig: WorkShiftConfig, options: { syncToGoogle: boolean }) => {
       setIsSavingWorkShift(true);
       try {
-        try {
-          localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-        } catch {
-          // Ignore storage errors
-        }
-
         const extraLinkedWorkIds = new Set<string>();
         for (const block of calendarBlocksRef.current) {
           if (block.id.startsWith(WORK_SHIFT_BLOCK_ID_PREFIX) && block.googleEventId) {
@@ -1914,7 +1909,7 @@ export const App: React.FC = () => {
             if (hasGoogleLink) {
               setGoogleActionBanner({
                 tone: 'warn',
-                text: 'Tu sesión de Google Calendar expiró. El turno laboral quedó guardado localmente; reconecta en Google Sync para publicar su serie recurrente.',
+                text: GOOGLE_REAUTH_MESSAGES.workShiftSavedLocally,
                 showSyncButton: true,
               });
             }
@@ -2087,7 +2082,7 @@ export const App: React.FC = () => {
           if (!activeToken) {
             setGoogleActionBanner({
               tone: 'warn',
-              text: 'Tu sesión de Google Calendar expiró. Reconecta en Google Sync para reubicar este entrenamiento en Google Calendar.',
+              text: GOOGLE_REAUTH_MESSAGES.gymSolutionNotMoved,
               showSyncButton: true,
             });
             return;
@@ -2292,25 +2287,41 @@ export const App: React.FC = () => {
     [state.weeklyReflections, state.currentAcademicWeek]
   );
 
+  // Con el gym desactivado no se muestran bloques ni eventos de gym (no se borran: solo se filtran al mostrar).
+  const visibleState = useMemo(
+    () =>
+      isGymEnabled
+        ? state
+        : { ...state, calendarBlocks: state.calendarBlocks.filter((b) => b.category !== 'gym') },
+    [isGymEnabled, state]
+  );
+  const visibleGoogleEvents = useMemo(
+    () => (isGymEnabled ? googleEvents : googleEvents.filter((event) => !isStudentOsGymGoogleEvent(event))),
+    [isGymEnabled, googleEvents]
+  );
+
   const missingScheduledGymDays = useMemo(
     () =>
-      findMissingScheduledGymDays({
-        gymProfile: state.gymProfile,
-        routines: state.gymRoutines,
-        attendanceLogs: state.gymAttendanceLogs,
-        calendarBlocks: state.calendarBlocks,
-        googleEvents,
-        snapshotGoogleEvents: loadGoogleEventsSnapshot(),
-        isGoogleConnected,
-        isGoogleMetaConnected: getStoredGoogleMeta().connected,
-        hasGoogleWeekReady,
-        isGoogleSyncing,
-        weekDates,
-        todayIso: getLocalIsoDate(),
-        dismissedDates: state.dismissedGymScheduleAlerts,
-        deletedDatesThisSession: deletedGymDatesThisSession,
-      }),
+      state.gymDisabled === true
+        ? []
+        : findMissingScheduledGymDays({
+          gymProfile: state.gymProfile,
+          routines: state.gymRoutines,
+          attendanceLogs: state.gymAttendanceLogs,
+          calendarBlocks: state.calendarBlocks,
+          googleEvents,
+          snapshotGoogleEvents: loadGoogleEventsSnapshot(),
+          isGoogleConnected,
+          isGoogleMetaConnected: getStoredGoogleMeta().connected,
+          hasGoogleWeekReady,
+          isGoogleSyncing,
+          weekDates,
+          todayIso: getLocalIsoDate(),
+          dismissedDates: state.dismissedGymScheduleAlerts,
+          deletedDatesThisSession: deletedGymDatesThisSession,
+        }),
     [
+      state.gymDisabled,
       state.gymProfile,
       state.gymRoutines,
       state.gymAttendanceLogs,
@@ -2325,48 +2336,15 @@ export const App: React.FC = () => {
     ]
   );
 
+  // Mientras Supabase restaura la sesion al abrir la web no se pinta la landing (evita un parpadeo para quien ya tenia sesion).
+  if (auth.status === 'loading' && currentView === 'landing') {
+    return <div className="min-h-screen bg-[var(--bg)]" aria-busy="true" />;
+  }
+
   if (currentView === 'landing') {
-    return (
-      <LandingPage
-        onEnterApp={() => setCurrentView('app')}
-        onAuthSuccess={(user) => {
-          setUserSession(user);
-          try {
-            localStorage.setItem(REAL_ACCOUNT_CLEANUP_FLAG_KEY, '1');
-            localStorage.setItem(WORK_SHIFT_INIT_FLAG_KEY, '1');
-          } catch {
-            // Ignore storage errors
-          }
-
-          const firstName = user.name.trim().split(/\s+/)[0];
-          setState((prev) => {
-            const cleaned = applyRealAccountCalendarCleanup(prev);
-            const withWorkShift = ensureDefaultWorkShiftForRealAccount(cleaned);
-            calendarBlocksRef.current = withWorkShift.calendarBlocks;
-            return {
-              ...withWorkShift,
-              studentName: firstName || withWorkShift.studentName,
-            };
-          });
-
-          if (user.provider === 'google') {
-            const activeToken = getStoredAccessToken();
-            if (activeToken) {
-              setIsGoogleConnected(true);
-              void refreshGoogleCalendarWeek({
-                explicitToken: activeToken,
-                source: 'internal_mutation',
-              });
-            }
-          }
-
-          if (!state.gymProfile) {
-            setIsFirstGymOnboardingOpen(true);
-          }
-          setCurrentView('app');
-        }}
-      />
-    );
+    // Sin sesion solo se ve la landing. La unica entrada es «Continuar con Google»: al volver, el efecto de `auth.userSession`
+    // de arriba restaura la sesion de Supabase y entra a la app (spec 009).
+    return <LandingPage />;
   }
 
   return (
@@ -2383,9 +2361,25 @@ export const App: React.FC = () => {
         isFreeWeek={isFreeWeek}
         hasReflectionThisWeek={hasReflectionThisWeek}
         gymScheduleAlertCount={missingScheduledGymDays.length}
+        gymEnabled={isGymEnabled}
         onNavigateLanding={() => setCurrentView('landing')}
         userSession={userSession}
         onLogout={handleLogout}
+      />
+      {logoutPhase === 'saving' && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[var(--line-strong)] bg-[var(--surface)] px-4 py-2 text-[13px] text-[var(--ink)] shadow-lg"
+        >
+          Guardando tus cambios antes de salir…
+        </div>
+      )}
+      <ConfirmLogoutDialog
+        isOpen={logoutPhase === 'confirm'}
+        pending={logoutPending.pending}
+        timedOut={logoutPending.timedOut}
+        onCancel={() => setLogoutPhase('idle')}
+        onConfirm={() => void finishLogout()}
       />
       {/* Estado de sincronizacion: no pinta nada si la nube no esta configurada */}
       <div className="empty:hidden flex justify-end px-4 pt-2 sm:px-6">
@@ -2451,6 +2445,7 @@ export const App: React.FC = () => {
         )}
         {!(
           activeTab === 'gym' &&
+          isGymEnabled &&
           googleImpactReport?.status === 'no_conflict' &&
           missingScheduledGymDays.length > 0
         ) && (
@@ -2464,16 +2459,20 @@ export const App: React.FC = () => {
           {activeTab === 'overview' && (
             <>
               <StatsHero
-                state={state}
-                googleEvents={googleEvents}
+                state={visibleState}
+                googleEvents={visibleGoogleEvents}
+                gymEnabled={isGymEnabled}
                 todayDateIso={getLocalIsoDate()}
                 missingGymScheduleCount={missingScheduledGymDays.length}
                 onOpenQuickAddWithTab={(tab) => handleOpenQuickAdd(tab)}
                 onNavigateTab={setActiveTab}
               />
               <OverviewBento
-                state={state}
-                googleEvents={googleEvents}
+                state={visibleState}
+                googleEvents={visibleGoogleEvents}
+                gymEnabled={isGymEnabled}
+                onEnableGym={handleEnableGym}
+                onDisableGym={handleDisableGym}
                 todayDateIso={getLocalIsoDate()}
                 attendanceLogs={state.gymAttendanceLogs}
                 missingScheduledGymDays={missingScheduledGymDays}
@@ -2484,6 +2483,7 @@ export const App: React.FC = () => {
                 onUpdateKanbanStatus={handleUpdateKanbanStatus}
                 onOpenQuickAdd={handleOpenQuickAdd}
                 onHabitsChange={handleHabitsChange}
+                chores={chores}
                 onSaveReflection={handleSaveReflection}
                 onRestoreState={handleRestoreState}
               />
@@ -2511,7 +2511,7 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'gym' && (
+          {activeTab === 'gym' && isGymEnabled && (
             <GymTracker
               routines={state.gymRoutines}
               gymProfile={state.gymProfile}
@@ -2539,6 +2539,7 @@ export const App: React.FC = () => {
               onFinishWorkout={handleFinishWorkout}
               onUpdateExercise={handleUpdateGymExercise}
               missingScheduledDays={missingScheduledGymDays}
+              onDisableGym={handleDisableGym}
               onDismissMissingGymDay={handleDismissMissingGymDay}
               onSwapFixedGymDay={handleSwapFixedGymDay}
               onRemoveFixedGymDay={handleRemoveFixedGymDay}
@@ -2547,13 +2548,13 @@ export const App: React.FC = () => {
 
           {activeTab === 'calendar' && (
             <WeeklyCalendar
-              blocks={state.calendarBlocks}
+              blocks={visibleState.calendarBlocks}
               onAddBlock={handleAddCalendarBlock}
               onDeleteBlock={handleDeleteCalendarBlock}
               onDeleteGoogleEvent={handleDeleteGoogleEvent}
               isGoogleConnected={isGoogleConnected}
               isGoogleSyncing={isGoogleSyncing}
-              googleEvents={googleEvents}
+              googleEvents={visibleGoogleEvents}
               googleBusyCount={googleBusyCount}
               onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
               onRefreshGoogleWeek={() => void refreshGoogleCalendarWeek({ source: 'manual_sync' })}
@@ -2580,7 +2581,7 @@ export const App: React.FC = () => {
       <footer className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-10 lg:px-8">
         <div className="flex flex-col gap-4 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <LegalLinks />
-          <AccountPanel onAccountDeleted={handleLogout} onClearLocalData={resetState} />
+          <AccountPanel onAccountDeleted={finishLogout} onClearLocalData={resetState} />
         </div>
       </footer>
 
@@ -2591,6 +2592,7 @@ export const App: React.FC = () => {
         state={state}
         initialTab={quickAddInitialTab}
         isGoogleConnected={isGoogleConnected}
+        gymEnabled={isGymEnabled}
         onAddAssignment={handleAddAssignment}
         onAddGymExercise={handleAddGymExercise}
         onAddKanbanItem={handleAddKanbanItem}
@@ -2669,7 +2671,7 @@ export const App: React.FC = () => {
       />
 
       {/* First-Time Real Account Gym Onboarding Popup (when viewing another tab) */}
-      {activeTab !== 'gym' && (
+      {activeTab !== 'gym' && isGymEnabled && (
         <GymOnboardingModal
           isOpen={isFirstGymOnboardingOpen}
           onClose={() => setIsFirstGymOnboardingOpen(false)}
@@ -2683,6 +2685,7 @@ export const App: React.FC = () => {
           isGoogleSyncing={isGoogleSyncing}
           onOpenGoogleSync={() => setIsGoogleSyncModalOpen(true)}
           onClearPreviousGymBlocks={handleClearPreviousGymBlocks}
+          onDisableGym={handleDisableGym}
           onComplete={(payload) => {
             void handleSaveGymPlan(payload);
             setIsFirstGymOnboardingOpen(false);

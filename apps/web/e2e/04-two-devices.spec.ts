@@ -22,7 +22,8 @@ import {
  */
 test.describe.configure({ mode: 'serial' });
 
-const WEEK = 5;
+// Una cuenta nueva parte de la semana academica 1 (spec 010).
+const WEEK = 1;
 
 async function kanbanAdd(page: Page, title: string): Promise<void> {
   await openTab(page, 'Kanban');
@@ -79,12 +80,11 @@ test.describe('4. PC y movil con el mismo usuario', () => {
     desktop = await dCtx.newPage();
     dTap = new PageTap(desktop);
     await gotoApp(desktop);
-    await expect(desktop.getByText('¿Subimos tus datos a la nube?')).toBeVisible({ timeout: 25_000 });
-    await desktop.getByRole('button', { name: 'Subir mis datos' }).click();
+    // Sin importador (spec 009) y con cuenta vacia (spec 010): el primer dispositivo solo sube el perfil; no hay datos de ejemplo.
     await waitSynced(desktop, 40_000);
-    await expect.poll(async () => (await rowsOf(session.userId)).syncActiveRecords, { timeout: 15_000 }).toBeGreaterThan(10);
+    await expect.poll(async () => (await rowsOf(session.userId)).syncActiveRecords, { timeout: 15_000 }).toBe(1);
 
-    // El movil entra con los mismos datos de ejemplo: nube y local iguales => silencioso (sin modal).
+    // El movil entra con la misma cuenta: trae lo de la nube y reemplaza su estado local (sin dialogos).
     const mCtx = await newContext(browser, { session, viewport: VIEWPORTS.mobile, isMobile: true });
     mobile = await mCtx.newPage();
     mTap = new PageTap(mobile);
@@ -158,6 +158,15 @@ test.describe('4. PC y movil con el mismo usuario', () => {
   });
 
   test('4c. orden estable: las dos pantallas muestran la misma secuencia de tarjetas', async () => {
+    // Una cuenta nueva parte vacia (spec 010): el PC crea varias tarjetas propias para que el orden se pueda comparar.
+    for (const title of ['Orden K1', 'Orden K2', 'Orden K3']) await kanbanAdd(desktop, title);
+    for (const title of ['Orden U1', 'Orden U2', 'Orden U3']) await uniAdd(desktop, title);
+    await expect.poll(() => hasRecord(session.userId, 'kanban', 'Orden K3'), { timeout: 20_000 }).toBe(true);
+    await expect.poll(() => hasRecord(session.userId, 'university', 'Orden U3'), { timeout: 20_000 }).toBe(true);
+    await openTab(mobile, 'Kanban');
+    await pullByFocusUntil(mobile, () => mobile.getByRole('heading', { name: 'Orden K3' }).isVisible());
+    await openTab(mobile, 'Universidad');
+    await expect(mobile.getByLabel('Eliminar Orden U3')).toBeVisible({ timeout: 15_000 });
     // Orden del estado local de cada dispositivo (lo que realmente pinta la UI), por coleccion.
     const stateOrder = async (p: Page): Promise<{ kanban: string[]; uni: string[] }> =>
       p.evaluate(() => {

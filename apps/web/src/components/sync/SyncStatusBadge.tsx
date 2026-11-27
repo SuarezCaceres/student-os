@@ -29,7 +29,7 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ className = ''
   const canRetry = interactive && !status.follower && (status.pending > 0 || status.phase === 'error' || status.phase === 'offline');
 
   return (
-    <div className={`inline-flex items-center gap-2 ${className}`}>
+    <div className={`inline-flex flex-wrap items-center justify-end gap-2 ${className}`}>
       <span
         role="status"
         aria-live="polite"
@@ -39,6 +39,11 @@ export const SyncStatusBadge: React.FC<SyncStatusBadgeProps> = ({ className = ''
         <Icon className={`h-3.5 w-3.5 shrink-0 ${label.icon === 'spinner' ? 'animate-spin' : ''}`} aria-hidden="true" />
         <span>{label.text}</span>
       </span>
+      {label.detail && (
+        <p role="alert" className="basis-full max-w-[360px] text-right text-[12px] leading-snug text-[var(--muted)]">
+          {label.detail}
+        </p>
+      )}
       {canRetry && (
         <button type="button" onClick={status.syncNow} className="t-btn t-btn-ghost min-h-[44px] min-w-[44px]">
           <RefreshCw className="h-4 w-4" aria-hidden="true" />

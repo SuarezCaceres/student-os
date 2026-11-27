@@ -220,7 +220,7 @@ export interface Device {
 
 /**
  * Abre un "dispositivo" (contexto nuevo con la sesion inyectada) y lo deja sincronizado y listo para usar.
- * `upload`: si la nube esta vacia, acepta "Subir mis datos" (el primer dispositivo de un usuario).
+ * `upload` ya no hace nada (se mantiene por compatibilidad): sin importador, el primer dispositivo sube su estado solo.
  */
 export async function bootDevice(
   browser: Browser,
@@ -238,9 +238,6 @@ export async function bootDevice(
   const tap = new PageTap(page);
   await gotoApp(page);
   await page.getByRole('navigation', { name: mobile ? 'Navegación móvil' : 'Navegación principal' }).waitFor({ state: 'visible', timeout: 30_000 });
-  if (options.upload) {
-    await page.getByRole('button', { name: 'Subir mis datos' }).click({ timeout: 25_000 });
-  }
   await waitSynced(page, 40_000);
   return { context, page, tap };
 }

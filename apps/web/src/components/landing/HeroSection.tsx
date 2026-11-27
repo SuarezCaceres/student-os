@@ -1,18 +1,14 @@
 import React from 'react';
-import { ArrowRight, CheckCircle2, ShieldCheck, Zap, Target } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ShieldCheck, Target, Zap } from 'lucide-react';
 import { WorkspaceInteractiveMockup } from './visuals/WorkspaceInteractiveMockup';
 import { AcademicCadenceHubVisual } from './visuals/AcademicCadenceHubVisual';
 import { InteractivePixelStudents } from './visuals/InteractivePixelStudents';
 
 interface HeroSectionProps {
-  onOpenAuth: (mode: 'login' | 'register') => void;
-  onEnterAppDemo: () => void;
+  onOpenAuth: () => void;
 }
 
-export const HeroSection: React.FC<HeroSectionProps> = ({
-  onOpenAuth,
-  onEnterAppDemo,
-}) => {
+export const HeroSection: React.FC<HeroSectionProps> = ({ onOpenAuth }) => {
   return (
     <section 
       id="inicio" 
@@ -36,27 +32,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </h1>
 
             <p className="mt-5 text-base sm:text-lg text-[var(--muted)] max-w-2xl font-normal leading-relaxed">
-              Unificamos tus <strong className="text-[var(--ink)] font-medium">entregas por semanas (1..16)</strong>, tus <strong className="text-[var(--ink)] font-medium">rutinas de gimnasio</strong> y tus <strong className="text-[var(--ink)] font-medium">proyectos de código</strong> en un único centro de comando ágil, 100% offline y sin burocracia de formularios.
+              Unificamos tus <strong className="text-[var(--ink)] font-medium">entregas por semanas (1..16)</strong>, tus <strong className="text-[var(--ink)] font-medium">rutinas de gimnasio</strong> y tus <strong className="text-[var(--ink)] font-medium">proyectos de código</strong> en un único centro de comando ágil, conectado a tu Google Calendar y sin burocracia de formularios.
             </p>
 
             {/* CTAs */}
             <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
               <button
                 type="button"
-                onClick={() => onOpenAuth('register')}
+                onClick={onOpenAuth}
                 className="t-btn t-btn-primary px-6 py-3 font-medium text-sm rounded-xl cursor-pointer shadow-sm hover:shadow-md"
               >
-                <span>Comenzar Ahora • Es Gratis</span>
+                <span>Continuar con Google • Es Gratis</span>
                 <ArrowRight className="h-4 w-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={onEnterAppDemo}
-                className="t-btn t-btn-secondary px-6 py-3 font-medium text-sm rounded-xl cursor-pointer"
-              >
-                <Zap className="h-4 w-4 text-[var(--action)]" />
-                <span>Explorar Demo en Vivo</span>
               </button>
             </div>
 
@@ -64,7 +51,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-mono text-[var(--muted)]">
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-[var(--ok)]" />
-                100% Privado (Tus datos en tu navegador)
+                Tus datos en tu cuenta, en todos tus dispositivos
               </span>
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-[var(--action)]" />
@@ -83,7 +70,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         <div className="mt-14 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Visual: The Live Interactive Workspace Interface */}
           <div className="lg:col-span-6 flex flex-col items-center w-full">
-            <WorkspaceInteractiveMockup onEnterApp={onEnterAppDemo} />
+            <WorkspaceInteractiveMockup />
           </div>
 
           {/* Right Visual: The Academic Cadence & Dual Engine Matrix */}

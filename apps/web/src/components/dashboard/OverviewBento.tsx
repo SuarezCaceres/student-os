@@ -54,6 +54,9 @@ import { YoutubeIcon } from '../common/YoutubeIcon';
 import type { NavTab } from '../layout/Navbar';
 import { AssignmentDetailModal } from '../university/AssignmentDetailModal';
 import { BackupModal } from './BackupModal';
+import type { UseChoresResult } from '../../hooks/useChores';
+import { ChoresCard } from './ChoresCard';
+import { EmptyHint } from '../common/EmptyHint';
 import { DailyHabitsCard } from './DailyHabitsCard';
 
 export interface OverviewBentoProps {
@@ -62,6 +65,10 @@ export interface OverviewBentoProps {
   todayDateIso?: string;
   attendanceLogs?: GymAttendanceLog[];
   missingScheduledGymDays?: MissingScheduledGymDay[];
+  /** `false` = el usuario dijo que no va al gimnasio: se oculta todo lo de gym (spec 011). */
+  gymEnabled?: boolean;
+  onEnableGym?: () => void;
+  onDisableGym?: () => void;
   onNavigateTab: (tab: NavTab) => void;
   onToggleGymSet: (routineId: string, exerciseId: string, setIndex: number) => void;
   onUpdateUniStatus: (id: string, status: AssignmentStatus) => void;
@@ -70,9 +77,11 @@ export interface OverviewBentoProps {
   onOpenQuickAdd: (
     tab?: 'university' | 'gym' | 'kanban' | 'calendar' | 'learning'
   ) => void;
-  onHabitsChange?: (habits: DailyHabits) => void;
+  onHabitsChange: (habits: DailyHabits) => void;
+  /** Quehaceres diarios (spec 012): estado y acciones de `useChores`. Sin él no se muestra la tarjeta. */
+  chores?: UseChoresResult;
   onSaveReflection?: (reflection: WeeklyReflection) => void;
-  onRestoreState?: (restored: AppState) => void;
+  onRestoreState: (restored: AppState) => void;
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -108,6 +117,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   todayDateIso,
   attendanceLogs,
   missingScheduledGymDays = [],
+  gymEnabled = true,
+  onEnableGym,
+  onDisableGym,
   onNavigateTab,
   onToggleGymSet,
   onUpdateUniStatus,
@@ -115,6 +127,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
   onUpdateKanbanStatus,
   onOpenQuickAdd,
   onHabitsChange,
+  chores,
   onSaveReflection,
   onRestoreState,
 }) => {
@@ -413,8 +426,24 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
     );
   };
 
+  const isAccountEmpty =
+    state.kanbanItems.length === 0 && state.universityAssignments.length === 0 && state.calendarBlocks.length === 0;
+
   return (
     <div className="space-y-6">
+      {isAccountEmpty && (
+        <EmptyHint
+          title="Tu espacio está listo"
+          actions={[
+            { label: 'Escribir mi primera tarea', onClick: () => onOpenQuickAdd('kanban') },
+            { label: 'Registrar una entrega', onClick: () => onOpenQuickAdd('university') },
+            { label: 'Agendar un bloque', onClick: () => onOpenQuickAdd('calendar') },
+          ]}
+        >
+          Empieza por tres cosas: escribe tu primera tarea en Kanban, registra una entrega en Universidad y agenda un bloque en
+          Horario.
+        </EmptyHint>
+      )}
       {/* Workspace Operational Heading */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
         <div>
@@ -706,6 +735,19 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
         </div>
 
         {/* Card 3: Entrenamiento de hoy (Synced with Attendance & Schedule) */}
+        {!gymEnabled ? (
+          <div className="t-card p-6 flex flex-col justify-center gap-3" data-testid="gym-disabled-notice">
+            <div className="flex items-center gap-2 text-[14px] text-[var(--muted)]">
+              <Dumbbell className="w-4 h-4 shrink-0" aria-hidden="true" />
+              <span>Gym desactivado</span>
+            </div>
+            {onEnableGym && (
+              <button type="button" onClick={onEnableGym} className="t-btn t-btn-secondary self-start">
+                Reactivar
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="t-card p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-start justify-between gap-2 pb-3.5 border-b border-[var(--line)] mb-2">
@@ -765,9 +807,20 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             )}
 
             {!todayRoutine || gymExercises.length === 0 ? (
-              <p className="py-8 text-[14px] text-[var(--muted)]">
-                Hoy toca descanso o aún no hay ejercicios cargados.
-              </p>
+              <div className="py-8">
+                <p className="text-[14px] text-[var(--muted)]">
+                  Hoy toca descanso o aún no hay ejercicios cargados.
+                </p>
+                {!state.gymProfile && onDisableGym && (
+                  <button
+                    type="button"
+                    onClick={onDisableGym}
+                    className="t-btn t-btn-ghost px-2.5 mt-3 text-[13px]"
+                  >
+                    No voy al gimnasio
+                  </button>
+                )}
+              </div>
             ) : (
               <div>
                 {visibleExercises.map((ex) => (
@@ -846,6 +899,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
             <span>Agregar ejercicio</span>
           </button>
         </div>
+        )}
 
         {/* Card 4: Hábitos diarios */}
         <DailyHabitsCard
@@ -853,6 +907,9 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
           todayDateIso={resolvedTodayIso}
           onHabitsChange={onHabitsChange}
         />
+
+        {/* Card 4b: Quehaceres diarios */}
+        {chores && <ChoresCard chores={chores} />}
 
         {/* Card 5 (2 Cols on lg): Proyectos en foco (Kanban) */}
         <div className="t-card p-6 lg:col-span-2 flex flex-col justify-between">
@@ -1228,6 +1285,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     Cerraste todas las entregas de la semana{' '}
                     <span className="t-num">{currentWeek}</span>.
                   </span>
+                  {gymEnabled && (
                   <button
                     type="button"
                     onClick={() => onNavigateTab('gym')}
@@ -1236,6 +1294,7 @@ export const OverviewBento: React.FC<OverviewBentoProps> = ({
                     <span>Ir al Gym</span>
                     <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                   </button>
+                  )}
                 </div>
               )}
             </div>

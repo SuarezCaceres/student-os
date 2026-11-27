@@ -5,14 +5,10 @@ import { LegalLinks } from '../legal/LegalLinks';
 const CURRENT_YEAR = new Date().getFullYear();
 
 interface LandingFooterProps {
-  onOpenAuth: (mode: 'login' | 'register') => void;
-  onEnterAppDemo: () => void;
+  onOpenAuth: () => void;
 }
 
-export const LandingFooter: React.FC<LandingFooterProps> = ({
-  onOpenAuth,
-  onEnterAppDemo,
-}) => {
+export const LandingFooter: React.FC<LandingFooterProps> = ({ onOpenAuth }) => {
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -113,19 +109,11 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
             <div className="flex flex-col gap-2.5">
               <button
                 type="button"
-                onClick={() => onOpenAuth('register')}
+                onClick={onOpenAuth}
                 className="t-btn t-btn-primary w-full min-h-[44px] text-xs font-medium"
-                aria-label="Crear cuenta en StudentOS con tu correo electrónico"
+                aria-label="Continuar con Google para entrar a StudentOS"
               >
-                Crear Cuenta con tu Correo
-              </button>
-              <button
-                type="button"
-                onClick={onEnterAppDemo}
-                className="t-btn t-btn-secondary w-full min-h-[44px] text-xs font-medium"
-                aria-label="Probar demo interactiva de StudentOS sin registrarte"
-              >
-                Probar Demo sin Registro
+                Continuar con Google
               </button>
             </div>
           </div>
@@ -152,7 +140,7 @@ export const LandingFooter: React.FC<LandingFooterProps> = ({
               .
             </span>
             <span>•</span>
-            <span className="text-[var(--action)] font-medium">100% Offline-First</span>
+            <span className="text-[var(--action)] font-medium">Tus datos en tu cuenta</span>
           </div>
 
           <div className="flex items-center gap-3">
