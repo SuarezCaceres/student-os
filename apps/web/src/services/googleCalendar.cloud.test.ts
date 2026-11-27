@@ -144,7 +144,7 @@ describe('googleCalendar (transporte por la API)', () => {
       expect(facade.getStoredAccessToken()).toBeNull();
     });
 
-    it('requiere reautorizar: null, la meta sigue "conectado" (para ofrecer Reconectar) y no hay token activo', async () => {
+    it('requiere reautorizar: null, la meta sigue "conectado" (para pedir volver a entrar con Google) y no hay token activo', async () => {
       respond(() => ({ configured: true, connected: true, needsReauth: true, email: 'ana@gmail.example', connectedAt: null, scopes: [] }));
       expect(await facade.trySilentGoogleReconnect()).toBeNull();
       expect(facade.getStoredGoogleMeta().connected).toBe(true);
@@ -295,7 +295,7 @@ describe('googleCalendar (transporte por la API)', () => {
       });
       await expect(facade.fetchGoogleEventsAndBusyForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
       expect(facade.getStoredAccessToken()).toBeNull();
-      // La meta sigue "conectada": la UI ofrece "Reconectar", no "Conectar".
+      // La meta sigue "conectada": la UI muestra "Requiere reconexión" y pide volver a entrar con Google.
       expect(facade.getStoredGoogleMeta().connected).toBe(true);
     });
 

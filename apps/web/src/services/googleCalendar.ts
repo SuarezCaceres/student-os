@@ -6,6 +6,7 @@ import {
   isStudentOsGymMetadata,
   isStudentOsWorkShiftMetadata,
 } from '../utils/gymScheduleFilter';
+import { GOOGLE_REAUTH_MESSAGES } from './googleReauthMessages';
 import {
   GOOGLE_CLOUD_ACCESS_TOKEN,
   forgetGoogleCloudState,
@@ -378,7 +379,7 @@ export async function fetchGoogleEventsAndBusyForWeek(
   busyByDate: Record<string, BusyInterval[]>;
 }> {
   if (!accessToken.trim()) {
-    throw new Error('Necesitas conectar tu cuenta de Google Calendar primero.');
+    throw new Error(GOOGLE_REAUTH_MESSAGES.calendarNotConnected);
   }
 
   const timeZone = getBrowserTimeZone();
@@ -580,7 +581,7 @@ export async function fetchGoogleBusyIntervalsForWeek(
   weekDates: Record<DayOfWeek, string>
 ): Promise<Record<string, BusyInterval[]>> {
   if (!accessToken.trim()) {
-    throw new Error('Necesitas conectar tu cuenta de Google Calendar primero.');
+    throw new Error(GOOGLE_REAUTH_MESSAGES.calendarNotConnected);
   }
 
   const timeZone = getBrowserTimeZone();
@@ -769,7 +770,7 @@ export async function upsertGoogleGymEvent(
   params: UpsertGoogleGymEventParams
 ): Promise<UpsertGoogleGymEventResult> {
   if (!accessToken.trim()) {
-    throw new Error('Debes conectar tu cuenta de Google Calendar antes de crear eventos.');
+    throw new Error(GOOGLE_REAUTH_MESSAGES.calendarNotConnected);
   }
 
   const timeZone = params.timeZone || getBrowserTimeZone();
@@ -1024,7 +1025,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
       failedCount: 0,
       deletedIds: [],
       message:
-        'Tu sesión de Google Calendar expiró o no está activa. Reconecta manualmente en Google Sync para borrar eventos en Google.',
+        GOOGLE_REAUTH_MESSAGES.deleteEventsMissingAccess,
     };
   }
 
@@ -1266,7 +1267,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
           deletedIds: processedIds,
           message:
             lastErrorMessage ||
-            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+            GOOGLE_REAUTH_MESSAGES.sessionExpired,
         };
       }
     }
@@ -1288,7 +1289,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
           deletedIds: processedIds,
           message:
             lastErrorMessage ||
-            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+            GOOGLE_REAUTH_MESSAGES.sessionExpired,
         };
       }
     }
