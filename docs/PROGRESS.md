@@ -11,6 +11,12 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-27 · Claude Code · docs/008-declara-profile (traspaso y limpieza)
+- **Hecho:** la sesión «pendientes» traspasó su trabajo a «login-google», que lleva todo desde ahora (incluida la 008). Se borraron 9 ramas remotas ya fusionadas en `main` y una rama huérfana de un sub-agente (sin commits propios), con permiso del humano. El directorio principal quedó en `main`.
+- **Decisión del humano (2026-11-27):** se **mantiene** el cambio de descripción del criterio 009-C4 en `features.json` (refleja los scopes reales: `openid`, `email` y `calendar.events.owned`), como excepción aprobada a la regla de tocar solo `estado` y `pasa`.
+- **Pendiente:** fusionar #22; desactivar Vercel Authentication en producción (lo hace el humano); declarar `openid`, `email`, `profile` y `calendar.events.owned` en Google Cloud; comprobación (a) de invitaciones con `events.owned`; Q2 y Q3 de la 008; comprar `studentoshub.io`.
+- **Problemas:** ninguno nuevo.
+
 ## 2026-11-27 · Claude Code (sesión «pendientes») · docs/008-declara-profile
 - **Hecho:** se declara el scope `profile` para la verificación en Google. En producción, Supabase lo añade al login (`google_connections.scopes` = `calendar.events.owned userinfo.email userinfo.profile openid`, comprobado el 2026-11-26) y la app sí lo usa: nombre y foto en la cabecera (`useAuthState.ts`) y nombre inicial del perfil nuevo (`newAccountState.ts`). Decisión del humano: declararlo, no sustituir el login de Supabase. Actualizados `scopes.md`, `justificaciones.md` (texto en inglés de `openid`/`email`/`profile`), el checklist (H2, B1) y `TASKS.md` (A4). Antes, en esta sesión: revisión de #19 (scopes reducidos a `calendar.events.owned`), avisos de reconexión de la 009 y respuestas a Q1, Q4–Q8 y Q10 de la 008 (dominio `studentoshub.io`).
 - **Verificación:** solo documentación; el hook de pre-commit (`check.sh --rapido`) pasa.
