@@ -1,10 +1,13 @@
 import { readFileSync } from 'node:fs';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { startJwksServer, type JwksServer } from './helpers/jwks-server';
 import { startPublicPg, type PublicPg } from './helpers/public-pg';
+import { ejecutarVerificacion } from './helpers/verificar-produccion';
 import { at, kanbanRecord, newUserId, profileRecord, tombstone } from './helpers/sync-fixtures';
 import { clearAccountDeletionHooksForTests, registerAccountDeletionHook } from '../src/common/account-deletion';
 import {
@@ -105,6 +108,21 @@ describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
     it('es publico y responde 200 con db ok cuando la base responde a SELECT 1', async () => {
       const res = await http().get('/health/ready').expect(200);
       expect(res.body).toEqual({ status: 'ok', db: 'ok' });
+    });
+
+    it('scripts/verificar-produccion.mjs pasa contra esta API real (y una web falsa que responde 200)', async () => {
+      await app.listen(0, '127.0.0.1');
+      const { port } = (app.getHttpServer() as Server).address() as AddressInfo;
+      const web = createServer((_req, res) => res.writeHead(200).end('<!doctype html>'));
+      await new Promise<void>((resolve) => web.listen(0, '127.0.0.1', resolve));
+      try {
+        const webUrl = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
+        const { code, stdout } = await ejecutarVerificacion(['--api', `http://127.0.0.1:${port}`, '--web', webUrl]);
+        expect(stdout).not.toContain('✘');
+        expect(code).toBe(0);
+      } finally {
+        await new Promise<void>((resolve) => web.close(() => resolve()));
+      }
     });
   });
 
