@@ -1,6 +1,6 @@
 # Spec · 008 · Verificación de la app StudentOS en Google
 
-> Estado: **aprobada** por el humano el 2026-11-24 (las preguntas abiertas Q1–Q10 siguen pendientes de respuesta)
+> Estado: **aprobada** por el humano el 2026-11-24 (preguntas abiertas: respondidas Q1 y Q4–Q9; Q10 aplazada; faltan Q2 y Q3)
 > Dice **qué** y **por qué**, no **cómo**. El cómo va en `plan.md`, después de aprobar esta spec.
 > Prioridad: Alto (`docs/TASKS.md` → 2). **Bloquea** que el login sea «para todos» (spec 009, C12) y tarda **semanas**, así que conviene empezar cuanto antes lo que no depende de nada.
 > Depende de: 007 (dominio y producción desplegada). Se coordina con: 009 (el flujo que Google verá).
@@ -13,7 +13,7 @@ La app pide a Google permisos de Calendar, que Google clasifica como **sensibles
 Hoy la verificación solo existe como una lista de tareas (`docs/google-verification-checklist.md`) y no hay nada acordado sobre qué es «estar listo para enviar», quién hace cada cosa, qué se enseña a Google ni qué hacer si Google pide cambios. Además, hay **incoherencias en el repo** que Google detectaría y rechazaría (ver «Incoherencias detectadas»).
 
 ## Objetivo
-Que Google **apruebe** la app StudentOS para los permisos `openid`, `email`, `calendar.readonly` y `calendar.events`, de modo que cualquier cuenta de Google pueda entrar sin el aviso de «app no verificada» y sin el tope de 100 usuarios (habilita 009-C12). Y que, hasta entonces, la app esté en **producción sin verificar** (no en Testing) para que los tokens no caduquen.
+Que Google **apruebe** la app StudentOS para los permisos `openid`, `email` y `calendar.events.owned` (estrechados el 2026-11-25, Q9 y ADR 0008, y reducidos el 2026-11-26 al quitar `calendar.freebusy` y `calendar.calendars.readonly`, que la app no usaba), de modo que cualquier cuenta de Google pueda entrar sin el aviso de «app no verificada» y sin el tope de 100 usuarios (habilita 009-C12). Y que, hasta entonces, la app esté en **producción sin verificar** (no en Testing) para que los tokens no caduquen.
 
 ## Alcance
 - **Incluye:**
@@ -68,8 +68,8 @@ Cada criterio debe poder comprobarse. Entre paréntesis, **cómo**: *prueba* (au
 
 **Pantalla de consentimiento**
 - **C7:** Dada la consola de Google (Branding / Audience / Data access), cuando se revisa, entonces: nombre «StudentOS»; logotipo válido; correo de asistencia y de contacto del desarrollador que el humano lee; dominio autorizado = el verificado; URLs de inicio, privacidad y términos = las de C3; tipo de usuario *External*; **estado *In production***; y los scopes declarados son exactamente los de C8. *(evidencia: capturas de cada pantalla)*
-- **C8:** Dada la configuración de OAuth del servidor, cuando se compara con los scopes declarados en la consola, entonces **coinciden exactamente** (hoy: `openid`, `email`, `calendar.readonly`, `calendar.events`, o el subconjunto que acuerde C9), y una prueba falla si alguien cambia `GOOGLE_SCOPES` sin actualizar la lista «scopes verificados». El fallo debe avisar de que cambiar scopes obliga a reverificar. *(prueba unitaria en `apps/api/src/google/`)*
-- **C9:** Dada la tabla «endpoint → scope mínimo aceptado», cuando se revisa, entonces cada endpoint que usa el proxy (`calendars.get`, `events.list/get/instances/insert/patch/delete`, `freebusy.query`) cita el scope que lo autoriza según la **referencia oficial** (con enlace), cada scope declarado tiene al menos un endpoint que lo necesita, y se confirma en la consola que los scopes de Calendar son **sensibles y no restringidos** (sin CASA). *(revisión + captura de la consola)*
+- **C8:** Dada la configuración de OAuth del servidor, cuando se compara con los scopes declarados en la consola, entonces **coinciden exactamente** (hoy, desde el 2026-11-26: `openid`, `email`, `calendar.events.owned`; del 2026-11-25 al 26 también `calendar.freebusy` y `calendar.calendars.readonly`; antes `openid`, `email`, `calendar.readonly`, `calendar.events`), y una prueba falla si alguien cambia `GOOGLE_SCOPES` sin actualizar la lista «scopes verificados». El fallo debe avisar de que cambiar scopes obliga a reverificar. *(prueba unitaria en `apps/api/src/google/`)*
+- **C9:** Dada la tabla «endpoint → scope mínimo aceptado», cuando se revisa, entonces cada endpoint que usa el proxy (desde el 2026-11-26 solo `events.list/get/instances/insert/patch/delete`; antes también `calendars.get` y `freebusy.query`) cita el scope que lo autoriza según la **referencia oficial** (con enlace), cada scope declarado tiene al menos un endpoint que lo necesita, y se confirma en la consola que los scopes de Calendar son **sensibles y no restringidos** (sin CASA). *(revisión + captura de la consola)*
 - **C10:** Dado un cliente OAuth de producción, cuando se revisan sus URIs de redirección, entonces son solo HTTPS y exactas (sin comodines), e incluyen el callback de la API (`GOOGLE_REDIRECT_URI`) y el de Supabase Auth. *(evidencia)*
 
 **Justificación y vídeo**
@@ -115,6 +115,8 @@ Cambiar scopes **después** de ser aprobada obliga a **volver a verificar**; por
 4. **Después:** seguimiento (C17) hasta la aprobación (C2).
 
 ## Anexo A · Guion del vídeo (lo que debe enseñar; en inglés, 3–5 min)
+> **Sustituido por [`video-guion.md`](video-guion.md)** (guion vigente, con los scopes del ADR 0008 revisado el 2026-11-26). Este anexo se conserva como historia.
+
 Grabado en el dominio de producción con una cuenta de Google ajena al desarrollador. Cada paso indica qué permiso demuestra. Este guion sustituye al del checklist, que enseñaba un botón de desconectar que la 009 elimina.
 
 | # | Qué se ve | Permiso / requisito |
@@ -129,6 +131,8 @@ Grabado en el dominio de producción con una cuenta de Google ajena al desarroll
 | 8 | «Descargar mis datos» y «Borrar mi cuenta» (confirmación escrita) y comprobar que el permiso desaparece | Control del usuario |
 
 ## Anexo B · Permisos y qué hay que justificar
+> **Sustituido por [`scopes.md`](scopes.md)** (tabla endpoint → scope vigente; desde el 2026-11-26 solo `openid`, `email` y `calendar.events.owned`, ADR 0008). Este anexo se conserva como historia.
+
 | Permiso | Clasificación | Función de la app | Endpoints que lo usan (`apps/api/src/google/google.controller.ts`) |
 |---|---|---|---|
 | `openid`, `email` | No sensible | Identificar la cuenta de Google que entra | Inicio de sesión |
@@ -140,12 +144,20 @@ Hallazgo para C9: el checklist daba por posible retirar `calendar.readonly` si `
 ## Preguntas abiertas
 El humano debe contestarlas; no se han rellenado con datos inventados.
 - **Q1 · Dominio:** ¿cuál es el dominio propio y está ya comprado? (el checklist solo da `studentos.app` como ejemplo). ¿Quién es el propietario de la cuenta de Search Console y de Google Cloud?
+  - **Respuesta (2026-11-26):** `studentoshub.io` (libre según el registro de Vercel el 2026-11-26; 14,99 USD el primer año y 46 USD al renovar). Lo compra el humano en el bloque H. Siguen abiertos el propietario de Search Console y de Google Cloud (debe ser la misma cuenta).
 - **Q2 · Datos legales:** nombre del responsable, país o jurisdicción y correo de contacto que irán publicados en las páginas legales (C4). No se prefija ninguno del repo ni de la cuenta personal.
 - **Q3 · Correos de la consola:** ¿correo de asistencia y correo de contacto del desarrollador? ¿Son el mismo que el de Q2 y se leen a diario?
 - **Q4 · Proyecto de Google Cloud:** ¿se usa el mismo proyecto y cliente OAuth de desarrollo para producción, o se crea uno separado con sus URIs? (recomendable separar; no es una decisión que esta spec pueda inventar).
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** cliente OAuth **nuevo y solo de producción**, con sus propias URIs.
 - **Q5 · Logotipo:** ¿`apps/web/public/logo.png` (JPEG 1024×1024) es el logotipo definitivo? Hay que preparar la versión de 120×120 px sin marcas de Google y comprobar el peso.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** el logotipo actual, **convertido a PNG real** (cuadrado, hasta 1 MB). Falta preparar la versión de 120×120 px.
 - **Q6 · Calendar obligatorio:** ¿se acepta el plan B (hacerlo opcional, reabriendo 009-C9) si Google cuestiona que el login lo exija? Es un riesgo conocido, no una certeza.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **no** hacerlo opcional de antemano; si Google lo cuestiona, justificarlo y decidir entonces.
 - **Q7 · Cuándo enviar:** ¿se espera a que 009 esté en producción para grabar el vídeo y enviar (recomendado) o se envía antes con el flujo actual y se regraba después?
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **antes, en paralelo** con producción. Riesgo aceptado: Google revisa la web pública, las páginas legales y el vídeo, así que enviar sin la 009 desplegada puede añadir rondas.
 - **Q8 · Revocación y `POST /google/disconnect`:** como la 009 elimina el botón, ¿se deja el endpoint sin uso en la API, se retira o se mantiene para el borrado de cuenta? Hay que responder a Google con exactitud cómo revoca el usuario.
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **mantener el endpoint sin botón** en la web. Al usuario se le indica revocar en `myaccount.google.com/permissions` (paso 6 del guion).
 - **Q9 · Retirada de scopes:** si C9 demuestra que algún scope sobra o hay uno más estrecho, ¿se autoriza modificar 009-C4 y el ADR 0005 («Scopes mínimos»)?
+  - **Respuesta (2026-11-25):** sí, **estrechar todo**: `calendar.events.owned`, `calendar.freebusy` y `calendar.calendars.readonly` en lugar de `calendar.readonly` y `calendar.events`. Registrado en el ADR 0008. El Anexo B queda sustituido por `scopes.md`.
 - **Q10 · Texto legal:** reescribir la política y los términos es una decisión con efecto jurídico; ¿quién los revisa antes de publicarse (el humano, un tercero)?
+  - **Respuesta (2026-11-25, confirmada el 2026-11-26):** **se deja para después**; el bloque B espera a esta respuesta y a Q2.

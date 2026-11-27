@@ -6,6 +6,7 @@ import {
   isStudentOsGymMetadata,
   isStudentOsWorkShiftMetadata,
 } from '../utils/gymScheduleFilter';
+import { GOOGLE_REAUTH_MESSAGES } from './googleReauthMessages';
 import {
   GOOGLE_CLOUD_ACCESS_TOKEN,
   forgetGoogleCloudState,
@@ -47,7 +48,6 @@ export interface GoogleCalendarMeta {
   email?: string;
   userName?: string;
   avatarUrl?: string;
-  calendarName?: string;
   connectedAt?: string;
   lastSyncedAt?: string;
 }
@@ -141,7 +141,7 @@ function saveStoredMeta(meta: GoogleCalendarMeta): void {
 
 /**
  * Unico punto por el que pasan las llamadas a Calendar API v3. `relativePath` es relativo a `/calendar/v3/`
- * (`calendars/primary/events?...`, `freeBusy`). Todas van por la API de StudentOS, que usa el permiso guardado en el
+ * (`calendars/primary/events?...`). Todas van por la API de StudentOS, que usa el permiso guardado en el
  * servidor; el parametro `accessToken` se conserva por compatibilidad de las firmas y siempre es el marcador de nube.
  */
 async function googleFetch(
@@ -165,7 +165,6 @@ export function getStoredGoogleMeta(): GoogleCalendarMeta {
       email: typeof parsed?.email === 'string' ? parsed.email : undefined,
       userName: typeof parsed?.userName === 'string' ? parsed.userName : undefined,
       avatarUrl: typeof parsed?.avatarUrl === 'string' ? parsed.avatarUrl : undefined,
-      calendarName: typeof parsed?.calendarName === 'string' ? parsed.calendarName : undefined,
       connectedAt: typeof parsed?.connectedAt === 'string' ? parsed.connectedAt : undefined,
       lastSyncedAt: typeof parsed?.lastSyncedAt === 'string' ? parsed.lastSyncedAt : undefined,
     };
@@ -378,7 +377,7 @@ export async function fetchGoogleEventsAndBusyForWeek(
   busyByDate: Record<string, BusyInterval[]>;
 }> {
   if (!accessToken.trim()) {
-    throw new Error('Necesitas conectar tu cuenta de Google Calendar primero.');
+    throw new Error(GOOGLE_REAUTH_MESSAGES.calendarNotConnected);
   }
 
   const timeZone = getBrowserTimeZone();
@@ -571,122 +570,6 @@ export async function fetchGoogleEventsAndBusyForWeek(
   return { events, busyByDate };
 }
 
-/**
- * Queries Google Calendar API v3 /freeBusy for the current week in the browser's IANA timezone
- * and converts returned ISO busy intervals into local-date BusyInterval maps without UTC day drift.
- */
-export async function fetchGoogleBusyIntervalsForWeek(
-  accessToken: string,
-  weekDates: Record<DayOfWeek, string>
-): Promise<Record<string, BusyInterval[]>> {
-  if (!accessToken.trim()) {
-    throw new Error('Necesitas conectar tu cuenta de Google Calendar primero.');
-  }
-
-  const timeZone = getBrowserTimeZone();
-  const dayEntries = ORDERED_DAYS.map((day) => ({ day, dateIso: weekDates[day] })).filter(
-    (entry) => Boolean(entry.dateIso)
-  );
-
-  if (dayEntries.length === 0) return {};
-
-  const sortedIsos = [...dayEntries].sort((a, b) => a.dateIso.localeCompare(b.dateIso));
-  const firstParts = parseLocalDateParts(sortedIsos[0].dateIso);
-  const lastParts = parseLocalDateParts(sortedIsos[sortedIsos.length - 1].dateIso);
-
-  const weekStartLocal = new Date(firstParts.year, firstParts.month - 1, firstParts.day, 0, 0, 0, 0);
-  const weekEndLocal = new Date(
-    lastParts.year,
-    lastParts.month - 1,
-    lastParts.day + 1,
-    0,
-    0,
-    0,
-    0
-  );
-
-  const response = await googleFetch(accessToken, 'freeBusy', {
-    method: 'POST',
-    body: JSON.stringify({
-      timeMin: weekStartLocal.toISOString(),
-      timeMax: weekEndLocal.toISOString(),
-      timeZone,
-      items: [{ id: 'primary' }],
-    }),
-  });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw buildErrorFromGoogleResponse(
-      response.status,
-      errText,
-      'No se pudo consultar la disponibilidad de Google Calendar'
-    );
-  }
-
-  const data = (await response.json()) as {
-    calendars?: {
-      primary?: {
-        busy?: Array<{ start?: string; end?: string }>;
-        errors?: Array<{ reason?: string }>;
-      };
-    };
-  };
-
-  const busySlots = data.calendars?.primary?.busy ?? [];
-  const result: Record<string, BusyInterval[]> = {};
-
-  for (const entry of dayEntries) {
-    result[entry.dateIso] = [];
-  }
-
-  for (const slot of busySlots) {
-    if (!slot.start || !slot.end) continue;
-    const busyStartMs = Date.parse(slot.start);
-    const busyEndMs = Date.parse(slot.end);
-    if (!Number.isFinite(busyStartMs) || !Number.isFinite(busyEndMs) || busyEndMs <= busyStartMs) {
-      continue;
-    }
-
-    for (const { day, dateIso } of dayEntries) {
-      const { year, month, day: dayNum } = parseLocalDateParts(dateIso);
-      const dayStartMs = new Date(year, month - 1, dayNum, 0, 0, 0, 0).getTime();
-      const dayEndMs = new Date(year, month - 1, dayNum + 1, 0, 0, 0, 0).getTime();
-
-      if (busyStartMs < dayEndMs && busyEndMs > dayStartMs) {
-        const clampedStartMs = Math.max(busyStartMs, dayStartMs);
-        const clampedEndMs = Math.min(busyEndMs, dayEndMs);
-
-        const startTime =
-          clampedStartMs === dayStartMs ? '00:00' : formatTimeInZone(clampedStartMs, timeZone);
-        const endTime =
-          clampedEndMs === dayEndMs ? '24:00' : formatTimeInZone(clampedEndMs, timeZone);
-
-        if (startTime !== endTime) {
-          result[dateIso].push({
-            startTime,
-            endTime,
-            title: 'Ocupado en Google Calendar',
-            source: 'google',
-            dateIso,
-            day,
-          });
-        }
-      }
-    }
-  }
-
-  const existingMeta = getStoredGoogleMeta();
-  if (existingMeta.connected) {
-    saveStoredMeta({
-      ...existingMeta,
-      lastSyncedAt: new Date().toISOString(),
-    });
-  }
-
-  return result;
-}
-
 function toLocalRfc3339(dateIso: string, timeStr: string): string {
   const { year, month, day } = parseLocalDateParts(dateIso);
   const [hRaw = '0', mRaw = '0'] = timeStr.trim().split(':');
@@ -769,7 +652,7 @@ export async function upsertGoogleGymEvent(
   params: UpsertGoogleGymEventParams
 ): Promise<UpsertGoogleGymEventResult> {
   if (!accessToken.trim()) {
-    throw new Error('Debes conectar tu cuenta de Google Calendar antes de crear eventos.');
+    throw new Error(GOOGLE_REAUTH_MESSAGES.calendarNotConnected);
   }
 
   const timeZone = params.timeZone || getBrowserTimeZone();
@@ -1024,7 +907,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
       failedCount: 0,
       deletedIds: [],
       message:
-        'Tu sesión de Google Calendar expiró o no está activa. Reconecta manualmente en Google Sync para borrar eventos en Google.',
+        GOOGLE_REAUTH_MESSAGES.deleteEventsMissingAccess,
     };
   }
 
@@ -1266,7 +1149,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
           deletedIds: processedIds,
           message:
             lastErrorMessage ||
-            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+            GOOGLE_REAUTH_MESSAGES.sessionExpired,
         };
       }
     }
@@ -1288,7 +1171,7 @@ async function clearOrCutoffStudentOsEventsFromMonday(params: {
           deletedIds: processedIds,
           message:
             lastErrorMessage ||
-            'Tu sesión de Google Calendar expiró. Reconecta manualmente en Google Sync.',
+            GOOGLE_REAUTH_MESSAGES.sessionExpired,
         };
       }
     }

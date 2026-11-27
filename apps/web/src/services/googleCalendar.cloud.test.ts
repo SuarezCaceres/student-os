@@ -144,7 +144,7 @@ describe('googleCalendar (transporte por la API)', () => {
       expect(facade.getStoredAccessToken()).toBeNull();
     });
 
-    it('requiere reautorizar: null, la meta sigue "conectado" (para ofrecer Reconectar) y no hay token activo', async () => {
+    it('requiere reautorizar: null, la meta sigue "conectado" (para pedir volver a entrar con Google) y no hay token activo', async () => {
       respond(() => ({ configured: true, connected: true, needsReauth: true, email: 'ana@gmail.example', connectedAt: null, scopes: [] }));
       expect(await facade.trySilentGoogleReconnect()).toBeNull();
       expect(facade.getStoredGoogleMeta().connected).toBe(true);
@@ -190,16 +190,6 @@ describe('googleCalendar (transporte por la API)', () => {
       expect(options?.query).toMatchObject({ singleEvents: 'true', orderBy: 'startTime', maxResults: '250' });
       expect(options?.body).toBeUndefined();
       expect(facade.getStoredGoogleMeta().lastSyncedAt).toBeTruthy();
-    });
-
-    it('freeBusy: POST /google/calendar/freebusy con el cuerpo parseado', async () => {
-      respond(() => ({ calendars: { primary: { busy: [{ start: '2026-11-10T15:00:00Z', end: '2026-11-10T16:00:00Z' }] } } }));
-      const busy = await facade.fetchGoogleBusyIntervalsForWeek(TOKEN(), WEEK);
-      expect(Object.values(busy).flat().length).toBeGreaterThan(0);
-      const [path, options] = request.mock.calls[0];
-      expect(path).toBe('/google/calendar/freebusy');
-      expect(options?.method).toBe('POST');
-      expect(options?.body).toMatchObject({ items: [{ id: 'primary' }] });
     });
 
     it('upsert: crear = POST; actualizar = PATCH /events/<id>; si el evento ya no existe (404) lo recrea', async () => {
@@ -295,7 +285,7 @@ describe('googleCalendar (transporte por la API)', () => {
       });
       await expect(facade.fetchGoogleEventsAndBusyForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
       expect(facade.getStoredAccessToken()).toBeNull();
-      // La meta sigue "conectada": la UI ofrece "Reconectar", no "Conectar".
+      // La meta sigue "conectada": la UI muestra "Requiere reconexión" y pide volver a entrar con Google.
       expect(facade.getStoredGoogleMeta().connected).toBe(true);
     });
 
@@ -303,7 +293,7 @@ describe('googleCalendar (transporte por la API)', () => {
       respond(() => {
         throw clientError(409, { code: 'google_not_connected', message: 'no conectado' });
       });
-      await expect(facade.fetchGoogleBusyIntervalsForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
+      await expect(facade.fetchGoogleEventsAndBusyForWeek(TOKEN(), WEEK)).rejects.toThrow(/expiró/);
     });
 
     it('borrado de series con reauth -> status auth_missing (no "error")', async () => {

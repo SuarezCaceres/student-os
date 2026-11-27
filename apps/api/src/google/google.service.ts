@@ -437,7 +437,7 @@ export class GoogleService implements OnModuleInit {
       return new GoogleHttpException(
         403,
         GOOGLE_ERROR_CODES.forbidden,
-        'Google rechazo los permisos de calendario (403). Reconecta y acepta todos los permisos.',
+        'Google rechazo los permisos de calendario (403). Cierra sesion y vuelve a entrar con Google aceptando todos los permisos.',
       );
     }
     if (status === 404) {

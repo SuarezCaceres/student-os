@@ -57,8 +57,7 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(p.get('scope')?.split(' ')).toEqual([
         'openid',
         'email',
-        'https://www.googleapis.com/auth/calendar.readonly',
-        'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar.events.owned',
       ]);
       // El verifier NO viaja en la URL: se guarda cifrado en servidor.
       expect(url).not.toMatch(/code_verifier/);
@@ -79,7 +78,7 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(stored?.refreshTokenEnc.startsWith('v1.')).toBe(true);
       expect(stored?.accountEmail).toBe('ana@gmail.example');
       expect(stored?.needsReauth).toBe(false);
-      expect(stored?.scopes).toContain('calendar.events');
+      expect(stored?.scopes).toContain('calendar.events.owned');
       // El estado PKCE se consumio.
       expect(h.repo.states.size).toBe(0);
 
@@ -176,7 +175,8 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
     it('consentimiento granular sin permiso de eventos: error y se revoca lo concedido', async () => {
       const redirect = await connectUser(h, USER_A, {
-        grantedScopes: ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'],
+        // El usuario desmarca el unico permiso de Calendar: Google solo concede la identidad.
+        grantedScopes: ['openid', 'email'],
       });
       expect(new URL(redirect).searchParams.get('reason')).toBe('missing_scopes');
       expect(await h.repo.getConnection(USER_A)).toBeNull();
@@ -222,14 +222,15 @@ describe('GoogleService (con servidor falso de Google)', () => {
 
   describe('vinculacion al terminar el login (link-login, spec 009)', () => {
     const EMAIL = 'ana@gmail.example';
-    const NO_EVENTS_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.readonly'];
+    // El usuario desmarca el unico permiso de Calendar que se pide: Google solo concede la identidad.
+    const NO_EVENTS_SCOPES = ['openid', 'email'];
 
     it('C5: valida el token con Google, lo guarda CIFRADO y deja Calendar conectado sin pasos manuales', async () => {
       const token = h.fake.issueRefreshToken(EMAIL);
       const status = await h.service.linkFromLogin(USER_A, EMAIL, token);
 
       expect(status).toMatchObject({ configured: true, connected: true, needsReauth: false, email: EMAIL });
-      expect(status.scopes).toContain('https://www.googleapis.com/auth/calendar.events');
+      expect(status.scopes).toContain('https://www.googleapis.com/auth/calendar.events.owned');
       const stored = await h.repo.getConnection(USER_A);
       expect(stored?.refreshTokenEnc.startsWith('v1.')).toBe(true);
       expect(stored?.refreshTokenEnc).not.toContain(token);
@@ -524,6 +525,16 @@ describe('GoogleService (con servidor falso de Google)', () => {
       expect(error?.getStatus()).toBe(status);
       expect(error?.code).toBe(code);
       expect(error?.message).not.toContain('secreto interno');
+    });
+
+    it('un 403 de permisos pide volver a entrar con Google, no reconectar (spec 009: ya no hay boton Conectar)', async () => {
+      h.fake.failNextCalendar(403, { error: { code: 403, errors: [{ reason: 'insufficientPermissions' }] } });
+      const error = await listEvents(h, USER_A).then(
+        () => null,
+        (e: unknown) => e as GoogleHttpException,
+      );
+      expect(error?.message).toContain('Cierra sesion y vuelve a entrar con Google');
+      expect(error?.message).not.toMatch(/Reconecta/i);
     });
 
     it('un fallo de red hacia Google se informa como google_upstream_error (424)', async () => {
