@@ -11,6 +11,13 @@
 - **Problemas:** errores, dudas o decisiones que necesitan al humano
 -->
 
+## 2026-11-27 · Claude Code · fix/render-google-redirect (producción desplegada)
+- **Hecho:** producción de la 007 en marcha. Supabase `student-os-prod` (us-east-1; se pausó `bidercorp-demo` por el límite de 2 proyectos gratuitos, decisión del humano) con las 2 migraciones y `rls-baseline.sql` aplicadas por el conector; API en Render (`https://student-os-api.onrender.com`, Virginia, rama `main`); web en Vercel con `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` y `VITE_API_URL`; #9 fusionado en `main` (con 010, 011, 012, 008 y la parte de código de la 007 dentro). Login real verificado: perfil creado, Calendar vinculado sin botón, 7 registros sincronizados. Ping a Supabase activo (`PROD_API_URL` en GitHub; primera ejecución en verde).
+- **Corrección:** la API necesitaba `GOOGLE_REDIRECT_URI` (la lee `GoogleConfig`, no `env.schema`) y no estaba en `render.yaml`; sin ella respondía `google_not_configured`. Ahora está en `render.yaml` y en `docs/stack/backend.md`, con una prueba que falla si la API lee una variable que `render.yaml` no declara.
+- **Verificación:** `scripts/verificar-produccion.mjs` contra producción: 5 de 5 en verde. Criterios 007 C1–C4 marcados; C5 (otro dispositivo) y C6–C8 pendientes de prueba manual.
+- **Pendiente:** el humano desactiva Vercel Authentication en producción (Settings → Deployment Protection; el agente no tiene permiso) para que entren otras personas; dominio `studentoshub.io`; verificación de Google (008), que debe declarar también `userinfo.profile` porque Supabase lo pide.
+- **Problemas:** el secreto del cliente de Google se vio en una captura y se rotó; un `E2E_PORT_OFFSET` que deja la API en el puerto 5060 falla porque `fetch` de Node bloquea ese puerto.
+
 ## 2026-11-26 · Claude Code · feat/007-produccion
 - **Hecho:** fase A del plan 007 (aprobado), un commit por paso, sobre `feat/009-login-google-calendar-automatico`: A2 `GET /health/ready` (público, sin límite, `SELECT 1` con tope de 5 s; 200 `{ status: 'ok', db: 'ok' }` o 503 sin detalles del error en la respuesta ni en el log; `/health` sin cambios), A1 `scripts/verificar-produccion.mjs` (solo lectura, sin dependencias ni credenciales; prueba contra servidores falsos y contra la API real con Postgres embebido), A3 `.github/workflows/ping-supabase.yml` (cada 3 días y a mano; en verde sin hacer nada si falta `PROD_API_URL`; `permissions: {}`) y A4 variables y orden de despliegue en `docs/stack/backend.md`.
 - **Verificación:** hook de cada commit con `E2E_PORT_OFFSET=1900` y `./scripts/check.sh` completo al cerrar (ver el PR).
