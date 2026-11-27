@@ -101,6 +101,13 @@ describe('Cuenta publica: exportar y borrar (e2e sobre Postgres real)', () => {
     };
   }
 
+  describe('GET /health/ready (preparacion con Postgres real)', () => {
+    it('es publico y responde 200 con db ok cuando la base responde a SELECT 1', async () => {
+      const res = await http().get('/health/ready').expect(200);
+      expect(res.body).toEqual({ status: 'ok', db: 'ok' });
+    });
+  });
+
   describe('autenticacion', () => {
     it('GET /account/export y DELETE /account sin token -> 401', async () => {
       await http().get('/account/export').expect(401);
