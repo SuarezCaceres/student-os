@@ -1,0 +1,43 @@
+# Ping de mantenimiento de producción (plan 007, paso A3; criterio C4).
+#
+# Supabase (plan gratuito) pausa el proyecto tras 7 días sin actividad. Este workflow llama cada 3 días a
+# GET /health/ready, que ejecuta `SELECT 1` en la base a través de la API, así que también despierta Render.
+#
+# Inactivo hasta que exista la variable de repositorio PROD_API_URL (Settings → Secrets and variables → Actions →
+# Variables), p. ej. https://api.<dominio>, sin barra final. Sin ella, el job termina en verde sin hacer nada.
+# No usa secretos: la ruta es pública y de solo lectura.
+name: Ping Supabase (producción)
+
+on:
+  schedule:
+    # Cada 3 días a las 09:17 UTC. Con */3 el salto entre meses es de 1 a 3 días: siempre por debajo de 7.
+    - cron: '17 9 */3 * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ping-supabase
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    name: GET /health/ready
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROD_API_URL: ${{ vars.PROD_API_URL }}
+    steps:
+      - name: Llamar a /health/ready
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${PROD_API_URL:-}" ]; then
+            echo "PROD_API_URL no está definida: no hay producción que despertar. Se omite el ping."
+            exit 0
+          fi
+          # Reintentos con espera: la primera petición puede tardar mientras Render despierta (503/504).
+          curl -fsS --retry 4 --retry-delay 30 --retry-connrefused --max-time 90 \
+            "${PROD_API_URL%/}/health/ready"
+          echo
+          echo "Ping correcto: la API respondió y la base de datos ejecutó SELECT 1."
